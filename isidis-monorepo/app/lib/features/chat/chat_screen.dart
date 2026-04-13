@@ -136,16 +136,25 @@ class _ChatScreenState extends State<ChatScreen> {
       final realMsg = r.data['data'] as Map<String, dynamic>?;
       if (realMsg != null && mounted) {
         setState(() {
+          // Remove duplicata que pode ter chegado via Realtime antes do HTTP
+          _messages.removeWhere(
+            (m) => m['id'] == realMsg['id'] && m['id'] != tempId,
+          );
           final idx = _messages.indexWhere((m) => m['id'] == tempId);
           if (idx >= 0) _messages[idx] = realMsg;
         });
       }
-    } catch (_) {
+    } catch (e) {
       // Reverter optimistic update em caso de erro
       if (mounted) {
         setState(() => _messages.removeWhere((m) => m['id'] == tempId));
+        final errMsg = e.toString().contains('403')
+            ? 'Sem permissão para enviar mensagem.'
+            : e.toString().contains('401')
+            ? 'Sessão expirada. Faça login novamente.'
+            : 'Erro ao enviar mensagem.';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao enviar mensagem.')),
+          SnackBar(content: Text(errMsg)),
         );
       }
     } finally {

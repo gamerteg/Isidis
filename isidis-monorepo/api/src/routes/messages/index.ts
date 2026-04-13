@@ -56,10 +56,16 @@ const messagesRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Você não pode conversar consigo mesmo' })
       }
 
+      const conversationSelect = `
+        id, created_at, last_message, last_message_at, order_id, gig_id,
+        client:profiles!client_id(id, full_name, avatar_url),
+        reader:profiles!reader_id(id, full_name, avatar_url)
+      `
+
       // Buscar conversa existente entre esses dois usuários (mesmo pedido ou gig)
       let query = fastify.supabase
         .from('conversations')
-        .select('id')
+        .select(conversationSelect)
         .eq('client_id', userId)
         .eq('reader_id', reader_id)
 
@@ -85,7 +91,7 @@ const messagesRoutes: FastifyPluginAsync = async (fastify) => {
           gig_id: gig_id ?? null,
           order_id: order_id ?? null,
         })
-        .select('id')
+        .select(conversationSelect)
         .single()
 
       if (error) {

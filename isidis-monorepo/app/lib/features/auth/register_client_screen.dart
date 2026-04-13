@@ -20,16 +20,19 @@ class _RegisterClientScreenState extends State<RegisterClientScreen> {
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  final _confirmPasswordCtrl = TextEditingController();
   final _cpfCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   bool _loading = false;
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _confirmPasswordCtrl.dispose();
     _cpfCtrl.dispose();
     _phoneCtrl.dispose();
     super.dispose();
@@ -48,22 +51,17 @@ class _RegisterClientScreenState extends State<RegisterClientScreen> {
 
       if (signUpResponse.session != null) {
         // Confirmação de email desativada no Supabase — sessão imediata.
-        final cpf = _cpfCtrl.text.trim();
-        final phone = _phoneCtrl.text.trim();
-        if (cpf.isNotEmpty || phone.isNotEmpty) {
-          try {
-            await api.patch(
-              '/me',
-              data: {
-                if (cpf.isNotEmpty)
-                  'tax_id': cpf.replaceAll(RegExp(r'[^0-9]'), ''),
-                if (phone.isNotEmpty)
-                  'cellphone': phone.replaceAll(RegExp(r'[^0-9]'), ''),
-              },
-            );
-          } catch (_) {
-            // Non-critical — user can fill later
-          }
+        try {
+          await api.patch(
+            '/me',
+            data: {
+              'tax_id': _cpfCtrl.text.trim().replaceAll(RegExp(r'[^0-9]'), ''),
+              'cellphone':
+                  _phoneCtrl.text.trim().replaceAll(RegExp(r'[^0-9]'), ''),
+            },
+          );
+        } catch (_) {
+          // Non-critical — continua mesmo se patch falhar
         }
         if (!mounted) return;
         context.go('/home');
@@ -176,71 +174,62 @@ class _RegisterClientScreenState extends State<RegisterClientScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
-                  // CPF / Phone — optional with incentive
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppColors.primary.withOpacity(0.3),
+                  AppTextField(
+                    controller: _confirmPasswordCtrl,
+                    label: 'Confirmar senha',
+                    obscureText: _obscureConfirmPassword,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirmPassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        color: AppColors.textMuted,
+                      ),
+                      onPressed: () => setState(
+                        () => _obscureConfirmPassword = !_obscureConfirmPassword,
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.bolt,
-                              color: AppColors.primaryLight,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Text(
-                                'Preencha agora e agilize seu primeiro pedido',
-                                style: TextStyle(
-                                  color: AppColors.primaryLight,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'CPF e telefone são necessários no momento do pagamento. Opcional agora.',
-                          style: TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        AppTextField(
-                          controller: _cpfCtrl,
-                          label: 'CPF (opcional)',
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            _CpfInputFormatter(),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        AppTextField(
-                          controller: _phoneCtrl,
-                          label: 'Telefone (opcional)',
-                          keyboardType: TextInputType.phone,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            _PhoneInputFormatter(),
-                          ],
-                        ),
-                      ],
-                    ),
+                    validator: (v) {
+                      if (v!.isEmpty) return 'Confirme sua senha';
+                      if (v != _passwordCtrl.text) return 'As senhas não coincidem';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  AppTextField(
+                    controller: _cpfCtrl,
+                    label: 'CPF',
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      _CpfInputFormatter(),
+                    ],
+                    validator: (v) {
+                      final digits = v!.replaceAll(RegExp(r'[^0-9]'), '');
+                      if (digits.isEmpty) return 'Informe seu CPF';
+                      if (digits.length != 11) return 'CPF inválido';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  AppTextField(
+                    controller: _phoneCtrl,
+                    label: 'Telefone',
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      _PhoneInputFormatter(),
+                    ],
+                    validator: (v) {
+                      final digits = v!.replaceAll(RegExp(r'[^0-9]'), '');
+                      if (digits.isEmpty) return 'Informe seu telefone';
+                      if (digits.length < 10) return 'Telefone inválido';
+                      return null;
+                    },
                   ),
 
                   const SizedBox(height: 32),
