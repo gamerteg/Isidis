@@ -7,15 +7,10 @@
       "use": "@vercel/node"
     }
   ],
-  "functions": {
-    "src/handler.ts": {
-      "maxDuration": 30
-    }
-  },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/(.*)",
-      "destination": "/src/handler"
+      "src": "/(.*)",
+      "dest": "src/handler.ts"
     }
   ]
 }
