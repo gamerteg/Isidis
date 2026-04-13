@@ -1,0 +1,407 @@
+{
+  "info": {
+    "name": "IsidisApp API — Fase 1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3001" },
+    { "key": "token", "value": "COLE_SEU_TOKEN_SUPABASE_AQUI" },
+    { "key": "cron_secret", "value": "your-cron-secret" },
+    { "key": "reader_id", "value": "COLE_UM_ID_DE_READER_AQUI" },
+    { "key": "gig_id", "value": "COLE_UM_ID_DE_GIG_AQUI" },
+    { "key": "order_id", "value": "COLE_UM_ID_DE_PEDIDO_AQUI" }
+  ],
+  "item": [
+    {
+      "name": "🟢 Health Check",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "POST /auth/login — obter token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "  pm.collectionVariables.set('token', json.access_token);",
+                  "  console.log('Token salvo automaticamente!');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/login",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"SEU_EMAIL_AQUI\",\n  \"password\": \"SUA_SENHA_AQUI\"\n}"
+            }
+          }
+        },
+        {
+          "name": "GET /me — perfil autenticado",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/me",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ]
+          }
+        },
+        {
+          "name": "PATCH /me — atualizar perfil",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/me",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Teste Atualizado\",\n  \"bio\": \"Nova bio de teste\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔮 Readers (Marketplace)",
+      "item": [
+        {
+          "name": "GET /readers — todos",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/readers"
+          }
+        },
+        {
+          "name": "GET /readers — filtro por especialidade",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/readers?specialty=amor&min_rating=4",
+              "query": [
+                { "key": "specialty", "value": "amor" },
+                { "key": "min_rating", "value": "4" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /readers — busca por texto",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/readers?search=tarot&limit=10",
+              "query": [
+                { "key": "search", "value": "tarot" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /readers — paginação",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/readers?page=2&limit=5",
+              "query": [
+                { "key": "page", "value": "2" },
+                { "key": "limit", "value": "5" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /readers/:id — perfil público",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/readers/{{reader_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🃏 Gigs",
+      "item": [
+        {
+          "name": "GET /gigs/:id — detalhe público",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/gigs/{{gig_id}}"
+          }
+        },
+        {
+          "name": "GET /gigs — meus gigs (reader autenticado)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/gigs",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ]
+          }
+        },
+        {
+          "name": "POST /gigs — criar gig",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/gigs",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Tiragem de 3 cartas — Amor e Relacionamentos\",\n  \"description\": \"Uma leitura focada em amor e relacionamentos com interpretação detalhada de cada carta, áudio explicativo e texto completo.\",\n  \"category\": \"amor\",\n  \"price\": 4900,\n  \"delivery_time_hours\": 48,\n  \"delivery_method\": \"DIGITAL_SPREAD\",\n  \"tags\": [\"amor\", \"tarot\", \"relacionamento\"],\n  \"pricing_type\": \"ONE_TIME\",\n  \"requirements\": [\n    {\n      \"id\": \"req1\",\n      \"question\": \"Qual é a sua dúvida principal?\",\n      \"type\": \"text\",\n      \"required\": true\n    }\n  ],\n  \"add_ons\": [\n    {\n      \"id\": \"addon1\",\n      \"title\": \"Entrega expressa (24h)\",\n      \"description\": \"Receba sua leitura em até 24 horas\",\n      \"price\": 1500,\n      \"type\": \"SPEED\"\n    }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "PATCH /gigs/:id — editar gig",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/gigs/{{gig_id}}",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"delivery_time_hours\": 24\n}"
+            }
+          }
+        },
+        {
+          "name": "PATCH /gigs/:id/toggle — ativar ou desativar",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/gigs/{{gig_id}}/toggle",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "📦 Orders (Pedidos)",
+      "item": [
+        {
+          "name": "GET /orders — meus pedidos",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/orders",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ]
+          }
+        },
+        {
+          "name": "GET /orders — filtrar por status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/orders?status=PAID",
+              "query": [
+                { "key": "status", "value": "PAID" }
+              ]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ]
+          }
+        },
+        {
+          "name": "GET /orders/:id — detalhe do pedido",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/orders/{{order_id}}",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "💰 Wallet (Carteira)",
+      "item": [
+        {
+          "name": "GET /wallet/balance — saldo com timeline",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/wallet/balance",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ]
+          }
+        },
+        {
+          "name": "GET /wallet/transactions — histórico",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/wallet/transactions",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ]
+          }
+        },
+        {
+          "name": "GET /wallet/transactions — filtrar por tipo",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/wallet/transactions?type=SALE_CREDIT",
+              "query": [
+                { "key": "type", "value": "SALE_CREDIT" }
+              ]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "💳 Checkout (Stripe PIX)",
+      "item": [
+        {
+          "name": "POST /checkout/create — criar pagamento PIX",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/checkout/create",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gig_id\": \"{{gig_id}}\",\n  \"add_on_ids\": [],\n  \"requirements_answers\": {\n    \"req1\": \"Quero saber sobre meu relacionamento atual\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "GET /checkout/status/:paymentIntentId — polling status",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/checkout/status/{{payment_intent_id}}",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "🚫 Cancel & Disputa",
+      "item": [
+        {
+          "name": "POST /orders/:id/cancel — reader cancela pedido",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/orders/{{order_id}}/cancel",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Tive um imprevisto e não conseguirei realizar a leitura no prazo.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "POST /orders/:id/dispute — cliente abre disputa",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/orders/{{order_id}}/dispute",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"A leitura entregue não corresponde ao que foi contratado. As cartas estão sem interpretação e o áudio está ausente.\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "⏰ Crons",
+      "item": [
+        {
+          "name": "POST /cron/expire-orders — cancelar PIX expirados",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/cron/expire-orders",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{cron_secret}}" }
+            ]
+          }
+        },
+        {
+          "name": "POST /cron/release-hold — liberar hold 48h",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/cron/release-hold",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{cron_secret}}" }
+            ]
+          }
+        },
+        {
+          "name": "POST /cron/complete-orders — auto-completar pedidos 72h",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/cron/complete-orders",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{cron_secret}}" }
+            ]
+          }
+        },
+        {
+          "name": "POST /cron/late-deliveries — alertar atrasos",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/cron/late-deliveries",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{cron_secret}}" }
+            ]
+          }
+        },
+        {
+          "name": "POST /cron/reader-quality — suspender readers com rating baixo",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/cron/reader-quality",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{cron_secret}}" }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
