@@ -40,11 +40,18 @@ class _RegisterClientScreenState extends State<RegisterClientScreen> {
     setState(() => _loading = true);
 
     try {
-      await SupabaseService.signUp(
+      final signUpResponse = await SupabaseService.signUp(
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
         data: {'full_name': _nameCtrl.text.trim(), 'role': 'CLIENT'},
       );
+
+      if (signUpResponse.session == null) {
+        await SupabaseService.signIn(
+          email: _emailCtrl.text.trim(),
+          password: _passwordCtrl.text,
+        );
+      }
 
       // Update profile with CPF and phone if provided
       final cpf = _cpfCtrl.text.trim();
@@ -69,12 +76,15 @@ class _RegisterClientScreenState extends State<RegisterClientScreen> {
       context.go('/home');
     } catch (e) {
       if (!mounted) return;
+      final msg = e.toString();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            e.toString().contains('already registered')
+            msg.contains('already registered')
                 ? 'Email já cadastrado'
-                : 'Erro ao criar conta. Tente novamente.',
+                : msg.contains('429') || msg.contains('rate')
+                    ? 'Muitas tentativas. Aguarde alguns minutos.'
+                    : 'Erro ao criar conta. Tente novamente.',
           ),
           backgroundColor: AppColors.error,
         ),

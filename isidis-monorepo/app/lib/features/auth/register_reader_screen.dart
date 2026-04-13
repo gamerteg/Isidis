@@ -71,11 +71,20 @@ class _RegisterReaderScreenState extends State<RegisterReaderScreen> {
     setState(() => _loading = true);
 
     try {
-      await SupabaseService.signUp(
+      final signUpResponse = await SupabaseService.signUp(
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
         data: {'full_name': _nameCtrl.text.trim(), 'role': 'READER'},
       );
+
+      // Se o Supabase não criou sessão (confirmação de email ativa),
+      // faz login explícito para obter o token antes de chamar a API.
+      if (signUpResponse.session == null) {
+        await SupabaseService.signIn(
+          email: _emailCtrl.text.trim(),
+          password: _passwordCtrl.text,
+        );
+      }
 
       await api.patch(
         '/me',
@@ -97,12 +106,15 @@ class _RegisterReaderScreenState extends State<RegisterReaderScreen> {
       context.go('/under-review');
     } catch (e) {
       if (!mounted) return;
+      final msg = e.toString();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            e.toString().contains('already registered')
+            msg.contains('already registered')
                 ? 'Email já cadastrado'
-                : 'Erro ao criar conta. Tente novamente.',
+                : msg.contains('429') || msg.contains('rate')
+                    ? 'Muitas tentativas. Aguarde alguns minutos.'
+                    : 'Erro ao criar conta. Tente novamente.',
           ),
           backgroundColor: AppColors.error,
         ),
