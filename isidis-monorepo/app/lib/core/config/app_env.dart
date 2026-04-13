@@ -1,7 +1,7 @@
 abstract final class AppEnv {
   static const apiUrl = String.fromEnvironment(
     'API_URL',
-    defaultValue: 'http://10.0.2.2:3001',
+    defaultValue: 'https://api.isidis.com.br',
   );
 
   static const supabaseUrl = String.fromEnvironment('SUPABASE_URL');

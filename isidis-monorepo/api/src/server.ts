@@ -24,6 +24,36 @@ import messagesRoutes from './routes/messages/index.js'
 import notificationsRoutes from './routes/notifications/index.js'
 import quizRoutes from './routes/quiz/index.js'
 
+const CORE_ENV_VARS = [
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_ANON_KEY',
+] as const
+
+const OPTIONAL_ENV_VARS = [
+  'APP_URL',
+  'APP_URLS',
+  'ASAAS_API_KEY',
+  'RESEND_API_KEY',
+  'CRON_SECRET',
+] as const
+
+function getProductionOrigins() {
+  const configuredOrigins = [
+    process.env.APP_URL,
+    ...(process.env.APP_URLS?.split(',') ?? []),
+    'https://isidis.com.br',
+    'https://www.isidis.com.br',
+    'https://isidis-web.vercel.app',
+  ]
+
+  return [...new Set(
+    configuredOrigins
+      .map((origin) => origin?.trim())
+      .filter((origin): origin is string => Boolean(origin))
+  )]
+}
+
 const build = async () => {
   const fastify = Fastify({
     logger: {
@@ -35,12 +65,22 @@ const build = async () => {
     },
   })
 
+  const productionOrigins = getProductionOrigins()
+
   // Security & Parsing
   await fastify.register(helmet, { contentSecurityPolicy: false })
   await fastify.register(cors, {
-    origin: process.env.NODE_ENV === 'production'
-      ? [process.env.APP_URL!, 'https://isidis.com.br']
-      : true,
+    origin:
+      process.env.NODE_ENV === 'production'
+        ? (origin, callback) => {
+            if (!origin || productionOrigins.includes(origin)) {
+              callback(null, true)
+              return
+            }
+
+            callback(null, false)
+          }
+        : true,
     credentials: true,
   })
   await fastify.register(multipart, {
@@ -79,19 +119,19 @@ const build = async () => {
 
 const start = async () => {
   try {
-    const required = [
-      'SUPABASE_URL',
-      'SUPABASE_SERVICE_ROLE_KEY',
-      'SUPABASE_ANON_KEY',
-      'ASAAS_API_KEY',
-      'RESEND_API_KEY',
-      'CRON_SECRET',
-    ]
+    const missingCoreVars = CORE_ENV_VARS.filter((key) => !process.env[key])
+    if (missingCoreVars.length > 0) {
+      throw new Error(
+        `Variavel de ambiente obrigatoria ausente: ${missingCoreVars.join(', ')}`
+      )
+    }
 
-    for (const key of required) {
-      if (!process.env[key]) {
-        throw new Error(`Variavel de ambiente obrigatoria ausente: ${key}`)
-      }
+    const missingOptionalVars = OPTIONAL_ENV_VARS.filter((key) => !process.env[key])
+    if (missingOptionalVars.length > 0) {
+      console.warn(
+        `Variaveis opcionais ausentes: ${missingOptionalVars.join(', ')}. ` +
+        'Rotas relacionadas podem ficar indisponiveis ate a configuracao ser concluida.'
+      )
     }
 
     const fastify = await build()

@@ -1,8 +1,21 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY!)
 const FROM = process.env.RESEND_FROM_EMAIL ?? 'noreply@isidis.com.br'
-const APP_URL = process.env.APP_URL ?? 'http://localhost:3000'
+const APP_URL =
+  process.env.APP_URL
+  ?? process.env.APP_URLS?.split(',').map((origin) => origin.trim()).find(Boolean)
+  ?? (process.env.NODE_ENV === 'production'
+    ? 'https://isidis.com.br'
+    : 'http://localhost:3000')
+
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    throw new Error('Servico de email indisponivel: RESEND_API_KEY nao configurada')
+  }
+
+  return new Resend(apiKey)
+}
 
 const header = (title: string) => `
   <div style="background:linear-gradient(135deg,#6d28d9,#8b5cf6);padding:32px;text-align:center;border-radius:12px 12px 0 0">
@@ -40,6 +53,7 @@ export async function sendOrderPaidToReader(params: {
 }) {
   const { readerEmail, readerName, clientName, gigTitle, amount, orderId } = params
   const amountBRL = `R$${(amount / 100).toFixed(2)}`
+  const resend = getResendClient()
 
   await resend.emails.send({
     from: FROM,
@@ -71,6 +85,7 @@ export async function sendOrderPaidToClient(params: {
 }) {
   const { clientEmail, clientName, readerName, gigTitle, amount, orderId, deliveryHours } = params
   const amountBRL = `R$${(amount / 100).toFixed(2)}`
+  const resend = getResendClient()
 
   await resend.emails.send({
     from: FROM,
@@ -100,6 +115,7 @@ export async function sendOrderDelivered(params: {
   orderId: string
 }) {
   const { clientEmail, clientName, readerName, gigTitle, orderId } = params
+  const resend = getResendClient()
 
   await resend.emails.send({
     from: FROM,
@@ -124,6 +140,7 @@ export async function sendOrderCanceled(params: {
   reason?: string
 }) {
   const { clientEmail, clientName, gigTitle, reason } = params
+  const resend = getResendClient()
 
   await resend.emails.send({
     from: FROM,
