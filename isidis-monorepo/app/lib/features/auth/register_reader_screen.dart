@@ -77,33 +77,36 @@ class _RegisterReaderScreenState extends State<RegisterReaderScreen> {
         data: {'full_name': _nameCtrl.text.trim(), 'role': 'READER'},
       );
 
-      // Se o Supabase não criou sessão (confirmação de email ativa),
-      // faz login explícito para obter o token antes de chamar a API.
-      if (signUpResponse.session == null) {
-        await SupabaseService.signIn(
-          email: _emailCtrl.text.trim(),
-          password: _passwordCtrl.text,
+      if (signUpResponse.session != null) {
+        // Confirmação de email desativada no Supabase — sessão imediata.
+        await api.patch(
+          '/me',
+          data: {
+            'bio': _bioCtrl.text.trim(),
+            'tagline': _taglineCtrl.text.trim(),
+            'experience_years': int.tryParse(_experienceCtrl.text) ?? 0,
+            'specialties': _selectedSpecialties.toList(),
+            'pix_key_type': _pixKeyType,
+            'pix_key': _pixKeyCtrl.text.trim(),
+            if (_cpfCtrl.text.isNotEmpty)
+              'tax_id': _cpfCtrl.text.replaceAll(RegExp(r'[^0-9]'), ''),
+            if (_phoneCtrl.text.isNotEmpty)
+              'cellphone': _phoneCtrl.text.replaceAll(RegExp(r'[^0-9]'), ''),
+          },
         );
+        if (!mounted) return;
+        context.go('/under-review');
+      } else {
+        // Confirmação de email ativada no Supabase — perfil será preenchido após confirmação.
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Conta criada! Confirme seu email para continuar.'),
+            duration: Duration(seconds: 5),
+          ),
+        );
+        context.go('/login');
       }
-
-      await api.patch(
-        '/me',
-        data: {
-          'bio': _bioCtrl.text.trim(),
-          'tagline': _taglineCtrl.text.trim(),
-          'experience_years': int.tryParse(_experienceCtrl.text) ?? 0,
-          'specialties': _selectedSpecialties.toList(),
-          'pix_key_type': _pixKeyType,
-          'pix_key': _pixKeyCtrl.text.trim(),
-          if (_cpfCtrl.text.isNotEmpty)
-            'tax_id': _cpfCtrl.text.replaceAll(RegExp(r'[^0-9]'), ''),
-          if (_phoneCtrl.text.isNotEmpty)
-            'cellphone': _phoneCtrl.text.replaceAll(RegExp(r'[^0-9]'), ''),
-        },
-      );
-
-      if (!mounted) return;
-      context.go('/under-review');
     } catch (e) {
       if (!mounted) return;
       final msg = e.toString();

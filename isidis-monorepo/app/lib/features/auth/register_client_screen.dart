@@ -46,34 +46,38 @@ class _RegisterClientScreenState extends State<RegisterClientScreen> {
         data: {'full_name': _nameCtrl.text.trim(), 'role': 'CLIENT'},
       );
 
-      if (signUpResponse.session == null) {
-        await SupabaseService.signIn(
-          email: _emailCtrl.text.trim(),
-          password: _passwordCtrl.text,
-        );
-      }
-
-      // Update profile with CPF and phone if provided
-      final cpf = _cpfCtrl.text.trim();
-      final phone = _phoneCtrl.text.trim();
-      if (cpf.isNotEmpty || phone.isNotEmpty) {
-        try {
-          await api.patch(
-            '/me',
-            data: {
-              if (cpf.isNotEmpty)
-                'tax_id': cpf.replaceAll(RegExp(r'[^0-9]'), ''),
-              if (phone.isNotEmpty)
-                'cellphone': phone.replaceAll(RegExp(r'[^0-9]'), ''),
-            },
-          );
-        } catch (_) {
-          // Non-critical — user can fill later
+      if (signUpResponse.session != null) {
+        // Confirmação de email desativada no Supabase — sessão imediata.
+        final cpf = _cpfCtrl.text.trim();
+        final phone = _phoneCtrl.text.trim();
+        if (cpf.isNotEmpty || phone.isNotEmpty) {
+          try {
+            await api.patch(
+              '/me',
+              data: {
+                if (cpf.isNotEmpty)
+                  'tax_id': cpf.replaceAll(RegExp(r'[^0-9]'), ''),
+                if (phone.isNotEmpty)
+                  'cellphone': phone.replaceAll(RegExp(r'[^0-9]'), ''),
+              },
+            );
+          } catch (_) {
+            // Non-critical — user can fill later
+          }
         }
+        if (!mounted) return;
+        context.go('/home');
+      } else {
+        // Confirmação de email ativada no Supabase.
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Conta criada! Confirme seu email para continuar.'),
+            duration: Duration(seconds: 5),
+          ),
+        );
+        context.go('/login');
       }
-
-      if (!mounted) return;
-      context.go('/home');
     } catch (e) {
       if (!mounted) return;
       final msg = e.toString();
