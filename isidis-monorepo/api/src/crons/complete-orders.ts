@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { Resend } from 'resend'
+import { notifyUser } from '../services/notify.js'
 
 /**
  * CRON 1: Auto-complete de pedidos
@@ -66,20 +67,18 @@ export async function runCompleteOrders(fastify: FastifyInstance) {
       }
 
       // 3. Criar notificação in-app para o reader
-      await fastify.supabase.from('notifications').insert({
-        user_id: order.reader_id,
+      await notifyUser(fastify, order.reader_id, {
         type: 'ORDER_STATUS',
         title: 'Leitura confirmada automaticamente',
-        message: `A leitura foi confirmada automaticamente. Seu saldo foi liberado.`,
+        message: 'A leitura foi confirmada automaticamente. Seu saldo foi liberado.',
         link: `/orders/${order.id}`,
       })
 
       // 4. Criar notificação para o cliente para avaliar
-      await fastify.supabase.from('notifications').insert({
-        user_id: order.client_id,
+      await notifyUser(fastify, order.client_id, {
         type: 'REVIEW_NEW',
         title: 'Como foi sua leitura?',
-        message: `Avalie sua experiência e ajude outros clientes a escolher.`,
+        message: 'Avalie sua experiência e ajude outros clientes a escolher.',
         link: `/orders/${order.id}/review`,
       })
 

@@ -137,7 +137,15 @@ const readersRoutes: FastifyPluginAsync = async (fastify) => {
       dbQuery = dbQuery.contains('specialties', [specialty])
     }
 
-    if (min_rating) {
+    if (min_price !== undefined) {
+      dbQuery = dbQuery.gte('gigs.price', min_price)
+    }
+
+    if (max_price !== undefined) {
+      dbQuery = dbQuery.lte('gigs.price', max_price)
+    }
+
+    if (min_rating !== undefined) {
       dbQuery = dbQuery.gte('rating_average', min_rating)
     }
 
@@ -151,8 +159,20 @@ const readersRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(500).send({ error: error.message })
     }
 
+    const normalizedData = (data ?? []).map((reader: any) => {
+      const gigs = Array.isArray(reader.gigs) ? reader.gigs : []
+      const prices = gigs
+        .map((gig: any) => gig?.price)
+        .filter((price: unknown): price is number => typeof price === 'number')
+
+      return {
+        ...reader,
+        starting_price: prices.length > 0 ? Math.min(...prices) : null,
+      }
+    })
+
     return reply.send({
-      data,
+      data: normalizedData,
       pagination: {
         total: count ?? 0,
         page,

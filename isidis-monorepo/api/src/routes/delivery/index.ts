@@ -2,6 +2,8 @@ import { FastifyPluginAsync } from 'fastify'
 import path from 'path'
 import { z } from 'zod'
 import { sendOrderDelivered } from '../../services/email.js'
+import { notifyUser } from '../../services/notify.js'
+import { createSignedReadingsUrl } from '../../services/readings-storage.js'
 
 // BUG-12: MIME types permitidos por categoria
 const ALLOWED_PHOTO_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp'])
@@ -14,12 +16,42 @@ const MIME_TO_EXT: Record<string, string> = {
 }
 
 // BUG-23: schema de validação para o conteúdo de entrega
-const deliveryContentSchema = z.object({
+const legacyDeliveryContentSchema = z.object({
   audio_url: z.string().url().optional(),
   photos: z.array(z.string().url()).max(10).optional(),
   text: z.string().max(5000).optional(),
   card_spread: z.array(z.string()).max(30).optional(),
 }).strict()
+
+const deliveryCardSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  position: z.enum(['upright', 'reversed']).optional(),
+  interpretation: z.string().optional(),
+  audio_url: z.string().url().optional(),
+  audio_file_name: z.string().optional(),
+  order: z.number().int().nonnegative(),
+}).strict()
+
+const deliverySectionSchema = z.object({
+  type: z.enum(['text', 'audio', 'photo']),
+  content: z.string().optional(),
+  url: z.string().url().optional(),
+  file_name: z.string().optional(),
+  order: z.number().int().nonnegative(),
+}).strict()
+
+const structuredDeliveryContentSchema = z.object({
+  method: z.enum(['DIGITAL_SPREAD', 'PHYSICAL']),
+  cards: z.array(deliveryCardSchema).max(30).optional(),
+  sections: z.array(deliverySectionSchema).max(50).optional(),
+  summary: z.string().max(5000).optional(),
+}).strict()
+
+const deliveryContentSchema = z.union([
+  legacyDeliveryContentSchema,
+  structuredDeliveryContentSchema,
+])
 
 const deliveryRoutes: FastifyPluginAsync = async (fastify) => {
   // POST /orders/:id/delivery/upload — upload de áudio ou foto para Supabase Storage
@@ -78,12 +110,13 @@ const deliveryRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(500).send({ error: 'Erro ao fazer upload do arquivo' })
       }
 
-      const { data: urlData } = fastify.supabase.storage
-        .from('readings')
-        .getPublicUrl(fileName)
+      const signedUrl = await createSignedReadingsUrl(fastify, fileName)
+      if (!signedUrl) {
+        return reply.status(500).send({ error: 'Erro ao gerar URL do arquivo' })
+      }
 
       return reply.status(201).send({
-        data: { url: urlData.publicUrl, file_name: fileName },
+        data: { url: signedUrl, file_name: fileName },
       })
     }
   )
@@ -140,20 +173,24 @@ const deliveryRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Apenas pedidos pagos podem ser entregues' })
       }
 
+      const parsed = deliveryContentSchema.safeParse(request.body)
+      if (!parsed.success) {
+        return reply.status(400).send({ error: 'Conteúdo de entrega inválido', details: parsed.error.flatten() })
+      }
+
       // Salvar conteúdo e mudar status para DELIVERED
       // BUG-10: setar delivered_at para uso na janela de disputa e no cron de auto-complete
       await fastify.supabase
         .from('orders')
         .update({
-          delivery_content: request.body,
+          delivery_content: parsed.data,
           status: 'DELIVERED',
           delivered_at: new Date().toISOString(),
         })
         .eq('id', orderId)
 
       // Notificação para o cliente
-      await fastify.supabase.from('notifications').insert({
-        user_id: order.client_id,
+      await notifyUser(fastify, order.client_id, {
         type: 'ORDER_STATUS',
         title: 'Sua leitura chegou! ✨',
         message: `${(order as any).gigs?.title ?? 'Sua leitura'} está pronta. Toque para ver.`,

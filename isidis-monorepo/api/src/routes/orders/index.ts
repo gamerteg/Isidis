@@ -2,12 +2,14 @@ import { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
 import { listOrdersSchema } from '../../schemas/index.js'
 import { sendOrderCanceled } from '../../services/email.js'
+import { notifyUser } from '../../services/notify.js'
 import { processPaidAsaasOrder } from '../../services/payment-reconciliation.js'
+import { signDeliveryContentUrls } from '../../services/readings-storage.js'
 
 const orderDetailSelect = `
   id, status, amount_total, amount_service_total, amount_reader_net, amount_platform_fee,
   payment_method, amount_card_fee, card_fee_responsibility,
-  stripe_payment_intent_id, asaas_payment_id, created_at, requirements_answers,
+  stripe_payment_intent_id, asaas_payment_id, created_at, delivered_at, requirements_answers,
   selected_addons, delivery_content, reader_viewed_at,
   gigs(id, title, description, price, image_url, delivery_time_hours, delivery_method, requirements, add_ons),
   client:profiles!client_id(id, full_name, avatar_url, cellphone),
@@ -130,6 +132,13 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
           .eq('id', id)
       }
 
+      if ((order as any).delivery_content) {
+        ;(order as any).delivery_content = await signDeliveryContentUrls(
+          fastify,
+          (order as any).delivery_content
+        )
+      }
+
       return reply.send({ data: order })
     }
   )
@@ -143,18 +152,38 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
 
       const { data: order } = await fastify.supabase
         .from('orders')
-        .select('id, status, client_id, reader_id, asaas_payment_id, amount_total, gigs(title)')
+        .select('id, status, client_id, reader_id, asaas_payment_id, amount_total, created_at, reader_viewed_at, gigs(title)')
         .eq('id', id)
         .single()
 
       if (!order) return reply.status(404).send({ error: 'Pedido nao encontrado' })
 
-      if (order.reader_id !== userId && role !== 'ADMIN') {
+      const isReader = order.reader_id === userId
+      const isClient = order.client_id === userId
+      const isAdmin = role === 'ADMIN'
+
+      if (!isReader && !isClient && !isAdmin) {
         return reply.status(403).send({ error: 'Sem permissao para cancelar este pedido' })
       }
 
       if (order.status !== 'PAID') {
         return reply.status(400).send({ error: 'Apenas pedidos pagos podem ser cancelados' })
+      }
+
+      if (isClient && !isAdmin) {
+        if ((order as any).reader_viewed_at) {
+          return reply.status(400).send({
+            error: 'A leitura ja foi iniciada e nao pode mais ser cancelada pelo cliente.',
+          })
+        }
+
+        const paidAt = new Date(order.created_at)
+        const hoursElapsed = (Date.now() - paidAt.getTime()) / (1000 * 60 * 60)
+        if (hoursElapsed > 2) {
+          return reply.status(400).send({
+            error: 'O prazo de cancelamento (2h apos o pagamento) expirou. Use a opcao de disputa se necessario.',
+          })
+        }
       }
 
       const body = z.object({ reason: z.string().min(10) }).safeParse(request.body)
@@ -199,8 +228,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
           .eq('type', 'SALE_CREDIT')
       }
 
-      await fastify.supabase.from('notifications').insert({
-        user_id: order.client_id,
+      await notifyUser(fastify, order.client_id, {
         type: 'ORDER_STATUS',
         title: 'Pedido cancelado',
         message: 'Seu pedido foi cancelado. O reembolso sera processado em ate 5 dias uteis.',
@@ -287,8 +315,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
         .eq('role', 'ADMIN')
 
       for (const admin of admins ?? []) {
-        await fastify.supabase.from('notifications').insert({
-          user_id: admin.id,
+        await notifyUser(fastify, admin.id, {
           type: 'SYSTEM',
           title: 'Nova disputa aberta',
           message: `Cliente abriu disputa no pedido ${id}. Ticket #${ticket?.id}`,

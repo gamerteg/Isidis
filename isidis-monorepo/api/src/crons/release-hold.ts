@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify'
+import { notifyUser } from '../services/notify.js'
 
 /**
  * CRON 3: LiberaÃ§Ã£o do hold de 48h
@@ -13,10 +14,11 @@ export async function runReleaseHold(fastify: FastifyInstance) {
   // BUG-18: incluir disputed_at e has_dispute do pedido para nÃ£o liberar fundos em disputas ativas
   const { data: transactions, error } = await fastify.supabase
     .from('transactions')
-    .select('id, wallet_id, amount, order_id, orders!inner(disputed_at, has_dispute)')
+    .select('id, wallet_id, amount, order_id, orders!inner(disputed_at, has_dispute, status)')
     .eq('type', 'SALE_CREDIT')
     .eq('status', 'PENDING')
     .eq('orders.has_dispute', false)
+    .in('orders.status', ['DELIVERED', 'COMPLETED'])
     .lt('created_at', cutoff.toISOString())
 
   if (error) {
@@ -31,7 +33,11 @@ export async function runReleaseHold(fastify: FastifyInstance) {
   // BUG-18: excluir transaÃ§Ãµes de pedidos em disputa ativa
   const releasable = transactions.filter((t) => {
     const order = (t as any).orders
-    return !order?.disputed_at && !order?.has_dispute
+    return (
+      !order?.disputed_at &&
+      !order?.has_dispute &&
+      ['DELIVERED', 'COMPLETED'].includes(order?.status)
+    )
   })
   const skipped = transactions.length - releasable.length
   if (skipped > 0) {
@@ -64,11 +70,10 @@ export async function runReleaseHold(fastify: FastifyInstance) {
         .single()
 
       if (wallet) {
-        await fastify.supabase.from('notifications').insert({
-          user_id: wallet.user_id,
+        await notifyUser(fastify, wallet.user_id, {
           type: 'WITHDRAWAL_UPDATE',
           title: 'Saldo liberado para saque',
-          message: `R$${(tx.amount / 100).toFixed(2)} estÃ£o disponÃ­veis para saque.`,
+          message: `R$${(tx.amount / 100).toFixed(2)} estao disponiveis para saque.`,
           link: '/wallet',
         })
       }

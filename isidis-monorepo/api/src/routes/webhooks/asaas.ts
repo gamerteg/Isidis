@@ -1,11 +1,13 @@
 import { FastifyPluginAsync } from 'fastify'
+import { notifyUser } from '../../services/notify.js'
 import { processPaidAsaasOrder } from '../../services/payment-reconciliation.js'
 
 const asaasWebhookRoute: FastifyPluginAsync = async (fastify) => {
   fastify.post('/webhooks/asaas', async (request, reply) => {
     const token = request.headers['asaas-access-token'] as string
-    if (process.env.ASAAS_WEBHOOK_TOKEN && token !== process.env.ASAAS_WEBHOOK_TOKEN) {
-      request.log.warn('[webhook:asaas] Token invalido')
+    const expectedToken = process.env.ASAAS_WEBHOOK_TOKEN
+    if (!expectedToken || token !== expectedToken) {
+      request.log.warn('[webhook:asaas] Token invalido ou ASAAS_WEBHOOK_TOKEN nao configurado')
       return reply.status(401).send({ error: 'Unauthorized' })
     }
 
@@ -94,7 +96,7 @@ const asaasWebhookRoute: FastifyPluginAsync = async (fastify) => {
       const chargebackStatus = payload.payment?.chargebackStatus ?? payload.payment?.chargeback?.status
       const { data: order } = await fastify.supabase
         .from('orders')
-        .select('id')
+        .select('id, reader_id, amount_total')
         .eq('asaas_payment_id', paymentId)
         .single()
 
@@ -122,7 +124,26 @@ const asaasWebhookRoute: FastifyPluginAsync = async (fastify) => {
           .eq('type', 'SALE_CREDIT')
           .eq('status', 'PENDING')
 
-        request.log.warn({ orderId: order.id }, '[webhook:asaas] Chargeback perdido - absorvido pela plataforma')
+        request.log.error({
+          orderId: order.id,
+          paymentId,
+          amountLost: order.amount_total,
+          readerId: order.reader_id,
+        }, '[chargeback] PREJUIZO: chargeback perdido - requer revisao manual')
+
+        const { data: admins } = await fastify.supabase
+          .from('profiles')
+          .select('id')
+          .eq('role', 'ADMIN')
+
+        for (const admin of admins ?? []) {
+          await notifyUser(fastify, admin.id, {
+            type: 'SYSTEM',
+            title: 'Chargeback perdido',
+            message: `Pedido ${order.id} - chargeback de R$${(order.amount_total / 100).toFixed(2)} foi perdido.`,
+            link: `/admin/orders/${order.id}`,
+          })
+        }
       }
     }
 

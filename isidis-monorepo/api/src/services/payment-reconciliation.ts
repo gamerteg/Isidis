@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { sendOrderPaidToReader, sendOrderPaidToClient } from './email.js'
+import { notifyUser } from './notify.js'
 
 async function getOrCreateWalletId(fastify: FastifyInstance, userId: string) {
   let { data: wallet } = await fastify.supabase
@@ -64,8 +65,7 @@ export async function processPaidAsaasOrder(
     })
   }
 
-  await fastify.supabase.from('notifications').insert({
-    user_id: order.reader_id,
+  await notifyUser(fastify, order.reader_id, {
     type: 'ORDER_NEW',
     title: 'Novo pedido recebido! 🎉',
     message: `Você recebeu um pedido de ${(order as any).gigs?.title ?? 'um serviço'}.`,

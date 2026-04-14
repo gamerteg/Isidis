@@ -14,6 +14,30 @@ declare module 'fastify' {
   }
 }
 
+type CachedProfile = Pick<AuthUser, 'id' | 'role' | 'verification_status'>
+
+const profileCache = new Map<string, { profile: CachedProfile; expiresAt: number }>()
+const CACHE_TTL_MS = 60_000
+
+function getCachedProfile(userId: string): CachedProfile | null {
+  const entry = profileCache.get(userId)
+  if (!entry) return null
+
+  if (Date.now() > entry.expiresAt) {
+    profileCache.delete(userId)
+    return null
+  }
+
+  return entry.profile
+}
+
+function setCachedProfile(userId: string, profile: CachedProfile) {
+  profileCache.set(userId, {
+    profile,
+    expiresAt: Date.now() + CACHE_TTL_MS,
+  })
+}
+
 const authPlugin: FastifyPluginAsync = async (fastify) => {
   // WeakMap para armazenar user por request (getter + setter mutável)
   const requestUserMap = new WeakMap<object, AuthUser>()
@@ -47,23 +71,28 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
           return reply.status(401).send({ error: 'Token inválido ou expirado' })
         }
 
-        // Buscar perfil para obter role
-        const { data: profile, error: profileError } = await fastify.supabase
-          .from('profiles')
-          .select('id, role, verification_status')
-          .eq('id', user.id)
-          .single()
+        let profile = getCachedProfile(user.id)
+        if (!profile) {
+          const { data, error: profileError } = await fastify.supabase
+            .from('profiles')
+            .select('id, role, verification_status')
+            .eq('id', user.id)
+            .single()
 
-        if (profileError || !profile) {
-          request.log.warn({
-            userId: user.id,
-            profileError: profileError?.message,
-            profileErrorCode: profileError?.code,
-          }, 'Perfil não encontrado')
-          return reply.status(401).send({
-            error: 'Perfil não encontrado',
-            detail: profileError?.message ?? 'Registro ausente na tabela profiles',
-          })
+          if (profileError || !data) {
+            request.log.warn({
+              userId: user.id,
+              profileError: profileError?.message,
+              profileErrorCode: profileError?.code,
+            }, 'Perfil não encontrado')
+            return reply.status(401).send({
+              error: 'Perfil não encontrado',
+              detail: profileError?.message ?? 'Registro ausente na tabela profiles',
+            })
+          }
+
+          profile = data
+          setCachedProfile(user.id, profile)
         }
 
         request.user = {

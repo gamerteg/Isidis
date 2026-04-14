@@ -58,19 +58,18 @@ export async function checkFraud(
     flags.push('new_account_high_value')
   }
 
-  const { count: sameGigCount } = await supabase
+  const { count: activeGigCount } = await supabase
     .from('orders')
     .select('id', { count: 'exact', head: true })
     .eq('client_id', params.clientId)
     .eq('gig_id', params.gigId)
-    .gte('created_at', oneDayAgo)
-    .neq('status', 'CANCELED')
+    .in('status', ['PENDING_PAYMENT', 'PAID', 'DELIVERED'])
 
-  if ((sameGigCount ?? 0) >= 1) {
+  if ((activeGigCount ?? 0) >= 1) {
     return {
       allowed: false,
-      reason: 'Voce ja possui um pedido recente deste servico.',
-      flags: ['duplicate_gig'],
+      reason: 'Voce ja possui um pedido ativo deste servico. Aguarde a conclusao antes de comprar novamente.',
+      flags: ['active_duplicate_gig'],
     }
   }
 

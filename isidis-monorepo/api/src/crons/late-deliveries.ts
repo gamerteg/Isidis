@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify'
+import { notifyUser } from '../services/notify.js'
 
 /**
  * CRON 4: Alerta de atraso de entrega
@@ -45,11 +46,10 @@ export async function runLateDeliveries(fastify: FastifyInstance) {
       const isEscalated = hoursLate >= gig.delivery_time_hours // atraso > 2x o prazo
 
       // Notificação in-app para o reader
-      await fastify.supabase.from('notifications').insert({
-        user_id: order.reader_id,
+      await notifyUser(fastify, order.reader_id, {
         type: 'ORDER_STATUS',
         title: 'Pedido atrasado!',
-        message: `Você tem ${hoursLate}h de atraso no pedido. Entregue o quanto antes para manter sua reputação.`,
+        message: `Voce tem ${hoursLate}h de atraso no pedido. Entregue o quanto antes para manter sua reputacao.`,
         link: `/orders/${order.id}/deliver`,
       })
 
@@ -73,11 +73,10 @@ export async function runLateDeliveries(fastify: FastifyInstance) {
         })
 
         // Notificar cliente
-        await fastify.supabase.from('notifications').insert({
-          user_id: order.client_id,
+        await notifyUser(fastify, order.client_id, {
           type: 'ORDER_STATUS',
-          title: 'Sua leitura está atrasada',
-          message: `Abrimos um ticket de suporte para resolver o atraso no seu pedido.`,
+          title: 'Sua leitura esta atrasada',
+          message: 'Abrimos um ticket de suporte para resolver o atraso no seu pedido.',
           link: `/orders/${order.id}`,
         })
 
@@ -128,11 +127,10 @@ export async function runLateDeliveries(fastify: FastifyInstance) {
         category: 'DUVIDA',
       })
 
-      await fastify.supabase.from('notifications').insert({
-        user_id: order.client_id,
+      await notifyUser(fastify, order.client_id, {
         type: 'ORDER_STATUS',
-        title: 'Sua leitura está muito atrasada',
-        message: `Abrimos um ticket de suporte para resolver o atraso no seu pedido.`,
+        title: 'Sua leitura esta muito atrasada',
+        message: 'Abrimos um ticket de suporte para resolver o atraso no seu pedido.',
         link: `/orders/${order.id}`,
       })
 

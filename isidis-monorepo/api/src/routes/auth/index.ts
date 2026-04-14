@@ -109,6 +109,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         'full_name', 'avatar_url', 'bio', 'specialties', 'tagline',
         'profile_color', 'cover_url', 'instagram_handle', 'youtube_url',
         'decks_used', 'max_orders_per_day', 'max_simultaneous_orders',
+        'experience_years',
         'cellphone', 'tax_id', 'sexo', 'birth_date', 'social_name',
         'notification_preferences', 'pix_key', 'pix_key_type',
       ]

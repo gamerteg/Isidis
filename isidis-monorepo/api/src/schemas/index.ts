@@ -13,8 +13,8 @@ export const listReadersSchema = z.object({
   max_price: z.coerce.number().optional(),
   min_rating: z.coerce.number().min(1).max(5).optional(),
   search: z.string().optional(),
-  page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
 })
 
 // ─── Orders ────────────────────────────────────────────────────────────────────

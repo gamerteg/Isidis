@@ -167,6 +167,83 @@ const walletRoutes: FastifyPluginAsync = async (fastify) => {
     }
   )
 
+  fastify.get(
+    '/wallet/statement',
+    { preHandler: [(fastify as any).requireReader] },
+    async (request, reply) => {
+      const query = request.query as { month?: string }
+      const month = query.month ?? new Date().toISOString().slice(0, 7)
+
+      if (!/^\d{4}-\d{2}$/.test(month)) {
+        return reply.status(400).send({ error: 'Mes invalido. Use o formato YYYY-MM.' })
+      }
+
+      const start = new Date(`${month}-01T00:00:00.000Z`)
+      if (Number.isNaN(start.getTime())) {
+        return reply.status(400).send({ error: 'Mes invalido. Use o formato YYYY-MM.' })
+      }
+
+      const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1))
+
+      const { data: wallet } = await fastify.supabase
+        .from('wallets')
+        .select('id')
+        .eq('user_id', request.user.id)
+        .single()
+
+      if (!wallet) {
+        return reply.status(404).send({ error: 'Carteira nao encontrada' })
+      }
+
+      const { data: transactions, error } = await fastify.supabase
+        .from('transactions')
+        .select('id, amount, type, status, created_at, orders(id, gigs(title))')
+        .eq('wallet_id', wallet.id)
+        .gte('created_at', start.toISOString())
+        .lt('created_at', end.toISOString())
+        .order('created_at', { ascending: true })
+
+      if (error) {
+        return reply.status(500).send({ error: error.message })
+      }
+
+      const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`
+
+      const rows = [
+        'Data,Tipo,Servico,Valor (R$),Status',
+        ...(transactions ?? []).map((tx: any) => {
+          const date = new Date(tx.created_at).toLocaleDateString('pt-BR')
+          const type =
+            tx.type === 'SALE_CREDIT'
+              ? 'Venda'
+              : tx.type === 'WITHDRAWAL'
+                ? 'Saque'
+                : tx.type
+          const title = tx.orders?.gigs?.title ?? '-'
+          const amount = (tx.amount / 100).toFixed(2).replace('.', ',')
+          const status =
+            tx.status === 'COMPLETED'
+              ? 'Concluido'
+              : tx.status === 'PENDING'
+                ? 'Pendente'
+                : tx.status
+
+          return [
+            escapeCsv(date),
+            escapeCsv(type),
+            escapeCsv(title),
+            escapeCsv(amount),
+            escapeCsv(status),
+          ].join(',')
+        }),
+      ].join('\n')
+
+      reply.header('Content-Type', 'text/csv; charset=utf-8')
+      reply.header('Content-Disposition', `attachment; filename="extrato-isidis-${month}.csv"`)
+      return reply.send('\uFEFF' + rows)
+    }
+  )
+
   // POST /wallet/withdraw â€” solicitar saque manual via PIX
   fastify.post(
     '/wallet/withdraw',
