@@ -54,6 +54,7 @@ dependencies:
   share_plus: ^10.1.4       # Compartilhar carta
   screenshot: ^3.0.0        # Capturar widget para compartilhar
   path_provider: ^2.1.5     # Caminhos de arquivo temporário
+  file_picker: ^11.0.2
 
 dev_dependencies:
   flutter_test:

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/api/api_client.dart';
-import '../../../core/platform/platform_capabilities.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/delivery.dart';
 import '../../../shared/models/order.dart';
@@ -10,8 +9,13 @@ import 'physical_delivery_screen.dart';
 
 class DeliveryEditorScreen extends StatefulWidget {
   final String orderId;
+  final Future<Order?> Function(String orderId)? orderLoader;
 
-  const DeliveryEditorScreen({super.key, required this.orderId});
+  const DeliveryEditorScreen({
+    super.key,
+    required this.orderId,
+    this.orderLoader,
+  });
 
   @override
   State<DeliveryEditorScreen> createState() => _DeliveryEditorScreenState();
@@ -24,19 +28,14 @@ class _DeliveryEditorScreenState extends State<DeliveryEditorScreen> {
   @override
   void initState() {
     super.initState();
-    if (!PlatformCapabilities.supportsReaderDeliveryEditor) {
-      _loading = false;
-      return;
-    }
     _loadOrder();
   }
 
   Future<void> _loadOrder() async {
     try {
-      final response = await api.get('/orders/${widget.orderId}');
-      final order = Order.fromJson(
-        response.data['data'] as Map<String, dynamic>,
-      );
+      final order =
+          await (widget.orderLoader?.call(widget.orderId) ??
+              _fetchOrder(widget.orderId));
       if (mounted) setState(() => _order = order);
     } catch (_) {
     } finally {
@@ -44,67 +43,13 @@ class _DeliveryEditorScreenState extends State<DeliveryEditorScreen> {
     }
   }
 
+  Future<Order?> _fetchOrder(String orderId) async {
+    final response = await api.get('/orders/$orderId');
+    return Order.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (!PlatformCapabilities.supportsReaderDeliveryEditor) {
-      return Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(
-          backgroundColor: AppColors.background,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => context.pop(),
-          ),
-          title: const Text(
-            'Entrega da leitura',
-            style: TextStyle(color: AppColors.textPrimary),
-          ),
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 520),
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.cloud_off_outlined,
-                    color: AppColors.textMuted,
-                    size: 44,
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'A edicao e o envio de leituras ainda nao estao liberados na versao web.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  SizedBox(height: 12),
-                  Text(
-                    'Esse fluxo ainda depende de captura e upload de midia nativos. Para concluir a entrega, use o app mobile.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
     if (_loading) {
       return const Scaffold(
         backgroundColor: AppColors.background,

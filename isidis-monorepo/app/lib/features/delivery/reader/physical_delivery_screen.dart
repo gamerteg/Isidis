@@ -1,12 +1,15 @@
 import 'dart:io';
-import 'package:dio/dio.dart';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+
 import '../../../core/api/api_client.dart';
+import '../../../core/platform/platform_capabilities.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/models/delivery.dart';
 import 'audio_recorder_widget.dart';
+import 'delivery_media.dart';
 
 class PhysicalDeliveryScreen extends StatefulWidget {
   final String orderId;
@@ -32,8 +35,8 @@ class _PhysicalDeliveryScreenState extends State<PhysicalDeliveryScreen> {
   void initState() {
     super.initState();
     if (widget.existingContent != null) {
-      for (final s in widget.existingContent!.sections) {
-        _sections.add(_EditableSection.fromDelivery(s));
+      for (final section in widget.existingContent!.sections) {
+        _sections.add(_EditableSection.fromDelivery(section));
       }
       _summaryCtrl.text = widget.existingContent?.summary ?? '';
     }
@@ -42,8 +45,8 @@ class _PhysicalDeliveryScreenState extends State<PhysicalDeliveryScreen> {
   @override
   void dispose() {
     _summaryCtrl.dispose();
-    for (final s in _sections) {
-      s.textCtrl.dispose();
+    for (final section in _sections) {
+      section.textCtrl.dispose();
     }
     super.dispose();
   }
@@ -55,16 +58,77 @@ class _PhysicalDeliveryScreenState extends State<PhysicalDeliveryScreen> {
   }
 
   Future<void> _addPhotoSection() async {
-    final picker = ImagePicker();
-    final image = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80,
-    );
-    if (image == null) return;
+    final source = PlatformCapabilities.isWeb
+        ? await _showPhotoSourceSheet()
+        : ImageSource.gallery;
+    if (source == null) return;
+
+    final picked = await _pickPhoto(source);
+    if (picked == null) return;
 
     setState(() {
-      _sections.add(_EditableSection(type: 'photo', localFilePath: image.path));
+      _sections.add(_EditableSection(type: 'photo', pendingMedia: picked));
     });
+  }
+
+  Future<ImageSource?> _showPhotoSourceSheet() async {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera, color: Colors.white),
+              title: const Text(
+                'Camera',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: Colors.white),
+              title: const Text(
+                'Arquivo',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<PendingDeliveryMedia?> _pickPhoto(ImageSource source) async {
+    final picker = ImagePicker();
+    XFile? image = await picker.pickImage(source: source, imageQuality: 80);
+
+    if (image == null &&
+        PlatformCapabilities.isWeb &&
+        source == ImageSource.camera) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Captura nao suportada neste navegador. Abrindo arquivo...',
+            ),
+          ),
+        );
+      }
+      image = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+    }
+
+    if (image == null) return null;
+
+    return PendingDeliveryMedia.fromXFile(
+      image,
+      mimeType: resolveDeliveryMimeType(image.mimeType, image.name),
+    );
   }
 
   void _addAudioSection() {
@@ -73,47 +137,42 @@ class _PhysicalDeliveryScreenState extends State<PhysicalDeliveryScreen> {
     });
   }
 
-  Future<String?> _uploadFile(String localPath, String type) async {
-    try {
-      final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(
-          localPath,
-          filename:
-              '${type}_${DateTime.now().millisecondsSinceEpoch}.${type == 'photo' ? 'jpg' : 'm4a'}',
-        ),
-        'type': type,
-      });
-      final response = await api.postMultipart(
-        '/orders/${widget.orderId}/delivery/upload',
-        formData: formData,
-      );
-      return response.data['data']['url'] as String?;
-    } catch (_) {
-      return null;
-    }
-  }
-
   Future<DeliveryContent> _buildContent() async {
     final result = <DeliverySection>[];
-    for (int i = 0; i < _sections.length; i++) {
-      final s = _sections[i];
-      String? url = s.uploadedUrl;
 
-      if (s.localFilePath != null && url == null) {
-        url = await _uploadFile(s.localFilePath!, s.type);
+    for (int i = 0; i < _sections.length; i++) {
+      final section = _sections[i];
+      String? url = section.uploadedUrl;
+      String? fileName = section.uploadedFileName;
+
+      if (section.pendingMedia != null) {
+        final upload = await uploadDeliveryMedia(
+          orderId: widget.orderId,
+          media: section.pendingMedia!,
+          type: section.type,
+        );
+        url = upload.url;
+        fileName = upload.fileName;
+        section
+          ..uploadedUrl = upload.url
+          ..uploadedFileName = upload.fileName
+          ..pendingMedia = null;
       }
 
       result.add(
         DeliverySection(
-          type: s.type,
-          content: s.textCtrl.text.trim().isNotEmpty
-              ? s.textCtrl.text.trim()
+          type: section.type,
+          content: section.textCtrl.text.trim().isNotEmpty
+              ? section.textCtrl.text.trim()
               : null,
           url: url,
+          fileName: fileName,
           order: i,
         ),
       );
     }
+
+    if (mounted) setState(() {});
 
     return DeliveryContent(
       method: 'PHYSICAL',
@@ -139,14 +198,7 @@ class _PhysicalDeliveryScreenState extends State<PhysicalDeliveryScreen> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: ${e.toString()}'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      _showError('Erro: $e');
     } finally {
       if (mounted) setState(() => _savingDraft = false);
     }
@@ -155,7 +207,7 @@ class _PhysicalDeliveryScreenState extends State<PhysicalDeliveryScreen> {
   Future<void> _submit() async {
     if (_sections.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Adicione ao menos uma seção à leitura.')),
+        const SnackBar(content: Text('Adicione ao menos uma secao a leitura.')),
       );
       return;
     }
@@ -177,17 +229,17 @@ class _PhysicalDeliveryScreenState extends State<PhysicalDeliveryScreen> {
         context.pop();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: ${e.toString()}'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      _showError('Erro: $e');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppColors.error),
+    );
   }
 
   @override
@@ -202,7 +254,7 @@ class _PhysicalDeliveryScreenState extends State<PhysicalDeliveryScreen> {
           onPressed: () => context.pop(),
         ),
         title: const Text(
-          'Entrega Física',
+          'Entrega Fisica',
           style: TextStyle(color: AppColors.textPrimary),
         ),
         actions: [
@@ -235,21 +287,17 @@ class _PhysicalDeliveryScreenState extends State<PhysicalDeliveryScreen> {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    'Use os botões abaixo para adicionar\ntexto, fotos ou áudios à leitura.',
+                    'Use os botoes abaixo para adicionar\ntexto, fotos ou audios a leitura.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: AppColors.textSecondary),
                   ),
                 ],
               ),
             ),
-
           ..._sections.asMap().entries.map(
-            (e) => _buildSectionCard(e.key, e.value),
+            (entry) => _buildSectionCard(entry.key, entry.value),
           ),
-
           const SizedBox(height: 16),
-
-          // Resumo
           const Text(
             'Resumo geral',
             style: TextStyle(
@@ -282,7 +330,6 @@ class _PhysicalDeliveryScreenState extends State<PhysicalDeliveryScreen> {
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Botões de adicionar seção
           Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             color: AppColors.surface,
@@ -316,7 +363,7 @@ class _PhysicalDeliveryScreenState extends State<PhysicalDeliveryScreen> {
                   child: OutlinedButton.icon(
                     onPressed: _addAudioSection,
                     icon: const Icon(Icons.mic, size: 16),
-                    label: const Text('Áudio'),
+                    label: const Text('Audio'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.textSecondary,
                       side: const BorderSide(color: AppColors.surfaceLight),
@@ -326,7 +373,6 @@ class _PhysicalDeliveryScreenState extends State<PhysicalDeliveryScreen> {
               ],
             ),
           ),
-          // Botão enviar
           Container(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             color: AppColors.surface,
@@ -404,7 +450,7 @@ class _PhysicalDeliveryScreenState extends State<PhysicalDeliveryScreen> {
                 controller: section.textCtrl,
                 maxLines: 4,
                 decoration: InputDecoration(
-                  hintText: 'Escreva o texto desta seção...',
+                  hintText: 'Escreva o texto desta secao...',
                   hintStyle: const TextStyle(
                     color: AppColors.textMuted,
                     fontSize: 13,
@@ -422,53 +468,70 @@ class _PhysicalDeliveryScreenState extends State<PhysicalDeliveryScreen> {
                 ),
               )
             else if (section.type == 'photo')
-              section.localFilePath != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.file(
-                        File(section.localFilePath!),
-                        height: 180,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    )
-                  : section.uploadedUrl != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        section.uploadedUrl!,
-                        height: 180,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    )
-                  : Container(
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'Foto selecionada',
-                          style: TextStyle(color: AppColors.textMuted),
-                        ),
-                      ),
-                    )
+              _buildPhotoPreview(section)
             else if (section.type == 'audio')
               AudioRecorderWidget(
                 existingAudioUrl: section.uploadedUrl,
-                onRecorded: (path) {
-                  section.localFilePath = path;
+                onRecorded: (media) {
+                  setState(() => section.pendingMedia = media);
                 },
                 onDelete: () {
                   setState(() {
-                    section.localFilePath = null;
-                    section.uploadedUrl = null;
+                    section
+                      ..pendingMedia = null
+                      ..uploadedUrl = null
+                      ..uploadedFileName = null;
                   });
                 },
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhotoPreview(_EditableSection section) {
+    if (section.pendingMedia != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: PlatformCapabilities.isWeb
+            ? Image.network(
+                section.pendingMedia!.file.path,
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              )
+            : Image.file(
+                File(section.pendingMedia!.file.path),
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+      );
+    }
+
+    if (section.uploadedUrl != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.network(
+          section.uploadedUrl!,
+          height: 180,
+          width: double.infinity,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+
+    return Container(
+      height: 80,
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Center(
+        child: Text(
+          'Foto selecionada',
+          style: TextStyle(color: AppColors.textMuted),
         ),
       ),
     );
@@ -484,7 +547,7 @@ class _PhysicalDeliveryScreenState extends State<PhysicalDeliveryScreen> {
   String _sectionLabel(String type) => switch (type) {
     'text' => 'Texto',
     'photo' => 'Foto',
-    'audio' => 'Áudio',
+    'audio' => 'Audio',
     _ => type,
   };
 }
@@ -492,15 +555,24 @@ class _PhysicalDeliveryScreenState extends State<PhysicalDeliveryScreen> {
 class _EditableSection {
   final String type;
   final TextEditingController textCtrl;
-  String? localFilePath;
+  PendingDeliveryMedia? pendingMedia;
   String? uploadedUrl;
+  String? uploadedFileName;
 
-  _EditableSection({required this.type, this.localFilePath, this.uploadedUrl})
-    : textCtrl = TextEditingController();
+  _EditableSection({
+    required this.type,
+    this.pendingMedia,
+    this.uploadedUrl,
+    this.uploadedFileName,
+  }) : textCtrl = TextEditingController();
 
-  factory _EditableSection.fromDelivery(DeliverySection s) {
-    final e = _EditableSection(type: s.type, uploadedUrl: s.url);
-    if (s.content != null) e.textCtrl.text = s.content!;
-    return e;
+  factory _EditableSection.fromDelivery(DeliverySection section) {
+    final editable = _EditableSection(
+      type: section.type,
+      uploadedUrl: section.url,
+      uploadedFileName: section.fileName,
+    );
+    if (section.content != null) editable.textCtrl.text = section.content!;
+    return editable;
   }
 }

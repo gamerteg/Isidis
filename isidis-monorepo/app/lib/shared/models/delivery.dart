@@ -4,6 +4,7 @@ class DeliveryCard {
   final String position; // 'upright' | 'reversed'
   final String interpretation;
   final String? audioUrl;
+  final String? audioFileName;
   final int order;
 
   const DeliveryCard({
@@ -12,6 +13,7 @@ class DeliveryCard {
     required this.position,
     required this.interpretation,
     this.audioUrl,
+    this.audioFileName,
     required this.order,
   });
 
@@ -21,6 +23,7 @@ class DeliveryCard {
     'position': position,
     'interpretation': interpretation,
     'audio_url': audioUrl,
+    'audio_file_name': audioFileName,
     'order': order,
   };
 
@@ -30,20 +33,26 @@ class DeliveryCard {
     position: json['position'] as String? ?? 'upright',
     interpretation: json['interpretation'] as String? ?? '',
     audioUrl: json['audio_url'] as String?,
+    audioFileName: json['audio_file_name'] as String?,
     order: json['order'] as int? ?? 0,
   );
 
   DeliveryCard copyWith({
     String? position,
     String? interpretation,
-    String? audioUrl,
+    Object? audioUrl = _missing,
+    Object? audioFileName = _missing,
+    int? order,
   }) => DeliveryCard(
     id: id,
     name: name,
     position: position ?? this.position,
     interpretation: interpretation ?? this.interpretation,
-    audioUrl: audioUrl ?? this.audioUrl,
-    order: order,
+    audioUrl: audioUrl == _missing ? this.audioUrl : audioUrl as String?,
+    audioFileName: audioFileName == _missing
+        ? this.audioFileName
+        : audioFileName as String?,
+    order: order ?? this.order,
   );
 }
 
@@ -51,12 +60,14 @@ class DeliverySection {
   final String type; // 'text' | 'audio' | 'photo'
   final String? content;
   final String? url;
+  final String? fileName;
   final int order;
 
   const DeliverySection({
     required this.type,
     this.content,
     this.url,
+    this.fileName,
     required this.order,
   });
 
@@ -64,6 +75,7 @@ class DeliverySection {
     'type': type,
     'content': content,
     'url': url,
+    'file_name': fileName,
     'order': order,
   };
 
@@ -72,14 +84,21 @@ class DeliverySection {
         type: json['type'] as String? ?? 'text',
         content: json['content'] as String?,
         url: json['url'] as String?,
+        fileName: json['file_name'] as String?,
         order: json['order'] as int? ?? 0,
       );
 
-  DeliverySection copyWith({String? content, String? url}) => DeliverySection(
+  DeliverySection copyWith({
+    String? content,
+    Object? url = _missing,
+    Object? fileName = _missing,
+    int? order,
+  }) => DeliverySection(
     type: type,
     content: content ?? this.content,
-    url: url ?? this.url,
-    order: order,
+    url: url == _missing ? this.url : url as String?,
+    fileName: fileName == _missing ? this.fileName : fileName as String?,
+    order: order ?? this.order,
   );
 }
 
@@ -123,3 +142,5 @@ class DeliveryContent {
         summary: json['summary'] as String?,
       );
 }
+
+const _missing = Object();

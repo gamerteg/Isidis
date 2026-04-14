@@ -1,11 +1,12 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/data/tarot_cards.dart';
 import '../../../shared/models/delivery.dart';
 import 'audio_recorder_widget.dart';
+import 'delivery_media.dart';
 
 class DigitalDeliveryScreen extends StatefulWidget {
   final String orderId;
@@ -25,12 +26,9 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  // Cartas selecionadas — mapa de cardId → DeliveryCard editável
   final Map<String, DeliveryCard> _selectedCards = {};
-  // Ordem de seleção
   final List<String> _cardOrder = [];
-  // Áudios pendentes de upload (cardId → localPath)
-  final Map<String, String> _pendingAudios = {};
+  final Map<String, PendingDeliveryMedia> _pendingAudios = {};
 
   final _summaryCtrl = TextEditingController();
   bool _submitting = false;
@@ -42,6 +40,7 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+
     if (widget.existingContent != null) {
       for (final card in widget.existingContent!.cards) {
         _selectedCards[card.id] = card;
@@ -77,49 +76,44 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
     });
   }
 
-  Future<String?> _uploadAudio(String cardId, String localPath) async {
-    try {
-      final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(
-          localPath,
-          filename: 'audio_$cardId.m4a',
-        ),
-        'type': 'audio',
-      });
-      final response = await api.postMultipart(
-        '/orders/${widget.orderId}/delivery/upload',
-        formData: formData,
-      );
-      return response.data['data']['url'] as String?;
-    } catch (e) {
-      return null;
-    }
-  }
-
   Future<DeliveryContent> _buildContent() async {
     final cards = <DeliveryCard>[];
+    final nextSelectedCards = Map<String, DeliveryCard>.from(_selectedCards);
+    final nextPendingAudios = Map<String, PendingDeliveryMedia>.from(
+      _pendingAudios,
+    );
+
     for (int i = 0; i < _cardOrder.length; i++) {
       final id = _cardOrder[i];
-      var card = _selectedCards[id]!;
+      var card = nextSelectedCards[id]!;
 
-      // Upload áudio pendente se existir
-      if (_pendingAudios.containsKey(id)) {
-        final url = await _uploadAudio(id, _pendingAudios[id]!);
-        if (url != null) {
-          card = card.copyWith(audioUrl: url);
-        }
+      final pendingAudio = nextPendingAudios[id];
+      if (pendingAudio != null) {
+        final upload = await uploadDeliveryMedia(
+          orderId: widget.orderId,
+          media: pendingAudio,
+          type: 'audio',
+        );
+        card = card.copyWith(
+          audioUrl: upload.url,
+          audioFileName: upload.fileName,
+        );
+        nextSelectedCards[id] = card;
+        nextPendingAudios.remove(id);
       }
 
-      cards.add(
-        DeliveryCard(
-          id: card.id,
-          name: card.name,
-          position: card.position,
-          interpretation: card.interpretation,
-          audioUrl: card.audioUrl,
-          order: i,
-        ),
-      );
+      cards.add(card.copyWith(order: i));
+    }
+
+    if (mounted) {
+      setState(() {
+        _selectedCards
+          ..clear()
+          ..addAll(nextSelectedCards);
+        _pendingAudios
+          ..clear()
+          ..addAll(nextPendingAudios);
+      });
     }
 
     return DeliveryContent(
@@ -137,6 +131,7 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
         '/orders/${widget.orderId}/delivery/draft',
         data: content.toJson(),
       );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -146,14 +141,7 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao salvar: ${e.toString()}'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      _showError('Erro ao salvar: $e');
     } finally {
       if (mounted) setState(() => _savingDraft = false);
     }
@@ -176,9 +164,9 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: AppColors.surface,
-          title: const Text('Interpretações vazias'),
+          title: const Text('Interpretacoes vazias'),
           content: Text(
-            '$emptyInterpretations carta(s) sem interpretação. Deseja enviar mesmo assim?',
+            '$emptyInterpretations carta(s) sem interpretacao. Deseja enviar mesmo assim?',
             style: const TextStyle(color: AppColors.textSecondary),
           ),
           actions: [
@@ -203,6 +191,7 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
         '/orders/${widget.orderId}/delivery/submit',
         data: content.toJson(),
       );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -213,17 +202,17 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
         context.pop();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: ${e.toString()}'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      _showError('Erro: $e');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppColors.error),
+    );
   }
 
   @override
@@ -238,7 +227,7 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
           onPressed: () => context.pop(),
         ),
         title: Text(
-          'Entrega — ${_selectedCards.length} carta(s)',
+          'Entrega - ${_selectedCards.length} carta(s)',
           style: const TextStyle(color: AppColors.textPrimary),
         ),
         actions: [
@@ -257,7 +246,7 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
           indicatorColor: AppColors.primary,
           tabs: const [
             Tab(text: 'Selecionar Cartas'),
-            Tab(text: 'Interpretações'),
+            Tab(text: 'Interpretacoes'),
           ],
         ),
       ),
@@ -270,7 +259,6 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
   }
 
   Widget _buildCardGrid() {
-    // Filtro por naipe
     final suits = ['all', 'major', 'wands', 'cups', 'swords', 'pentacles'];
     final suitNames = {'all': 'Todos', ...kSuitLabels};
 
@@ -280,7 +268,6 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
 
     return Column(
       children: [
-        // Filtro de naipe
         SizedBox(
           height: 44,
           child: ListView(
@@ -316,7 +303,6 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
             }).toList(),
           ),
         ),
-
         Expanded(
           child: GridView.builder(
             padding: const EdgeInsets.all(16),
@@ -379,11 +365,11 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              '${_cardOrder.indexOf(card.id) + 1}ª',
+                              '${_cardOrder.indexOf(card.id) + 1}a',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 9,
@@ -412,7 +398,7 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
             Icon(Icons.auto_awesome, color: AppColors.textMuted, size: 48),
             SizedBox(height: 12),
             Text(
-              'Selecione cartas na aba anterior\npara escrever as interpretações.',
+              'Selecione cartas na aba anterior\npara escrever as interpretacoes.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textSecondary),
             ),
@@ -468,7 +454,6 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header: nome + posição
             Row(
               children: [
                 Icon(
@@ -493,7 +478,6 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
                     ),
                   ),
                 ),
-                // Toggle posição
                 GestureDetector(
                   onTap: () => setState(() {
                     _selectedCards[cardId] = card.copyWith(
@@ -509,8 +493,8 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
                     ),
                     decoration: BoxDecoration(
                       color: card.position == 'upright'
-                          ? Colors.green.withOpacity(0.2)
-                          : Colors.orange.withOpacity(0.2),
+                          ? Colors.green.withValues(alpha: 0.2)
+                          : Colors.orange.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -541,18 +525,15 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
                 ),
               ],
             ),
-
             const SizedBox(height: 12),
-
-            // Campo de interpretação
             TextFormField(
               initialValue: card.interpretation,
               maxLines: 4,
-              onChanged: (v) => setState(() {
-                _selectedCards[cardId] = card.copyWith(interpretation: v);
+              onChanged: (value) => setState(() {
+                _selectedCards[cardId] = card.copyWith(interpretation: value);
               }),
               decoration: InputDecoration(
-                hintText: 'Escreva a interpretação desta carta...',
+                hintText: 'Escreva a interpretacao desta carta...',
                 hintStyle: const TextStyle(
                   color: AppColors.textMuted,
                   fontSize: 13,
@@ -569,18 +550,18 @@ class _DigitalDeliveryScreenState extends State<DigitalDeliveryScreen>
                 fontSize: 14,
               ),
             ),
-
             const SizedBox(height: 12),
-
-            // Gravador de áudio
             AudioRecorderWidget(
               existingAudioUrl: card.audioUrl,
-              onRecorded: (path) {
-                _pendingAudios[cardId] = path;
+              onRecorded: (media) {
+                setState(() => _pendingAudios[cardId] = media);
               },
               onDelete: () {
                 setState(() {
-                  _selectedCards[cardId] = card.copyWith(audioUrl: '');
+                  _selectedCards[cardId] = card.copyWith(
+                    audioUrl: null,
+                    audioFileName: null,
+                  );
                   _pendingAudios.remove(cardId);
                 });
               },
