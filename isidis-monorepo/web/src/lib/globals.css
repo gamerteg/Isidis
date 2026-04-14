@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Mystic dark palette — background: #1A0F1E */
+    --background: 285 30% 8%;
+    --foreground: 280 20% 92%;
+
+    --card: 285 28% 11%;
+    --card-foreground: 280 20% 92%;
+
+    /* Primary: plum purple #8B6BA8 */
+    --primary: 275 25% 54%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 285 20% 16%;
+    --secondary-foreground: 280 20% 85%;
+
+    --muted: 285 20% 16%;
+    --muted-foreground: 280 12% 55%;
+
+    --accent: 285 20% 18%;
+    --accent-foreground: 280 20% 92%;
+
+    --destructive: 0 63% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 285 18% 18%;
+    --input: 285 18% 18%;
+    --ring: 275 25% 54%;
+
+    --radius: 1rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    background-image: radial-gradient(ellipse at top, rgba(139, 107, 168, 0.08) 0%, transparent 60%);
+    min-height: 100dvh;
+  }
+
+  h1, h2, h3 {
+    @apply font-display;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary/40;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  /* Gold text */
+  .text-gold {
+    color: #C9A84C;
+  }
+  .text-gold-gradient {
+    background: linear-gradient(135deg, #C9A84C 0%, #E8C96B 50%, #A07830 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Mystic card glass effect */
+  .card-mystic {
+    background: rgba(45, 27, 61, 0.6);
+    border: 1px solid rgba(139, 107, 168, 0.2);
+    backdrop-filter: blur(12px);
+  }
+
+  /* Safe area for mobile bottom nav */
+  .pb-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 5rem);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
