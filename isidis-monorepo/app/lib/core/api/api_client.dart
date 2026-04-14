@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/app_env.dart';
@@ -38,7 +39,12 @@ class ApiClient {
                 final retryResponse = await _dio.fetch(error.requestOptions);
                 return handler.resolve(retryResponse);
               }
-            } catch (_) {}
+            } catch (refreshError) {
+              debugPrint('[ApiClient] Token refresh failed: $refreshError');
+              try {
+                await Supabase.instance.client.auth.signOut();
+              } catch (_) {}
+            }
           }
           return handler.next(error);
         },

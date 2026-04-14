@@ -127,7 +127,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/pix',
         builder: (_, state) {
-          final extra = state.extra as Map<String, dynamic>;
+          final extra = state.extra as Map<String, dynamic>?;
+          if (extra == null) {
+            return const Scaffold(
+              body: Center(child: Text('Dados do pagamento não encontrados.')),
+            );
+          }
           return PixScreen(
             orderId: extra['orderId'] as String,
             pixQrCodeId: extra['pixQrCodeId'] as String,
@@ -141,7 +146,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/credit-card',
         builder: (_, state) {
-          final extra = state.extra as Map<String, dynamic>;
+          final extra = state.extra as Map<String, dynamic>?;
+          if (extra == null) {
+            return const Scaffold(
+              body: Center(child: Text('Dados do checkout não encontrados.')),
+            );
+          }
           return CreditCardScreen(
             gigId: extra['gigId'] as String,
             addOnIds: (extra['addOnIds'] as List<dynamic>).cast<String>(),
@@ -252,7 +262,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/readings/:orderId/end',
         builder: (_, state) {
-          final extra = state.extra as Map<String, dynamic>;
+          final extra = state.extra as Map<String, dynamic>?;
+          if (extra == null) {
+            return const Scaffold(
+              body: Center(child: Text('Dados da leitura não encontrados.')),
+            );
+          }
           return ReadingEndScreen(
             orderId: state.pathParameters['orderId']!,
             gigId: extra['gigId'] as String,
@@ -303,9 +318,12 @@ class _SplashScreenState extends State<SplashScreen> {
 
     try {
       final response = await api.get('/me');
-      final profile = Profile.fromJson(
-        response.data['data'] as Map<String, dynamic>,
-      );
+      final rawData = response.data['data'];
+      if (rawData is! Map<String, dynamic>) {
+        if (mounted) context.go('/login');
+        return;
+      }
+      final profile = Profile.fromJson(rawData);
 
       if (!mounted) return;
 

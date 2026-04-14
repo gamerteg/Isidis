@@ -69,7 +69,9 @@ class _PixScreenState extends State<PixScreen> {
             context.pushReplacement('/order-confirmation/${widget.orderId}');
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[Pix] Polling error: $e');
+      }
     });
   }
 
@@ -109,10 +111,11 @@ class _PixScreenState extends State<PixScreen> {
     if (rawBase64 == null || rawBase64.isEmpty) return null;
 
     try {
-      final normalizedBase64 = rawBase64.contains(',')
-          ? rawBase64.split(',').last
-          : rawBase64;
-
+      final parts = rawBase64.split(',');
+      final normalizedBase64 = (parts.length > 1 && parts.last.isNotEmpty)
+          ? parts.last
+          : parts.first;
+      if (normalizedBase64.isEmpty) return null;
       return base64Decode(normalizedBase64.trim());
     } catch (_) {
       return null;

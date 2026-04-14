@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -54,7 +55,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _loadGig() async {
     try {
       final response = await api.get('/gigs/${widget.gigId}');
-      final gig = Gig.fromJson(response.data['data'] as Map<String, dynamic>);
+      final rawData = response.data['data'];
+      if (rawData is! Map<String, dynamic>) {
+        throw FormatException('Resposta inesperada de /gigs/${widget.gigId}');
+      }
+      final gig = Gig.fromJson(rawData);
       if (!mounted) return;
 
       setState(() {
@@ -72,7 +77,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _answerControllers[req.id] = TextEditingController();
         }
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[Checkout] Failed to load gig ${widget.gigId}: $e');
       if (!mounted) return;
       setState(() => _loading = false);
     }

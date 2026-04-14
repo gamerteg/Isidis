@@ -6,7 +6,8 @@
       "Bash(grep -n \"messages\\\\|conversations\\\\|device_tokens\" \"c:\\\\Apps\\\\IsidisApp\\\\Isidis\\\\supabase\\\\migrations\"/*.sql)",
       "Bash(find c:AppsIsidisAppIsidissupabasemigrations -type f -name *.sql)",
       "Bash(find c:AppsIsidisAppIsidisApp-APImigrations -type f -name *.sql)",
-      "Bash(grep -r \"ShellRoute\\\\|StatefulShellRoute\\\\|navigator.*shell\" c:/Apps/IsidisApp/isidis_flutter/lib --include=*.dart)"
+      "Bash(grep -r \"ShellRoute\\\\|StatefulShellRoute\\\\|navigator.*shell\" c:/Apps/IsidisApp/isidis_flutter/lib --include=*.dart)",
+      "Bash(flutter analyze:*)"
     ]
   }
 }

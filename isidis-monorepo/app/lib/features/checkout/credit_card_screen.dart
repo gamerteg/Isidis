@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../core/api/api_client.dart';
+import '../../core/config/app_env.dart';
 import '../../core/platform/platform_capabilities.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -30,9 +33,15 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
   bool _loading = false;
   String? _error;
   WebViewController? _webViewController;
+  Timer? _pollTimer;
+  int _pollAttempts = 0;
 
   // HTML mínimo com Asaas JS para tokenização de cartão
-  static String get _asaasTokenizerHtml => '''
+  static String get _asaasTokenizerHtml {
+    final asaasBase = AppEnv.isProduction
+        ? 'https://www.asaas.com'
+        : 'https://sandbox.asaas.com';
+    return '''
 <!DOCTYPE html>
 <html>
 <head>
@@ -56,7 +65,7 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
     }
     button:disabled { opacity: 0.5; }
   </style>
-  <script src="https://sandbox.asaas.com/static/js/asaas-card.js"></script>
+  <script src="$asaasBase/static/js/asaas-card.js"></script>
 </head>
 <body>
 <input id="holderName" placeholder="Nome no cartao" autocomplete="cc-name" />
@@ -97,6 +106,7 @@ async function tokenize() {
 </body>
 </html>
 ''';
+  }
 
   @override
   void initState() {
@@ -171,33 +181,45 @@ async function tokenize() {
   }
 
   void _startPolling(String paymentId, String orderId) {
-    var attempts = 0;
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 5));
-      attempts++;
-      if (attempts > 120 || !mounted) return false;
+    _pollAttempts = 0;
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      _pollAttempts++;
+      if (_pollAttempts > 120) {
+        _pollTimer?.cancel();
+        if (mounted) {
+          setState(() {
+            _error = 'Tempo esgotado. Verifique o app do banco.';
+            _loading = false;
+          });
+        }
+        return;
+      }
 
       try {
         final res = await api.get('/checkout/status/$paymentId');
         final status = res.data['data']['status'] as String?;
         if (status == 'PAID') {
-          if (mounted) {
-            context.pushReplacement('/order-confirmation/$orderId');
-          }
-          return false;
-        }
-        if (status == 'OVERDUE') {
+          _pollTimer?.cancel();
+          if (mounted) context.pushReplacement('/order-confirmation/$orderId');
+        } else if (status == 'OVERDUE') {
+          _pollTimer?.cancel();
           if (mounted) {
             setState(() {
               _error = 'Pagamento expirado. Tente novamente.';
               _loading = false;
             });
           }
-          return false;
         }
-      } catch (_) {}
-      return true;
+      } catch (e) {
+        debugPrint('[CreditCard] Polling error (attempt $_pollAttempts): $e');
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   String _extractError(dynamic error) {
@@ -336,7 +358,11 @@ async function tokenize() {
                 ),
               ),
               // WebView com formulário Asaas
-              Expanded(child: WebViewWidget(controller: _webViewController!)),
+              Expanded(
+                child: _webViewController != null
+                    ? WebViewWidget(controller: _webViewController!)
+                    : const Center(child: CircularProgressIndicator()),
+              ),
             ],
           ),
           if (_loading)

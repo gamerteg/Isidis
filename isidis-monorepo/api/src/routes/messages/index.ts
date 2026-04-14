@@ -179,11 +179,14 @@ const messagesRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: body.error.flatten() })
       }
 
+      const recipientId = conv.client_id === userId ? conv.reader_id : conv.client_id
+
       const { data: message, error } = await fastify.supabase
         .from('messages')
         .insert({
           conversation_id: conversationId,
           sender_id: userId,
+          receiver_id: recipientId,
           content: body.data.content,
           type: body.data.type,
         })
@@ -204,7 +207,6 @@ const messagesRoutes: FastifyPluginAsync = async (fastify) => {
         .eq('id', conversationId)
 
       // Notificação para o destinatário
-      const recipientId = conv.client_id === userId ? conv.reader_id : conv.client_id
       await fastify.supabase.from('notifications').insert({
         user_id: recipientId,
         type: 'NEW_MESSAGE',

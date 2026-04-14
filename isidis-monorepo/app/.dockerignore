@@ -1,0 +1,13 @@
+.dart_tool
+.flutter-plugins
+.flutter-plugins-dependencies
+.git
+.gitignore
+.idea
+.pub
+.vscode
+build
+coverage
+android
+ios
+test

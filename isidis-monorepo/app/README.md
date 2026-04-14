@@ -51,3 +51,41 @@ flutter build web --release \
   --dart-define=SUPABASE_URL=https://example.supabase.co \
   --dart-define=SUPABASE_ANON_KEY=example-key
 ```
+
+## Deploy em VPS com Docker
+
+O diretorio `app/` agora inclui:
+
+- `Dockerfile`
+- `nginx.conf`
+- `.dockerignore`
+
+Execute os comandos abaixo a partir deste diretorio (`isidis-monorepo/app`).
+
+Build da imagem:
+
+```bash
+docker build -t isidis-web \
+  --build-arg API_URL=https://api.seudominio.com \
+  --build-arg SUPABASE_URL=https://xxxxx.supabase.co \
+  --build-arg SUPABASE_ANON_KEY=xxxxx \
+  --build-arg ASAAS_ENV=production \
+  .
+```
+
+Subir o container:
+
+```bash
+docker run -d \
+  --name isidis-web \
+  --restart unless-stopped \
+  -p 8080:80 \
+  isidis-web
+```
+
+Notas:
+
+- `API_URL`, `SUPABASE_URL` e `SUPABASE_ANON_KEY` sao obrigatorias no `docker build`
+- no Flutter web, essas variaveis ficam compiladas no bundle final
+- o `nginx.conf` faz fallback para `index.html`, entao rotas SPA continuam funcionando
+- se voce usar proxy reverso na VPS, aponte o dominio para `http://127.0.0.1:8080`
