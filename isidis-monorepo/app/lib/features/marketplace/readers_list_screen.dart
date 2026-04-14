@@ -22,6 +22,8 @@ class _ReadersListScreenState extends State<ReadersListScreen>
   List<dynamic> _readers = [];
   bool _loading = true;
   String? _activeSpecialty;
+  double? _minRating;
+  int? _maxPrice;
 
   static const _specialties = [
     'Amor e Relacionamentos',
@@ -48,6 +50,16 @@ class _ReadersListScreenState extends State<ReadersListScreen>
     super.dispose();
   }
 
+  bool get _hasAdvancedFilters => _minRating != null || _maxPrice != null;
+
+  void _clearAdvancedFilters() {
+    setState(() {
+      _minRating = null;
+      _maxPrice = null;
+    });
+    _loadReaders();
+  }
+
   Future<void> _loadReaders() async {
     setState(() => _loading = true);
     try {
@@ -55,6 +67,12 @@ class _ReadersListScreenState extends State<ReadersListScreen>
       if (_activeSpecialty != null) params['specialty'] = _activeSpecialty!;
       if (_searchCtrl.text.trim().isNotEmpty) {
         params['search'] = _searchCtrl.text.trim();
+      }
+      if (_minRating != null) {
+        params['min_rating'] = _minRating!.toStringAsFixed(1);
+      }
+      if (_maxPrice != null) {
+        params['max_price'] = _maxPrice!.toString();
       }
 
       final response = await api.get('/readers', params: params);
@@ -133,9 +151,18 @@ class _ReadersListScreenState extends State<ReadersListScreen>
                           color: AppColors.surfaceLight.withValues(alpha: 0.55),
                           borderRadius: BorderRadius.circular(22),
                         ),
-                        child: const Icon(
-                          Icons.tune_rounded,
-                          color: AppColors.textPrimary,
+                        child: IconButton(
+                          onPressed: _hasAdvancedFilters
+                              ? _clearAdvancedFilters
+                              : null,
+                          icon: Icon(
+                            _hasAdvancedFilters
+                                ? Icons.filter_alt_off_rounded
+                                : Icons.tune_rounded,
+                            color: _hasAdvancedFilters
+                                ? AppColors.primaryLight
+                                : AppColors.textPrimary,
+                          ),
                         ),
                       ),
                     ],
@@ -166,6 +193,59 @@ class _ReadersListScreenState extends State<ReadersListScreen>
                         ),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _ThemeChip(
+                        label: '4.0+',
+                        selected: _minRating == 4.0,
+                        onTap: () {
+                          setState(() {
+                            _minRating = _minRating == 4.0 ? null : 4.0;
+                          });
+                          _loadReaders();
+                        },
+                      ),
+                      _ThemeChip(
+                        label: '4.5+',
+                        selected: _minRating == 4.5,
+                        onTap: () {
+                          setState(() {
+                            _minRating = _minRating == 4.5 ? null : 4.5;
+                          });
+                          _loadReaders();
+                        },
+                      ),
+                      _ThemeChip(
+                        label: 'Ate R\$ 50',
+                        selected: _maxPrice == 5000,
+                        onTap: () {
+                          setState(() {
+                            _maxPrice = _maxPrice == 5000 ? null : 5000;
+                          });
+                          _loadReaders();
+                        },
+                      ),
+                      _ThemeChip(
+                        label: 'Ate R\$ 100',
+                        selected: _maxPrice == 10000,
+                        onTap: () {
+                          setState(() {
+                            _maxPrice = _maxPrice == 10000 ? null : 10000;
+                          });
+                          _loadReaders();
+                        },
+                      ),
+                      if (_hasAdvancedFilters)
+                        _ThemeChip(
+                          label: 'Limpar filtros',
+                          selected: false,
+                          onTap: _clearAdvancedFilters,
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 18),
                   Container(
@@ -213,7 +293,7 @@ class _ReadersListScreenState extends State<ReadersListScreen>
                             itemBuilder: (context, index) => _ReaderCard(
                               reader: _readers[index] as Map<String, dynamic>,
                             ),
-                            separatorBuilder: (_, __) =>
+                            separatorBuilder: (_, _) =>
                                 const SizedBox(height: 14),
                             itemCount: _readers.length,
                           ),

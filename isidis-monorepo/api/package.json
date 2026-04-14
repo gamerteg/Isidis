@@ -18,6 +18,7 @@
     "@fastify/helmet": "^13.0.2",
     "@fastify/jwt": "^10.0.0",
     "@fastify/multipart": "^9.4.0",
+    "@sentry/node": "^10.48.0",
     "@supabase/supabase-js": "^2.100.0",
     "dotenv": "^17.3.1",
     "fastify": "^5.8.4",

@@ -1,5 +1,13 @@
 import 'dotenv/config'
+import * as Sentry from '@sentry/node'
 import { build } from './app.js'
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: process.env.NODE_ENV,
+  tracesSampleRate: 0.1,
+  enabled: Boolean(process.env.SENTRY_DSN),
+})
 
 const CORE_ENV_VARS = [
   'SUPABASE_URL',
@@ -39,6 +47,8 @@ const start = async () => {
     await fastify.listen({ port, host })
     fastify.log.info(`IsidisApp API rodando em http://${host}:${port}`)
   } catch (err) {
+    Sentry.captureException(err)
+    await Sentry.close(2000)
     console.error('Erro fatal ao iniciar servidor:', err)
     process.exit(1)
   }

@@ -1,11 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/platform/platform_capabilities.dart';
+import '../../core/services/pending_profile_sync_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/gig.dart';
+import '../../shared/models/profile.dart';
 import '../../shared/widgets/app_button.dart';
 import '../../shared/widgets/app_text_field.dart';
 
@@ -118,8 +119,47 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _currency(int cents) =>
       'R\$ ${(cents / 100).toStringAsFixed(2).replaceAll('.', ',')}';
 
+  Future<bool> _ensureClientProfileReady() async {
+    final synced = await PendingProfileSyncService.syncPendingClientContact();
+
+    try {
+      final response = await api.get('/me');
+      final profile = Profile.fromJson(
+        response.data['data'] as Map<String, dynamic>,
+      );
+      final hasTaxId = profile.taxId?.trim().isNotEmpty ?? false;
+      final hasCellphone = profile.cellphone?.trim().isNotEmpty ?? false;
+      if (hasTaxId && hasCellphone) {
+        return true;
+      }
+    } catch (error) {
+      debugPrint('[Checkout] Failed to load profile before payment: $error');
+    }
+
+    if (!mounted) return false;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          synced
+              ? 'Complete seu CPF e telefone antes de comprar.'
+              : 'Nao conseguimos sincronizar seu CPF e telefone. Tente novamente em instantes.',
+        ),
+        backgroundColor: AppColors.error,
+      ),
+    );
+    return false;
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _submitting = true);
+
+    final profileReady = await _ensureClientProfileReady();
+    if (!profileReady) {
+      if (mounted) setState(() => _submitting = false);
+      return;
+    }
 
     final answers = <String, String>{};
     for (final entry in _answerControllers.entries) {
@@ -128,6 +168,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     // Para CARD: navegar direto para CreditCardScreen — ela faz checkout/create após tokenizar
     if (_paymentMethod == 'CARD') {
+      if (mounted) setState(() => _submitting = false);
+      if (!mounted) return;
       context.pushReplacement(
         '/credit-card',
         extra: {
@@ -140,8 +182,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
       return;
     }
-
-    setState(() => _submitting = true);
 
     try {
       final response = await api.post(

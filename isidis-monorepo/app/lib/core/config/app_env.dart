@@ -6,6 +6,7 @@ abstract final class AppEnv {
 
   static const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
   static const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  static const sentryDsn = String.fromEnvironment('SENTRY_DSN');
 
   static const asaasEnvironment = String.fromEnvironment(
     'ASAAS_ENV',

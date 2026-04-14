@@ -53,6 +53,7 @@ class Order {
   final Map<String, dynamic> requirementsAnswers;
   final List<String> selectedAddons;
   final Map<String, dynamic>? deliveryContent;
+  final DateTime? deliveredAt;
   final DateTime? readerViewedAt;
   final OrderGig? gig;
   final OrderProfile? client;
@@ -68,6 +69,7 @@ class Order {
     required this.requirementsAnswers,
     required this.selectedAddons,
     this.deliveryContent,
+    this.deliveredAt,
     this.readerViewedAt,
     this.gig,
     this.client,
@@ -110,6 +112,7 @@ class Order {
               .toList() ??
           [],
       deliveryContent: json['delivery_content'] as Map<String, dynamic>?,
+      deliveredAt: DateTime.tryParse(json['delivered_at'] as String? ?? ''),
       readerViewedAt: DateTime.tryParse(
         json['reader_viewed_at'] as String? ?? '',
       ),

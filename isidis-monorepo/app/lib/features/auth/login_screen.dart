@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/supabase/supabase_service.dart';
+
 import '../../core/api/api_client.dart';
+import '../../core/services/pending_profile_sync_service.dart';
+import '../../core/supabase/supabase_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/models/profile.dart';
 import '../../shared/widgets/app_button.dart';
@@ -38,11 +40,12 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
       );
-    } catch (e) {
+      await PendingProfileSyncService.syncPendingProfileData();
+    } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Email ou senha incorretos'),
           backgroundColor: AppColors.error,
         ),
@@ -53,7 +56,6 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       if (!mounted) return;
 
-      // Buscar perfil para redirecionar corretamente
       final response = await api.get('/me');
       final profile = Profile.fromJson(
         response.data['data'] as Map<String, dynamic>,
@@ -62,11 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (profile.isReader) {
-        if (!profile.isApproved) {
-          context.go('/under-review');
-        } else {
-          context.go('/reader-home');
-        }
+        context.go(profile.isApproved ? '/reader-home' : '/under-review');
       } else {
         try {
           final quizResponse = await api.get('/me/quiz');
@@ -78,12 +76,13 @@ class _LoginScreenState extends State<LoginScreen> {
           if (mounted) context.go('/home');
         }
       }
-    } catch (e) {
+    } catch (error) {
       if (!mounted) return;
       await SupabaseService.signOut();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao carregar perfil: ${e.toString()}'),
+          content: Text('Erro ao carregar perfil: ${error.toString()}'),
           backgroundColor: AppColors.error,
           duration: const Duration(seconds: 8),
         ),
@@ -106,8 +105,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 48),
-
-                  // Logo / título
                   Center(
                     child: Column(
                       children: [
@@ -141,17 +138,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 48),
-
                   AppTextField(
                     controller: _emailCtrl,
                     label: 'Email',
                     keyboardType: TextInputType.emailAddress,
-                    validator: (v) => v!.isEmpty ? 'Informe seu email' : null,
+                    validator: (value) =>
+                        value!.isEmpty ? 'Informe seu email' : null,
                   ),
                   const SizedBox(height: 16),
-
                   AppTextField(
                     controller: _passwordCtrl,
                     label: 'Senha',
@@ -166,30 +161,26 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: () =>
                           setState(() => _obscurePassword = !_obscurePassword),
                     ),
-                    validator: (v) => v!.isEmpty ? 'Informe sua senha' : null,
+                    validator: (value) =>
+                        value!.isEmpty ? 'Informe sua senha' : null,
                   ),
-
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: () => _showForgotPassword(),
+                      onPressed: () => context.go('/forgot-password'),
                       child: const Text(
                         'Esqueci minha senha',
                         style: TextStyle(color: AppColors.primaryLight),
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
                   AppButton(
                     label: 'Entrar',
                     loading: _loading,
                     onPressed: _login,
                   ),
-
                   const SizedBox(height: 24),
-
                   Row(
                     children: [
                       const Expanded(child: Divider()),
@@ -203,9 +194,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const Expanded(child: Divider()),
                     ],
                   ),
-
                   const SizedBox(height: 24),
-
                   OutlinedButton(
                     onPressed: () => context.go('/register'),
                     child: const Text('Criar conta como cliente'),
@@ -220,42 +209,6 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  void _showForgotPassword() {
-    final emailCtrl = TextEditingController(text: _emailCtrl.text);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('Recuperar senha'),
-        content: AppTextField(
-          controller: emailCtrl,
-          label: 'Seu email',
-          keyboardType: TextInputType.emailAddress,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await SupabaseService.resetPassword(emailCtrl.text.trim());
-              if (ctx.mounted) {
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Email de recuperação enviado!'),
-                  ),
-                );
-              }
-            },
-            child: const Text('Enviar'),
-          ),
-        ],
       ),
     );
   }

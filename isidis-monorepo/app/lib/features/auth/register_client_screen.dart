@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/supabase/supabase_service.dart';
+
 import '../../core/api/api_client.dart';
+import '../../core/services/pending_profile_sync_service.dart';
+import '../../core/supabase/supabase_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/app_button.dart';
 import '../../shared/widgets/app_text_field.dart';
@@ -43,6 +45,12 @@ class _RegisterClientScreenState extends State<RegisterClientScreen> {
     setState(() => _loading = true);
 
     try {
+      final taxId = _cpfCtrl.text.trim().replaceAll(RegExp(r'[^0-9]'), '');
+      final cellphone = _phoneCtrl.text.trim().replaceAll(
+        RegExp(r'[^0-9]'),
+        '',
+      );
+
       final signUpResponse = await SupabaseService.signUp(
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
@@ -50,43 +58,62 @@ class _RegisterClientScreenState extends State<RegisterClientScreen> {
       );
 
       if (signUpResponse.session != null) {
-        // Confirmação de email desativada no Supabase — sessão imediata.
+        var profileSaved = false;
+
         try {
           await api.patch(
             '/me',
-            data: {
-              'tax_id': _cpfCtrl.text.trim().replaceAll(RegExp(r'[^0-9]'), ''),
-              'cellphone':
-                  _phoneCtrl.text.trim().replaceAll(RegExp(r'[^0-9]'), ''),
-            },
+            data: {'tax_id': taxId, 'cellphone': cellphone},
           );
-        } catch (_) {
-          // Non-critical — continua mesmo se patch falhar
+          await PendingProfileSyncService.clearPendingClientContact();
+          profileSaved = true;
+        } catch (error) {
+          debugPrint('[Register] Falha ao salvar CPF/telefone: $error');
+          await PendingProfileSyncService.savePendingClientContact(
+            taxId: taxId,
+            cellphone: cellphone,
+          );
         }
+
         if (!mounted) return;
+        if (!profileSaved) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Conta criada! Complete seu perfil antes de comprar.',
+              ),
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
         context.go('/home');
       } else {
-        // Confirmação de email ativada no Supabase.
+        await PendingProfileSyncService.savePendingClientContact(
+          taxId: taxId,
+          cellphone: cellphone,
+        );
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Conta criada! Confirme seu email para continuar.'),
+            content: Text(
+              'Conta criada! Confirme seu email e faca login para continuar.',
+            ),
             duration: Duration(seconds: 5),
           ),
         );
         context.go('/login');
       }
-    } catch (e) {
+    } catch (error) {
       if (!mounted) return;
-      final msg = e.toString();
+      final msg = error.toString();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             msg.contains('already registered')
-                ? 'Email já cadastrado'
+                ? 'Email ja cadastrado'
                 : msg.contains('429') || msg.contains('rate')
-                    ? 'Muitas tentativas. Aguarde alguns minutos.'
-                    : 'Erro ao criar conta. Tente novamente.',
+                ? 'Muitas tentativas. Aguarde alguns minutos.'
+                : 'Erro ao criar conta. Tente novamente.',
           ),
           backgroundColor: AppColors.error,
         ),
@@ -117,7 +144,6 @@ class _RegisterClientScreenState extends State<RegisterClientScreen> {
                     onPressed: () => context.go('/login'),
                   ),
                   const SizedBox(height: 16),
-
                   const Text(
                     'Criar conta',
                     style: TextStyle(
@@ -132,28 +158,25 @@ class _RegisterClientScreenState extends State<RegisterClientScreen> {
                     style: TextStyle(color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 32),
-
                   AppTextField(
                     controller: _nameCtrl,
                     label: 'Nome completo',
                     textCapitalization: TextCapitalization.words,
-                    validator: (v) =>
-                        v!.trim().isEmpty ? 'Informe seu nome' : null,
+                    validator: (value) =>
+                        value!.trim().isEmpty ? 'Informe seu nome' : null,
                   ),
                   const SizedBox(height: 16),
-
                   AppTextField(
                     controller: _emailCtrl,
                     label: 'Email',
                     keyboardType: TextInputType.emailAddress,
-                    validator: (v) {
-                      if (v!.isEmpty) return 'Informe seu email';
-                      if (!v.contains('@')) return 'Email inválido';
+                    validator: (value) {
+                      if (value!.isEmpty) return 'Informe seu email';
+                      if (!value.contains('@')) return 'Email invalido';
                       return null;
                     },
                   ),
                   const SizedBox(height: 16),
-
                   AppTextField(
                     controller: _passwordCtrl,
                     label: 'Senha',
@@ -168,14 +191,13 @@ class _RegisterClientScreenState extends State<RegisterClientScreen> {
                       onPressed: () =>
                           setState(() => _obscurePassword = !_obscurePassword),
                     ),
-                    validator: (v) {
-                      if (v!.isEmpty) return 'Informe uma senha';
-                      if (v.length < 6) return 'Mínimo 6 caracteres';
+                    validator: (value) {
+                      if (value!.isEmpty) return 'Informe uma senha';
+                      if (value.length < 6) return 'Minimo 6 caracteres';
                       return null;
                     },
                   ),
                   const SizedBox(height: 16),
-
                   AppTextField(
                     controller: _confirmPasswordCtrl,
                     label: 'Confirmar senha',
@@ -188,17 +210,19 @@ class _RegisterClientScreenState extends State<RegisterClientScreen> {
                         color: AppColors.textMuted,
                       ),
                       onPressed: () => setState(
-                        () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                        () =>
+                            _obscureConfirmPassword = !_obscureConfirmPassword,
                       ),
                     ),
-                    validator: (v) {
-                      if (v!.isEmpty) return 'Confirme sua senha';
-                      if (v != _passwordCtrl.text) return 'As senhas não coincidem';
+                    validator: (value) {
+                      if (value!.isEmpty) return 'Confirme sua senha';
+                      if (value != _passwordCtrl.text) {
+                        return 'As senhas nao coincidem';
+                      }
                       return null;
                     },
                   ),
                   const SizedBox(height: 16),
-
                   AppTextField(
                     controller: _cpfCtrl,
                     label: 'CPF',
@@ -207,15 +231,14 @@ class _RegisterClientScreenState extends State<RegisterClientScreen> {
                       FilteringTextInputFormatter.digitsOnly,
                       _CpfInputFormatter(),
                     ],
-                    validator: (v) {
-                      final digits = v!.replaceAll(RegExp(r'[^0-9]'), '');
+                    validator: (value) {
+                      final digits = value!.replaceAll(RegExp(r'[^0-9]'), '');
                       if (digits.isEmpty) return 'Informe seu CPF';
-                      if (digits.length != 11) return 'CPF inválido';
+                      if (digits.length != 11) return 'CPF invalido';
                       return null;
                     },
                   ),
                   const SizedBox(height: 16),
-
                   AppTextField(
                     controller: _phoneCtrl,
                     label: 'Telefone',
@@ -224,28 +247,25 @@ class _RegisterClientScreenState extends State<RegisterClientScreen> {
                       FilteringTextInputFormatter.digitsOnly,
                       _PhoneInputFormatter(),
                     ],
-                    validator: (v) {
-                      final digits = v!.replaceAll(RegExp(r'[^0-9]'), '');
+                    validator: (value) {
+                      final digits = value!.replaceAll(RegExp(r'[^0-9]'), '');
                       if (digits.isEmpty) return 'Informe seu telefone';
-                      if (digits.length < 10) return 'Telefone inválido';
+                      if (digits.length < 10) return 'Telefone invalido';
                       return null;
                     },
                   ),
-
                   const SizedBox(height: 32),
-
                   AppButton(
                     label: 'Criar conta',
                     loading: _loading,
                     onPressed: _register,
                   ),
-
                   const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
-                        'Já tem conta? ',
+                        'Ja tem conta? ',
                         style: TextStyle(color: AppColors.textSecondary),
                       ),
                       TextButton(
@@ -276,12 +296,14 @@ class _CpfInputFormatter extends TextInputFormatter {
   ) {
     final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.length > 11) return oldValue;
+
     final buffer = StringBuffer();
-    for (int i = 0; i < digits.length; i++) {
-      if (i == 3 || i == 6) buffer.write('.');
-      if (i == 9) buffer.write('-');
-      buffer.write(digits[i]);
+    for (var index = 0; index < digits.length; index++) {
+      if (index == 3 || index == 6) buffer.write('.');
+      if (index == 9) buffer.write('-');
+      buffer.write(digits[index]);
     }
+
     final formatted = buffer.toString();
     return TextEditingValue(
       text: formatted,
@@ -298,13 +320,15 @@ class _PhoneInputFormatter extends TextInputFormatter {
   ) {
     final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.length > 11) return oldValue;
+
     final buffer = StringBuffer();
-    for (int i = 0; i < digits.length; i++) {
-      if (i == 0) buffer.write('(');
-      if (i == 2) buffer.write(') ');
-      if (i == 7) buffer.write('-');
-      buffer.write(digits[i]);
+    for (var index = 0; index < digits.length; index++) {
+      if (index == 0) buffer.write('(');
+      if (index == 2) buffer.write(') ');
+      if (index == 7) buffer.write('-');
+      buffer.write(digits[index]);
     }
+
     final formatted = buffer.toString();
     return TextEditingValue(
       text: formatted,

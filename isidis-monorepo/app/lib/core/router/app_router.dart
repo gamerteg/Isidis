@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/auth/login_screen.dart';
+import '../../features/auth/forgot_password_screen.dart';
 import '../../features/auth/register_client_screen.dart';
 import '../../features/auth/register_reader_screen.dart';
 import '../../features/home/onboarding_screen.dart';
@@ -35,6 +36,7 @@ import '../../features/chat/conversations_screen.dart';
 import '../../features/chat/chat_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/quiz/quiz_onboarding_screen.dart';
+import '../../core/services/pending_profile_sync_service.dart';
 import '../../core/supabase/supabase_service.dart';
 import '../../core/api/api_client.dart';
 import '../../shared/models/profile.dart';
@@ -45,6 +47,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) async {
       final publicRoutes = [
         '/login',
+        '/forgot-password',
         '/register',
         '/register-reader',
         '/onboarding',
@@ -62,32 +65,33 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       // ── Splash ─────────────────────────────────────────────────────────────
-      GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
+      GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
 
       // ── Onboarding ─────────────────────────────────────────────────────────
-      GoRoute(
-        path: '/onboarding',
-        builder: (_, __) => const OnboardingScreen(),
-      ),
+      GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingScreen()),
       GoRoute(
         path: '/quiz-onboarding',
         builder: (_, _) => const QuizOnboardingScreen(),
       ),
 
       // ── Auth ───────────────────────────────────────────────────────────────
-      GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+      GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (_, _) => const ForgotPasswordScreen(),
+      ),
       GoRoute(
         path: '/register',
-        builder: (_, __) => const RegisterClientScreen(),
+        builder: (_, _) => const RegisterClientScreen(),
       ),
       GoRoute(
         path: '/register-reader',
-        builder: (_, __) => const RegisterReaderScreen(),
+        builder: (_, _) => const RegisterReaderScreen(),
       ),
 
       // ── Cliente — Home ──────────────────────────────────────────────────────
-      GoRoute(path: '/home', builder: (_, __) => const ClientHomeScreen()),
-      GoRoute(path: '/tiragem', builder: (_, __) => const TiragemScreen()),
+      GoRoute(path: '/home', builder: (_, _) => const ClientHomeScreen()),
+      GoRoute(path: '/tiragem', builder: (_, _) => const TiragemScreen()),
 
       // ── Marketplace ────────────────────────────────────────────────────────
       GoRoute(
@@ -170,7 +174,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       // ── Cliente — Pedidos ──────────────────────────────────────────────────
-      GoRoute(path: '/orders', builder: (_, __) => const ClientOrdersScreen()),
+      GoRoute(path: '/orders', builder: (_, _) => const ClientOrdersScreen()),
       GoRoute(
         path: '/orders/:id',
         builder: (_, state) =>
@@ -180,15 +184,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       // ── Reader ─────────────────────────────────────────────────────────────
       GoRoute(
         path: '/reader-home',
-        builder: (_, __) => const ReaderHomeScreen(),
+        builder: (_, _) => const ReaderHomeScreen(),
       ),
       GoRoute(
         path: '/under-review',
-        builder: (_, __) => const UnderReviewScreen(),
+        builder: (_, _) => const UnderReviewScreen(),
       ),
       GoRoute(
         path: '/reader-orders',
-        builder: (_, __) => const ReaderOrdersScreen(),
+        builder: (_, _) => const ReaderOrdersScreen(),
       ),
       GoRoute(
         path: '/reader-orders/:id',
@@ -197,7 +201,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       // ── Carteira ───────────────────────────────────────────────────────────
-      GoRoute(path: '/wallet', builder: (_, __) => const WalletScreen()),
+      GoRoute(path: '/wallet', builder: (_, _) => const WalletScreen()),
       GoRoute(
         path: '/withdraw',
         builder: (_, state) {
@@ -209,11 +213,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       // ── Serviços do reader ─────────────────────────────────────────────────
-      GoRoute(path: '/my-gigs', builder: (_, __) => const MyGigsScreen()),
-      GoRoute(
-        path: '/my-gigs/new',
-        builder: (_, __) => const GigEditorScreen(),
-      ),
+      GoRoute(path: '/my-gigs', builder: (_, _) => const MyGigsScreen()),
+      GoRoute(path: '/my-gigs/new', builder: (_, _) => const GigEditorScreen()),
       GoRoute(
         path: '/my-gigs/:id/edit',
         builder: (_, state) {
@@ -223,16 +224,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       // ── Perfil ─────────────────────────────────────────────────────────────
-      GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
+      GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen()),
       GoRoute(
         path: '/edit-profile',
-        builder: (_, __) => const EditProfileScreen(),
+        builder: (_, _) => const EditProfileScreen(),
       ),
 
       // ── Chat ───────────────────────────────────────────────────────────────
       GoRoute(
         path: '/conversations',
-        builder: (_, __) => const ConversationsScreen(),
+        builder: (_, _) => const ConversationsScreen(),
       ),
       GoRoute(
         path: '/chat/:conversationId',
@@ -245,7 +246,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // ── Notificações ───────────────────────────────────────────────────────
       GoRoute(
         path: '/notifications',
-        builder: (_, __) => const NotificationsScreen(),
+        builder: (_, _) => const NotificationsScreen(),
       ),
 
       // ── Delivery ───────────────────────────────────────────────────────────
@@ -306,6 +307,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     final prefs = await SharedPreferences.getInstance();
     final seenOnboarding = prefs.getBool('seen_onboarding') ?? false;
+    if (!mounted) return;
 
     if (!SupabaseService.isLoggedIn) {
       if (!seenOnboarding) {
@@ -317,6 +319,7 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     try {
+      await PendingProfileSyncService.syncPendingProfileData();
       final response = await api.get('/me');
       final rawData = response.data['data'];
       if (rawData is! Map<String, dynamic>) {
