@@ -302,10 +302,17 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
                     parsedYear += 2000;
                 }
 
-                const mpPublicKey = process.env.MERCADOPAGO_PUBLIC_KEY!
+                const mpPublicKey = process.env.MERCADOPAGO_PUBLIC_KEY
+                if (!mpPublicKey) {
+                    request.log.error('[checkout] MERCADOPAGO_PUBLIC_KEY nao esta definida nas variaveis de ambiente!')
+                    throw new Error('Configuracao do gateway de pagamento incompleta. Contate o suporte.')
+                }
+                request.log.info({ mpPublicKey: mpPublicKey.slice(0, 20) + '...' }, '[checkout] Tokenizando cartao com public_key')
+
                 const tokenRes = await fastify.mp(`/v1/card_tokens?public_key=${mpPublicKey}`, {
                     method: 'POST',
                     body: JSON.stringify({
+                        public_key: mpPublicKey,
                         card_number: sanitizedCardNumber,
                         expiration_month: parseInt(sanitizedExpiryMonth!),
                         expiration_year: parsedYear,
