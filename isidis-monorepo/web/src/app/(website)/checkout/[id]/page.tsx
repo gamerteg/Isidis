@@ -8,7 +8,11 @@ import type { GigAddOn, GigRequirement } from '@/types'
 
 const CheckoutForm = lazy(() => import('./checkout-form').then((mod) => ({ default: mod.CheckoutForm })))
 
-function formatPrice(value: number) {
+function formatCurrencyFromCents(value: number) {
+  return (value / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+function formatCurrencyFromReais(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
@@ -173,7 +177,7 @@ export default function CheckoutPage() {
               <div className="space-y-3 text-sm text-slate-300">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Servico base</span>
-                  <span>{formatPrice(gig.price)}</span>
+                  <span>{formatCurrencyFromCents(gig.price)}</span>
                 </div>
 
                 {selectedAddOns.map((addOn) => (
@@ -182,13 +186,13 @@ export default function CheckoutPage() {
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
                       {addOn.title}
                     </span>
-                    <span>{formatPrice(Math.round(addOn.price * 100))}</span>
+                    <span>{formatCurrencyFromReais(addOn.price)}</span>
                   </div>
                 ))}
 
                 <div className="flex items-center justify-between border-t border-white/10 pt-3 text-base font-semibold text-white">
                   <span>Total</span>
-                  <span>{formatPrice(Math.round(orderTotal * 100))}</span>
+                  <span>{formatCurrencyFromReais(orderTotal)}</span>
                 </div>
               </div>
             </div>
