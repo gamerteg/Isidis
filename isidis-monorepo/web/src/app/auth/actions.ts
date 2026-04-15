@@ -90,6 +90,9 @@ export async function signup(prevState: any, formData: FormData) {
     if (authData.user) {
         const userId = authData.user.id
 
+        const cleanCpf = cpf ? cpf.replace(/\D/g, "") : null;
+        const cleanPhone = cellphone ? cellphone.replace(/\D/g, "") : null;
+
         // Initialize update data
         let updateData: any = {
             id: userId,
@@ -97,9 +100,12 @@ export async function signup(prevState: any, formData: FormData) {
             social_name: socialName,
             role: role,
             sexo: sexo || null,
-            cellphone: cellphone ? cellphone.replace(/\D/g, "") : null,
-            tax_id: cpf ? cpf.replace(/\D/g, "") : null, // Store clean CPF
+            cellphone: cleanPhone,
+            tax_id: cleanCpf,
+            cpf_cnpj: cleanCpf, // Set both to accommodate any schema adjustments
         }
+
+        console.log('SIGNUP PROFILE ATTEMPT:', updateData);
 
         // Handle File Uploads & Extended Data for READER
         if (role === 'READER') {
