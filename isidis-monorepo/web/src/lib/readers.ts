@@ -130,7 +130,7 @@ export function mapReaderToMarketplaceReader(reader: ReaderListItem): Marketplac
   return {
     id: reader.id,
     name: reader.full_name || 'Cartomante',
-    title: primaryGig?.title || reader.tagline || 'Tarot & VIdencia',
+    title: primaryGig?.title || reader.tagline || 'Tarot & Videncia',
     bio: reader.bio || '',
     rating: Number(reader.rating_average || 5),
     reviews: Number(reader.reviews_count || 0),

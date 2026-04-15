@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { useNavigate, Link } from 'react-router-dom'
 import { Sparkles, Star, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Profile, Gig } from '@/types'
 import { getCategoryCounts, getBestSellingGigs } from '@/lib/data/stats'
 import { PageContainer } from '@/components/layout/PageContainer'
 import { PageSection } from '@/components/layout/PageSection'
@@ -18,7 +16,6 @@ import apiClient from '@/lib/apiClient'
 export default function DashboardHome() {
     const { user, loading: authLoading } = useAuth()
     const navigate = useNavigate()
-    const [activeReaders, setActiveReaders] = useState<Profile[]>([])
     const [categoryCounts, setCategoryCounts] = useState<any[]>([])
     const [recommendedGigs, setRecommendedGigs] = useState<any[]>([])
     const [refreshKey, setRefreshKey] = useState(0)
@@ -37,19 +34,16 @@ export default function DashboardHome() {
         if (!user) { navigate('/login'); return }
         if (user.user_metadata?.role === 'READER') { navigate('/dashboard/cartomante'); return }
 
-        const supabase = createClient()
         Promise.all([
             apiClient.get<{ data: { completed: boolean } }>('/me/quiz').catch(() => null),
-            supabase.from('profiles').select('*').eq('role', 'READER').eq('verification_status', 'APPROVED').limit(50).returns<Profile[]>(),
             getCategoryCounts(),
             getBestSellingGigs(4),
-        ]).then(([quizResponse, readersResponse, categories, gigs]) => {
+        ]).then(([quizResponse, categories, gigs]) => {
             if (quizResponse && !quizResponse.data.data.completed) {
                 navigate('/quiz-onboarding', { replace: true })
                 return
             }
 
-            setActiveReaders(readersResponse.data || [])
             setCategoryCounts(categories)
             setRecommendedGigs(gigs)
         })
@@ -126,7 +120,7 @@ export default function DashboardHome() {
                             </Link>
                         </div>
 
-                        <OnlineReaders initialReaders={activeReaders} />
+                        <OnlineReaders />
                     </PageSection>
 
                     {/* 5. Recomendados */}

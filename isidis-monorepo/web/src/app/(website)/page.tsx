@@ -29,7 +29,7 @@ export default function Home() {
   const [stats, setStats] = useState({ totalConsultations: 0, satisfactionRate: 0, activeReaders: 0, averageRating: 0 })
 
   useEffect(() => {
-    getFeaturedReaders().then(setReaders)
+    getFeaturedReaders().then(setReaders).catch(() => setReaders([]))
     getLandingStats().then(setStats)
   }, [])
 
