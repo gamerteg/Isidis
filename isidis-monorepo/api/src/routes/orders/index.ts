@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { listOrdersSchema } from '../../schemas/index.js'
 import { sendOrderCanceled } from '../../services/email.js'
 import { notifyUser } from '../../services/notify.js'
-import { processPaidAsaasOrder } from '../../services/payment-reconciliation.js'
+import { processPaidMpOrder } from '../../services/payment-reconciliation.js'
 import { signDeliveryContentUrls } from '../../services/readings-storage.js'
 
 const orderDetailSelect = `
@@ -98,9 +98,9 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (order.status === 'PENDING_PAYMENT' && (order as any).asaas_payment_id) {
         try {
-          const charge = await fastify.asaas(`/payments/${(order as any).asaas_payment_id}`)
-          if (['CONFIRMED', 'RECEIVED'].includes(charge.status)) {
-            await processPaidAsaasOrder(fastify, (order as any).asaas_payment_id)
+          const charge = await fastify.mp(`/v1/payments/${(order as any).asaas_payment_id}`)
+          if (['approved', 'authorized'].includes(charge.status)) {
+            await processPaidMpOrder(fastify, (order as any).asaas_payment_id)
 
             const refreshed = await fastify.supabase
               .from('orders')
@@ -246,15 +246,11 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       try {
-        await fastify.asaas(`/payments/${order.asaas_payment_id}/refund`, {
+        await fastify.mp(`/v1/payments/${order.asaas_payment_id}/refunds`, {
           method: 'POST',
-          body: JSON.stringify({
-            value: order.amount_total / 100,
-            description: body.data.reason,
-          }),
         })
-      } catch (asaasErr: any) {
-        request.log.error({ asaasErr: asaasErr.message }, '[cancel] Erro ao criar reembolso Asaas')
+      } catch (mpErr: any) {
+        request.log.error({ mpErr: mpErr.message }, '[cancel] Erro ao criar reembolso Mercado Pago')
         return reply.status(500).send({ error: 'Erro ao processar reembolso. Tente novamente.' })
       }
 

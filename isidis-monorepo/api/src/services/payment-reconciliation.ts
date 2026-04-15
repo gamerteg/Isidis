@@ -22,7 +22,7 @@ async function getOrCreateWalletId(fastify: FastifyInstance, userId: string) {
   return wallet?.id ?? null
 }
 
-export async function processPaidAsaasOrder(
+export async function processPaidMpOrder(
   fastify: FastifyInstance,
   paymentId: string
 ): Promise<{ orderId?: string; processed: boolean; found: boolean }> {

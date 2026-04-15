@@ -7,7 +7,7 @@ import multipart from '@fastify/multipart'
 import supabasePlugin from './plugins/supabase.js'
 import resendPlugin from './plugins/resend.js'
 import authPlugin from './plugins/auth.js'
-import asaasPlugin from './plugins/asaas.js'
+import mercadopagoPlugin from './plugins/mercadopago.js'
 
 // Routes
 import authRoutes from './routes/auth/index.js'
@@ -16,7 +16,7 @@ import gigsRoutes from './routes/gigs/index.js'
 import ordersRoutes from './routes/orders/index.js'
 import walletRoutes from './routes/wallet/index.js'
 import checkoutRoutes from './routes/checkout/index.js'
-import asaasWebhookRoute from './routes/webhooks/asaas.js'
+import mercadopagoWebhookRoute from './routes/webhooks/mercadopago.js'
 import cronRoutes from './routes/crons/index.js'
 import deliveryRoutes from './routes/delivery/index.js'
 import messagesRoutes from './routes/messages/index.js'
@@ -73,7 +73,7 @@ export async function build() {
   await fastify.register(supabasePlugin)
   await fastify.register(resendPlugin)
   await fastify.register(authPlugin)
-  await fastify.register(asaasPlugin)
+  await fastify.register(mercadopagoPlugin)
 
   fastify.get('/health', async () => ({
     status: 'ok',
@@ -87,7 +87,7 @@ export async function build() {
   await fastify.register(ordersRoutes)
   await fastify.register(walletRoutes)
   await fastify.register(checkoutRoutes)
-  await fastify.register(asaasWebhookRoute)
+  await fastify.register(mercadopagoWebhookRoute)
   await fastify.register(cronRoutes)
   await fastify.register(deliveryRoutes)
   await fastify.register(messagesRoutes)

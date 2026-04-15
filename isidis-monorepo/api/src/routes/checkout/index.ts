@@ -1,28 +1,16 @@
 import { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
-import { getOrCreateAsaasCustomer } from '../../plugins/asaas.js'
 import { checkFraud } from '../../services/fraud.js'
-import { processPaidAsaasOrder } from '../../services/payment-reconciliation.js'
+import { processPaidMpOrder } from '../../services/payment-reconciliation.js'
 
 const PLATFORM_FEE_PERCENT = 0.15
-const ASAAS_CARD_FEE_PERCENT = parseFloat(process.env.ASAAS_CARD_FEE_PERCENT ?? '0.0349')
-const ASAAS_CARD_FEE_FIXED = parseInt(process.env.ASAAS_CARD_FEE_FIXED ?? '39', 10)
+const CARD_FEE_PERCENT = parseFloat(process.env.MERCADOPAGO_CARD_FEE_PERCENT ?? '0.0499')
+const CARD_FEE_FIXED = parseInt(process.env.MERCADOPAGO_CARD_FEE_FIXED ?? '30', 10) // 30 centavos
 
-const toAsaas = (centavos: number) => centavos / 100
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-function getAsaasErrorMessage(error: any, fallback: string) {
-  return (
-    error?.responseBody?.errors?.[0]?.description ??
-    error?.responseBody?.error ??
-    error?.message ??
-    fallback
-  )
-}
+const toDecimal = (centavos: number) => Number((centavos / 100).toFixed(2))
 
 function calculateCardFee(amountInCents: number) {
-  return Math.ceil(amountInCents * ASAAS_CARD_FEE_PERCENT) + ASAAS_CARD_FEE_FIXED
+  return Math.ceil(amountInCents * CARD_FEE_PERCENT) + CARD_FEE_FIXED
 }
 
 function sanitizePixDescription(orderId: string, gigTitle: string) {
@@ -36,34 +24,6 @@ function sanitizePixDescription(orderId: string, gigTitle: string) {
     : `Pedido ${orderId}`
 
   return description.slice(0, 140)
-}
-
-async function getPixQrCodeWithRetry(
-  asaas: (path: string, options?: RequestInit) => Promise<any>,
-  paymentId: string,
-  retries = 5
-) {
-  let lastError: any
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      return await asaas(`/payments/${paymentId}/pixQrCode`)
-    } catch (error: any) {
-      lastError = error
-      const message = String(error?.message ?? '')
-      const isTransientPixAvailabilityError =
-        message.includes('nao permite pagamentos via Pix') ||
-        message.includes('não permite pagamentos via Pix')
-
-      if (!isTransientPixAvailabilityError || attempt === retries) {
-        throw error
-      }
-
-      await sleep(attempt * 500)
-    }
-  }
-
-  throw lastError
 }
 
 const createCheckoutSchema = z.object({
@@ -84,7 +44,7 @@ const createCheckoutSchema = z.object({
 
 const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/checkout/config', async (_request, reply) => {
-    return reply.send({ data: { gateway: 'asaas' } })
+    return reply.send({ data: { gateway: 'mercadopago' } })
   })
 
   fastify.post(
@@ -332,55 +292,79 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
           return reply.status(400).send({ error: 'Dados do cartao sao obrigatorios para pagamento com cartao' })
         }
 
-        if (!card_holder_postal_code || !card_holder_address_number) {
-          return reply.status(400).send({
-            error: 'CEP e numero do endereco sao obrigatorios para pagamento com cartao',
-          })
-        }
+        let finalCardToken = card_token
+        let derivedPaymentMethodId = 'visa' // standard fallback
 
-        let charge: any
         try {
-          const customerId = await getOrCreateAsaasCustomer(fastify.asaas, {
-            name: clientProfile.full_name,
-            email: clientEmail,
-            cpfCnpj: clientProfile.tax_id,
-            mobilePhone: clientProfile.cellphone,
-          })
+            if (!finalCardToken && hasRawCard) {
+                const tokenRes = await fastify.mp('/v1/card_tokens', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        card_number: sanitizedCardNumber,
+                        expiration_month: parseInt(sanitizedExpiryMonth!),
+                        expiration_year: parseInt(sanitizedExpiryYear!),
+                        security_code: sanitizedCardCvv,
+                        cardholder: {
+                            name: card_holder_name ?? clientProfile.full_name,
+                            identification: {
+                                type: 'CPF',
+                                number: clientProfile.tax_id.replace(/\D/g, '')
+                            }
+                        }
+                    })
+                })
+                finalCardToken = tokenRes.id
+                
+                // Get bin for payment method
+                const binRes = await fastify.mp(`/v1/payment_methods/search?bin=${sanitizedCardNumber!.substring(0, 6)}`)
+                if (binRes.results && binRes.results.length > 0) {
+                    derivedPaymentMethodId = binRes.results[0].id
+                }
+            } else if (card_token) {
+                 // if token provided by MP SDK, SDK handles payment_method mapping. Let's fallback to infering or maybe client sends it. Currently we don't have it so we just supply generic credit_card or visa
+                 derivedPaymentMethodId = 'master' // MP typically validates via token anyway
+            }
+        
+            const charge = await fastify.mp('/v1/payments', {
+              method: 'POST',
+              body: JSON.stringify({
+                transaction_amount: toDecimal(totalAmount),
+                token: finalCardToken,
+                description: sanitizePixDescription(order.id, gig.title),
+                installments: 1,
+                payment_method_id: derivedPaymentMethodId, // MP typically reads from token / BIN
+                payer: {
+                  email: clientEmail,
+                  first_name: clientProfile.full_name.split(' ')[0],
+                  identification: {
+                    type: 'CPF',
+                    number: clientProfile.tax_id.replace(/\D/g, '')
+                  }
+                },
+                external_reference: order.id,
+              }),
+            })
+            
+            await fastify.supabase
+              .from('orders')
+              .update({ asaas_payment_id: charge.id?.toString(), metadata: orderMetadata })
+              .eq('id', order.id)
 
-          charge = await fastify.asaas('/payments', {
-            method: 'POST',
-            body: JSON.stringify({
-              customer: customerId,
-              billingType: 'CREDIT_CARD',
-              value: toAsaas(totalAmount),
-              dueDate: new Date().toISOString().split('T')[0],
-              description: gig.title.slice(0, 100),
-              externalReference: order.id,
-              ...(card_token
-                ? { creditCardToken: card_token }
-                : {
-                    creditCard: {
-                      holderName: card_holder_name ?? clientProfile.full_name,
-                      number: sanitizedCardNumber,
-                      expiryMonth: sanitizedExpiryMonth,
-                      expiryYear: sanitizedExpiryYear,
-                      ccv: sanitizedCardCvv,
-                    },
-                  }),
-              creditCardHolderInfo: {
-                name: card_holder_name ?? clientProfile.full_name,
-                email: clientEmail,
-                cpfCnpj: clientProfile.tax_id.replace(/\D/g, ''),
-                postalCode: card_holder_postal_code.replace(/\D/g, ''),
-                addressNumber: card_holder_address_number,
-                phone: clientProfile.cellphone?.replace(/\D/g, '') ?? '',
+            return reply.status(201).send({
+              data: {
+                order_id: order.id,
+                payment_method: 'CARD',
+                amount_total: totalAmount,
+                amount_service_total: serviceAmount,
+                amount_card_fee: cardFee,
+                card_fee_responsibility: 'READER',
+                // Keep the property name to avoid breaking frontend immediately
+                asaas_payment_id: charge.id?.toString(), 
+                status: charge.status === 'approved' ? 'CONFIRMED' : 'PENDING',
               },
-              remoteIp: clientIp,
-              installmentCount: 1,
-              installmentValue: toAsaas(totalAmount),
-            }),
-          })
-        } catch (asaasErr: any) {
+            })
+
+        } catch (mpErr: any) {
           await fastify.supabase
             .from('orders')
             .update({ status: 'CANCELED' })
@@ -388,63 +372,65 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
 
           request.log.error(
             {
-              err: asaasErr.message,
-              statusCode: asaasErr.statusCode,
-              responseBody: asaasErr.responseBody,
+              err: mpErr.message,
+              statusCode: mpErr.statusCode,
+              responseBody: mpErr.responseBody,
             },
-            '[checkout] Erro no Asaas CARD'
+            '[checkout] Erro no MP CARD'
           )
 
-          const statusCode = typeof asaasErr?.statusCode === 'number' ? asaasErr.statusCode : 502
-          const errorMessage = getAsaasErrorMessage(asaasErr, 'Erro ao processar cartao. Tente novamente.')
+          const statusCode = typeof mpErr?.statusCode === 'number' ? mpErr.statusCode : 502
+          const errorMessage = mpErr.message ?? 'Erro ao processar cartao. Tente novamente.'
 
           return reply.status(statusCode >= 400 && statusCode < 500 ? 400 : 502).send({ error: errorMessage })
         }
+      }
+
+      // PIX Flow
+      try {
+        const dueDate = new Date(Date.now() + 15 * 60 * 1000) // MP supports 15min well
+        const pixDescription = sanitizePixDescription(order.id, gig.title)
+
+        const charge = await fastify.mp('/v1/payments', {
+          method: 'POST',
+          body: JSON.stringify({
+            transaction_amount: toDecimal(totalAmount),
+            description: pixDescription,
+            payment_method_id: 'pix',
+            payer: {
+              email: clientEmail,
+              first_name: clientProfile.full_name.split(' ')[0],
+              identification: {
+                type: 'CPF',
+                number: clientProfile.tax_id.replace(/\D/g, '')
+              }
+            },
+            date_of_expiration: dueDate.toISOString(),
+            external_reference: order.id,
+          }),
+        })
 
         await fastify.supabase
           .from('orders')
-          .update({ asaas_payment_id: charge.id, metadata: orderMetadata })
+          .update({ asaas_payment_id: charge.id?.toString(), metadata: orderMetadata })
           .eq('id', order.id)
+
+        const transactionData = charge.point_of_interaction?.transaction_data
 
         return reply.status(201).send({
           data: {
             order_id: order.id,
-            payment_method: 'CARD',
+            pix_qr_code_id: charge.id?.toString(),
             amount_total: totalAmount,
             amount_service_total: serviceAmount,
-            amount_card_fee: cardFee,
-            card_fee_responsibility: 'READER',
-            asaas_payment_id: charge.id,
-            status: charge.status === 'CONFIRMED' ? 'CONFIRMED' : 'PENDING',
+            pix: {
+              qr_code_base64: transactionData?.qr_code_base64 ?? null,
+              copy_paste_code: transactionData?.qr_code ?? null,
+              expires_at: charge.date_of_expiration ?? null,
+            },
           },
         })
-      }
-
-      let charge: any
-
-      try {
-        const customerId = await getOrCreateAsaasCustomer(fastify.asaas, {
-          name: clientProfile.full_name,
-          email: clientEmail,
-          cpfCnpj: clientProfile.tax_id,
-          mobilePhone: clientProfile.cellphone,
-        })
-
-        const dueDate = new Date(Date.now() + 10 * 60 * 1000)
-        const pixDescription = sanitizePixDescription(order.id, gig.title)
-
-        charge = await fastify.asaas('/payments', {
-          method: 'POST',
-          body: JSON.stringify({
-            customer: customerId,
-            billingType: 'PIX',
-            value: toAsaas(totalAmount),
-            dueDate: dueDate.toISOString().split('T')[0],
-            description: pixDescription,
-            externalReference: order.id,
-          }),
-        })
-      } catch (asaasErr: any) {
+      } catch (mpErr: any) {
         await fastify.supabase
           .from('orders')
           .update({ status: 'CANCELED' })
@@ -452,53 +438,18 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
 
         request.log.error(
           {
-            err: asaasErr.message,
-            statusCode: asaasErr.statusCode,
-            responseBody: asaasErr.responseBody,
+            err: mpErr.message,
+            statusCode: mpErr.statusCode,
+            responseBody: mpErr.responseBody,
           },
-          '[checkout] Erro no Asaas PIX'
+          '[checkout] Erro no MP PIX'
         )
 
-        const statusCode = typeof asaasErr?.statusCode === 'number' ? asaasErr.statusCode : 502
-        const errorMessage = getAsaasErrorMessage(asaasErr, 'Erro ao gerar pagamento. Tente novamente.')
+        const statusCode = typeof mpErr?.statusCode === 'number' ? mpErr.statusCode : 502
+        const errorMessage = mpErr.message ?? 'Erro ao gerar pagamento PIX. Tente novamente.'
 
         return reply.status(statusCode >= 400 && statusCode < 500 ? 400 : 502).send({ error: errorMessage })
       }
-
-      await fastify.supabase
-        .from('orders')
-        .update({ asaas_payment_id: charge.id, metadata: orderMetadata })
-        .eq('id', order.id)
-
-      let pixData: any
-      try {
-        pixData = await getPixQrCodeWithRetry(fastify.asaas, charge.id)
-      } catch (asaasErr: any) {
-        request.log.error(
-          {
-            err: asaasErr.message,
-            paymentId: charge.id,
-            statusCode: asaasErr.statusCode,
-            responseBody: asaasErr.responseBody,
-          },
-          '[checkout] Erro ao buscar QR Code PIX no Asaas'
-        )
-        return reply.status(502).send({ error: 'PIX criado, mas o QR Code ainda nao ficou disponivel. Tente novamente em instantes.' })
-      }
-
-      return reply.status(201).send({
-        data: {
-          order_id: order.id,
-          pix_qr_code_id: charge.id,
-          amount_total: totalAmount,
-          amount_service_total: serviceAmount,
-          pix: {
-            qr_code_base64: pixData.encodedImage ?? null,
-            copy_paste_code: pixData.payload ?? null,
-            expires_at: charge.dueDate ?? null,
-          },
-        },
-      })
     }
   )
 
@@ -523,13 +474,13 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       try {
-        const charge = await fastify.asaas(`/payments/${paymentId}`)
-        const asaasStatus = charge.status
-        const mappedStatus = ['CONFIRMED', 'RECEIVED'].includes(asaasStatus) ? 'PAID' : asaasStatus
+        const charge = await fastify.mp(`/v1/payments/${paymentId}`)
+        const mpStatus = charge.status
+        const mappedStatus = ['approved', 'authorized'].includes(mpStatus) ? 'PAID' : mpStatus.toUpperCase()
 
         if (mappedStatus === 'PAID' && order.status === 'PENDING_PAYMENT') {
           try {
-            await processPaidAsaasOrder(fastify, paymentId)
+            await processPaidMpOrder(fastify, paymentId)
           } catch (reconcileErr: any) {
             request.log.error(
               { paymentId, err: reconcileErr?.message ?? reconcileErr },

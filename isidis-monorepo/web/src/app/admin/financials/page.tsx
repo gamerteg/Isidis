@@ -167,7 +167,7 @@ export default function AdminFinancialsPage() {
                         Solicitações de Saque Pendentes
                     </CardTitle>
                     <CardDescription className="text-amber-500/60">
-                        Os saques agora são **automáticos** via AbacatePay. Esta lista serve para monitorar o status das transferências.
+                        Abaixo estão os pedidos de saque. Você deve fazer o **PIX manualmente** pelo seu aplicativo do banco e, após transferir o valor, clicar no botão de concluir.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -206,8 +206,31 @@ export default function AdminFinancialsPage() {
                                         <td className="py-4 px-2 text-right font-black text-white text-lg">
                                             {formatCurrency(req.amount)}
                                         </td>
-                                        <td className="py-4 px-2 text-center text-muted-foreground/50 italic">
-                                            Processamento automático
+                                        <td className="py-4 px-2 text-center">
+                                            <div className="flex items-center justify-center gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="border-green-500/30 text-green-400 hover:bg-green-500/10"
+                                                    disabled={processing === req.id}
+                                                    onClick={() => handleWithdrawalAction(req.id, 'COMPLETED')}
+                                                >
+                                                    {processing === req.id ? '...' : <Check className="w-4 h-4 mr-1" />} Pago
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                                                    disabled={processing === req.id}
+                                                    onClick={() => {
+                                                        if (confirm('Rejeitar este saque devolverá o saldo para a carteira do usuário. Continuar?')) {
+                                                            handleWithdrawalAction(req.id, 'FAILED')
+                                                        }
+                                                    }}
+                                                >
+                                                    {processing === req.id ? '...' : <X className="w-4 h-4" />}
+                                                </Button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

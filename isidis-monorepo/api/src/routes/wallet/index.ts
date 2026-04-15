@@ -9,25 +9,7 @@ const withdrawSchema = z.object({
   notes: z.string().optional(),
 })
 
-function toAsaasPixKeyType(pixKeyType: 'CPF' | 'CNPJ' | 'EMAIL' | 'PHONE' | 'RANDOM') {
-  return pixKeyType === 'RANDOM' ? 'EVP' : pixKeyType
-}
 
-function normalizePixKeyValue(
-  pixKeyType: 'CPF' | 'CNPJ' | 'EMAIL' | 'PHONE' | 'RANDOM',
-  pixKey: string
-) {
-  const trimmed = pixKey.trim()
-
-  switch (pixKeyType) {
-    case 'CPF':
-    case 'CNPJ':
-    case 'PHONE':
-      return trimmed.replace(/\D/g, '')
-    default:
-      return trimmed
-  }
-}
 
 const walletRoutes: FastifyPluginAsync = async (fastify) => {
   // GET /wallet/balance â€” saldo do reader com timeline de desbloqueio
@@ -303,43 +285,7 @@ const walletRoutes: FastifyPluginAsync = async (fastify) => {
         .limit(1)
         .maybeSingle()
 
-      const asaasPixKeyType = toAsaasPixKeyType(pix_key_type)
-      const normalizedPixKey = normalizePixKeyValue(pix_key_type, pix_key)
 
-      let transfer: any
-      try {
-        transfer = await fastify.asaas('/transfers', {
-          method: 'POST',
-          body: JSON.stringify({
-            value: amount / 100,
-            pixAddressKey: normalizedPixKey,
-            pixAddressKeyType: asaasPixKeyType,
-            scheduleDate: null,
-            operationType: 'PIX',
-            description: notes ?? `Saque Isidis - ${new Date().toLocaleDateString('pt-BR')}`,
-          }),
-        })
-      } catch (asaasErr: any) {
-        request.log.error({ err: asaasErr.message }, '[withdraw] Erro no Asaas transfer')
-
-        const statusCode = typeof asaasErr?.statusCode === 'number' ? asaasErr.statusCode : null
-        if (pendingWithdrawal?.id && statusCode && statusCode >= 400 && statusCode < 500) {
-          await fastify.supabase
-            .from('transactions')
-            .update({ status: 'FAILED' })
-            .eq('id', pendingWithdrawal.id)
-            .eq('status', 'PENDING')
-
-          return reply.status(400).send({ error: asaasErr.message })
-        }
-      }
-
-      if (transfer?.id && pendingWithdrawal?.id) {
-        await fastify.supabase
-          .from('transactions')
-          .update({ external_id: transfer.id })
-          .eq('id', pendingWithdrawal.id)
-      }
 
       // NotificaÃ§Ã£o interna para admin processar
       await fastify.supabase.from('notifications').insert({
