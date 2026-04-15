@@ -58,11 +58,16 @@ async function getPixQrCodeWithRetry(
 }
 
 const createCheckoutSchema = z.object({
+  order_id: z.string().uuid().optional(),
   gig_id: z.string().uuid(),
   add_on_ids: z.array(z.string()).default([]),
   requirements_answers: z.record(z.string(), z.string()).default({}),
   payment_method: z.enum(['PIX', 'CARD']).default('PIX'),
   card_token: z.string().optional(),
+  card_number: z.string().optional(),
+  card_expiry_month: z.string().optional(),
+  card_expiry_year: z.string().optional(),
+  card_cvv: z.string().optional(),
   card_holder_name: z.string().optional(),
   card_holder_postal_code: z.string().optional(),
   card_holder_address_number: z.string().optional(),
@@ -83,11 +88,16 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const {
+        order_id,
         gig_id,
         add_on_ids,
         requirements_answers,
         payment_method,
         card_token,
+        card_number,
+        card_expiry_month,
+        card_expiry_year,
+        card_cvv,
         card_holder_name,
         card_holder_postal_code,
         card_holder_address_number,
@@ -162,14 +172,14 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
         0
       )
 
-      const serviceAmount = gig.price + addOnTotal
-      const platformFee = Math.round(serviceAmount * PLATFORM_FEE_PERCENT)
+      let serviceAmount = gig.price + addOnTotal
+      let platformFee = Math.round(serviceAmount * PLATFORM_FEE_PERCENT)
       const baseReaderNet = serviceAmount - platformFee
-      const totalAmount = serviceAmount
+      let totalAmount = serviceAmount
       const cardFee = payment_method === 'CARD'
         ? calculateCardFee(serviceAmount)
         : null
-      const orderReaderNet = payment_method === 'CARD' && cardFee !== null
+      let orderReaderNet = payment_method === 'CARD' && cardFee !== null
         ? baseReaderNet - cardFee
         : baseReaderNet
 
@@ -198,47 +208,125 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
       }
       const clientEmail = clientAuthData.user?.email ?? ''
 
-      const { data: order, error: orderError } = await fastify.supabase
-        .from('orders')
-        .insert({
-          gig_id,
-          client_id: clientId,
-          reader_id: gig.owner_id,
-          status: 'PENDING_PAYMENT',
-          amount_total: totalAmount,
-          amount_service_total: serviceAmount,
-          amount_platform_fee: platformFee,
-          amount_reader_net: orderReaderNet,
-          requirements_answers,
-          selected_addons: add_on_ids,
-          payment_method,
-          metadata: orderMetadata,
-          ...(payment_method === 'CARD' && { card_fee_responsibility: 'READER' }),
-          ...(cardFee !== null && { amount_card_fee: cardFee }),
-        })
-        .select('id')
-        .single()
+      let order: { id: string } | null = null
 
-      if (orderError || !order) {
-        request.log.error({ orderError }, '[checkout] Erro ao criar pedido')
+      if (order_id) {
+        const { data: existingOrder, error: existingOrderError } = await fastify.supabase
+          .from('orders')
+          .select(`
+            id, gig_id, client_id, status,
+            amount_total, amount_service_total, amount_platform_fee, amount_reader_net
+          `)
+          .eq('id', order_id)
+          .single()
 
-        if (orderError?.message?.includes('orders.metadata')) {
-          return reply.status(500).send({
-            error: 'Migration pendente: execute fase12_security.sql no Supabase antes de usar o checkout.',
-          })
+        if (existingOrderError || !existingOrder) {
+          return reply.status(404).send({ error: 'Pedido pendente nao encontrado' })
         }
 
-        return reply.status(500).send({ error: 'Erro ao criar pedido' })
+        if (existingOrder.client_id !== clientId) {
+          return reply.status(403).send({ error: 'Sem permissao para reutilizar este pedido' })
+        }
+
+        if (existingOrder.status !== 'PENDING_PAYMENT') {
+          return reply.status(400).send({ error: 'Somente pedidos pendentes podem ser reutilizados no checkout' })
+        }
+
+        if (existingOrder.gig_id !== gig_id) {
+          return reply.status(400).send({ error: 'Pedido pendente nao corresponde ao servico selecionado' })
+        }
+
+        serviceAmount = existingOrder.amount_service_total ?? serviceAmount
+        platformFee = existingOrder.amount_platform_fee ?? platformFee
+        totalAmount = existingOrder.amount_total ?? serviceAmount
+        orderReaderNet = payment_method === 'CARD' && cardFee !== null
+          ? serviceAmount - platformFee - cardFee
+          : existingOrder.amount_reader_net ?? orderReaderNet
+
+        const { error: reuseError } = await fastify.supabase
+          .from('orders')
+          .update({
+            amount_total: totalAmount,
+            amount_service_total: serviceAmount,
+            amount_platform_fee: platformFee,
+            amount_reader_net: orderReaderNet,
+            requirements_answers,
+            selected_addons: add_on_ids,
+            payment_method,
+            metadata: orderMetadata,
+            card_fee_responsibility: payment_method === 'CARD' ? 'READER' : null,
+            amount_card_fee: cardFee,
+          })
+          .eq('id', existingOrder.id)
+
+        if (reuseError) {
+          request.log.error({ reuseError }, '[checkout] Erro ao atualizar pedido pendente')
+          return reply.status(500).send({ error: 'Erro ao preparar pedido pendente' })
+        }
+
+        order = { id: existingOrder.id }
+      } else {
+        const { data: createdOrder, error: orderError } = await fastify.supabase
+          .from('orders')
+          .insert({
+            gig_id,
+            client_id: clientId,
+            reader_id: gig.owner_id,
+            status: 'PENDING_PAYMENT',
+            amount_total: totalAmount,
+            amount_service_total: serviceAmount,
+            amount_platform_fee: platformFee,
+            amount_reader_net: orderReaderNet,
+            requirements_answers,
+            selected_addons: add_on_ids,
+            payment_method,
+            metadata: orderMetadata,
+            ...(payment_method === 'CARD' && { card_fee_responsibility: 'READER' }),
+            ...(cardFee !== null && { amount_card_fee: cardFee }),
+          })
+          .select('id')
+          .single()
+
+        if (orderError || !createdOrder) {
+          request.log.error({ orderError }, '[checkout] Erro ao criar pedido')
+
+          if (orderError?.message?.includes('orders.metadata')) {
+            return reply.status(500).send({
+              error: 'Migration pendente: execute fase12_security.sql no Supabase antes de usar o checkout.',
+            })
+          }
+
+          return reply.status(500).send({ error: 'Erro ao criar pedido' })
+        }
+
+        order = createdOrder
       }
 
       if (payment_method === 'CARD') {
-        if (!card_token) {
+        const sanitizedCardNumber = card_number?.replace(/\D/g, '')
+        const sanitizedCardCvv = card_cvv?.replace(/\D/g, '')
+        const sanitizedExpiryMonth = card_expiry_month?.replace(/\D/g, '')
+        const sanitizedExpiryYear = card_expiry_year?.replace(/\D/g, '')
+
+        const hasRawCard =
+          Boolean(sanitizedCardNumber) &&
+          Boolean(sanitizedCardCvv) &&
+          Boolean(sanitizedExpiryMonth) &&
+          Boolean(sanitizedExpiryYear)
+
+        if (!card_token && !hasRawCard) {
           await fastify.supabase
             .from('orders')
             .update({ status: 'CANCELED' })
             .eq('id', order.id)
 
-          return reply.status(400).send({ error: 'Token de cartao e obrigatorio para pagamento com cartao' })
+          return reply.status(400).send({ error: 'Dados do cartao sao obrigatorios para pagamento com cartao' })
+        }
+
+        if (!card_holder_postal_code || !card_holder_address_number) {
+          return reply.status(400).send({
+            error: 'CEP e numero do endereco sao obrigatorios para pagamento com cartao',
+          })
         }
 
         let charge: any
@@ -259,15 +347,26 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
               dueDate: new Date().toISOString().split('T')[0],
               description: gig.title.slice(0, 100),
               externalReference: order.id,
-              creditCardToken: card_token,
+              ...(card_token
+                ? { creditCardToken: card_token }
+                : {
+                    creditCard: {
+                      holderName: card_holder_name ?? clientProfile.full_name,
+                      number: sanitizedCardNumber,
+                      expiryMonth: sanitizedExpiryMonth,
+                      expiryYear: sanitizedExpiryYear,
+                      ccv: sanitizedCardCvv,
+                    },
+                  }),
               creditCardHolderInfo: {
                 name: card_holder_name ?? clientProfile.full_name,
                 email: clientEmail,
                 cpfCnpj: clientProfile.tax_id.replace(/\D/g, ''),
-                postalCode: card_holder_postal_code ?? '',
-                addressNumber: card_holder_address_number ?? '',
-                phone: clientProfile.cellphone ?? '',
+                postalCode: card_holder_postal_code.replace(/\D/g, ''),
+                addressNumber: card_holder_address_number,
+                phone: clientProfile.cellphone?.replace(/\D/g, '') ?? '',
               },
+              remoteIp: clientIp,
               installmentCount: 1,
               installmentValue: toAsaas(totalAmount),
             }),

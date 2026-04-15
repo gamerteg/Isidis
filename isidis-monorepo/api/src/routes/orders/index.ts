@@ -17,6 +17,10 @@ const orderDetailSelect = `
   subscriptions(id, status, readings_per_month, readings_done_this_period)
 `
 
+const updateRequirementsSchema = z.object({
+  requirements_answers: z.record(z.string(), z.string()),
+})
+
 const ordersRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     '/orders',
@@ -140,6 +144,51 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       return reply.send({ data: order })
+    }
+  )
+
+  fastify.patch<{ Params: { id: string } }>(
+    '/orders/:id/requirements',
+    { preHandler: [(fastify as any).authenticate] },
+    async (request, reply) => {
+      const { id } = request.params
+      const { id: userId } = request.user
+      const body = updateRequirementsSchema.safeParse(request.body)
+
+      if (!body.success) {
+        return reply.status(400).send({ error: body.error.flatten() })
+      }
+
+      const { data: order } = await fastify.supabase
+        .from('orders')
+        .select('id, client_id, status')
+        .eq('id', id)
+        .single()
+
+      if (!order) {
+        return reply.status(404).send({ error: 'Pedido nao encontrado' })
+      }
+
+      if (order.client_id !== userId) {
+        return reply.status(403).send({ error: 'Sem permissao para editar este pedido' })
+      }
+
+      if (!['PENDING_PAYMENT', 'PAID'].includes(order.status)) {
+        return reply.status(400).send({
+          error: 'Os requisitos so podem ser atualizados em pedidos pendentes ou pagos',
+        })
+      }
+
+      const { error } = await fastify.supabase
+        .from('orders')
+        .update({ requirements_answers: body.data.requirements_answers })
+        .eq('id', id)
+
+      if (error) {
+        return reply.status(500).send({ error: error.message })
+      }
+
+      return reply.send({ data: { message: 'Requisitos atualizados com sucesso.' } })
     }
   )
 

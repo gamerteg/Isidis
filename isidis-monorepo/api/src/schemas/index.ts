@@ -9,10 +9,28 @@ export const paginationSchema = z.object({
 // ─── Readers ───────────────────────────────────────────────────────────────────
 export const listReadersSchema = z.object({
   specialty: z.string().optional(),
+  deck: z.string().optional(),
   min_price: z.coerce.number().optional(),
   max_price: z.coerce.number().optional(),
   min_rating: z.coerce.number().min(1).max(5).optional(),
   search: z.string().optional(),
+  ids: z.preprocess((value) => {
+    if (typeof value === 'string') {
+      return value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    }
+
+    if (Array.isArray(value)) {
+      return value
+        .flatMap((item) => String(item).split(','))
+        .map((item) => item.trim())
+        .filter(Boolean)
+    }
+
+    return undefined
+  }, z.array(z.string()).optional()),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(20),
 })

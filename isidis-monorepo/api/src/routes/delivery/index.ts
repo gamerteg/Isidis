@@ -31,7 +31,11 @@ const deliveryCardSchema = z
   .object({
     id: z.string().min(1),
     name: z.string().min(1),
+    card_id: z.string().min(1).optional(),
+    numeral: z.string().min(1).optional(),
+    card_image: z.string().min(1).optional(),
     position: z.enum(['upright', 'reversed']).default('upright'),
+    position_name: z.string().min(1).max(200).optional(),
     interpretation: z.string().max(5000).optional(),
     audio_url: z.string().url().optional(),
     audio_file_name: z.string().optional(),
@@ -41,6 +45,8 @@ const deliveryCardSchema = z
 
 const deliverySectionSchema = z
   .object({
+    section_id: z.string().min(1).optional(),
+    title: z.string().min(1).max(200).optional(),
     type: z.enum(['text', 'audio', 'photo']),
     content: z.string().max(5000).optional(),
     url: z.string().url().optional(),

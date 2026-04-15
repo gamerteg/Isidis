@@ -114,7 +114,7 @@ const readersRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: query.error.flatten() })
     }
 
-    const { specialty, min_price, max_price, min_rating, search, page, limit } = query.data
+    const { specialty, deck, min_price, max_price, min_rating, search, ids, page, limit } = query.data
     const offset = (page - 1) * limit
 
     let dbQuery = fastify.supabase
@@ -137,6 +137,10 @@ const readersRoutes: FastifyPluginAsync = async (fastify) => {
       dbQuery = dbQuery.contains('specialties', [specialty])
     }
 
+    if (deck) {
+      dbQuery = dbQuery.contains('decks_used', [deck])
+    }
+
     if (min_price !== undefined) {
       dbQuery = dbQuery.gte('gigs.price', min_price)
     }
@@ -151,6 +155,10 @@ const readersRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (search) {
       dbQuery = dbQuery.or(`full_name.ilike.%${search}%,bio.ilike.%${search}%,tagline.ilike.%${search}%`)
+    }
+
+    if (ids && ids.length > 0) {
+      dbQuery = dbQuery.in('id', ids)
     }
 
     const { data, error, count } = await dbQuery
@@ -207,7 +215,8 @@ const readersRoutes: FastifyPluginAsync = async (fastify) => {
       .select(`
         id, title, description, price, category, image_url,
         delivery_time_hours, delivery_method, add_ons, requirements, tags,
-        pricing_type, readings_per_month, payment_methods, card_fee_responsibility
+        pricing_type, readings_per_month, payment_methods, card_fee_responsibility,
+        is_active, status
       `)
       .eq('owner_id', id)
       .eq('is_active', true)

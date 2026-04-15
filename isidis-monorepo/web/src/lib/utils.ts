@@ -1,88 +1,83 @@
-import { type ClassValue, clsx } from 'clsx'
-import { twMerge } from 'tailwind-merge'
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(cents: number): string {
+export function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
-  }).format(cents / 100)
+  }).format(value / 100)
 }
 
-export function formatDate(date: string | Date, opts?: Intl.DateTimeFormatOptions): string {
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    ...opts,
-  }).format(new Date(date))
-}
+export function getYouTubeEmbedUrl(url: string | null | undefined) {
+  if (!url) return null
 
-export function formatDateTime(date: string | Date): string {
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(date))
-}
+  // Support various YouTube URL formats
+  // https://www.youtube.com/watch?v=dQw4w9WgXcQ
+  // https://youtu.be/dQw4w9WgXcQ
+  // https://www.youtube.com/shorts/dQw4w9WgXcQ
+  // https://www.youtube.com/embed/dQw4w9WgXcQ
 
-export function pixKeyTypeLabel(type: string): string {
-  const map: Record<string, string> = {
-    CPF: 'CPF',
-    CNPJ: 'CNPJ',
-    EMAIL: 'E-mail',
-    PHONE: 'Telefone',
-    RANDOM: 'Chave Aleatória',
+  let videoId = ''
+
+  try {
+    const urlObj = new URL(url)
+    if (urlObj.hostname === 'youtu.be') {
+      videoId = urlObj.pathname.slice(1)
+    } else if (urlObj.hostname.includes('youtube.com')) {
+      if (urlObj.pathname.includes('/shorts/')) {
+        videoId = urlObj.pathname.split('/shorts/')[1]
+      } else if (urlObj.pathname.includes('/embed/')) {
+        videoId = urlObj.pathname.split('/embed/')[1]
+      } else {
+        videoId = urlObj.searchParams.get('v') || ''
+      }
+    }
+  } catch (e) {
+    // If URL is invalid, try manual regex fallback
+    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:.*v=|.*\/|.*embed\/|.*shorts\/))([^?&"'>]+)/)
+    if (match) videoId = match[1]
   }
-  return map[type] ?? type
+
+  if (!videoId) return null
+
+  return `https://www.youtube.com/embed/${videoId}`
 }
 
-export const ORDER_STATUS_MAP: Record<string, { label: string; color: string }> = {
-  PENDING_PAYMENT: { label: 'Aguardando pagamento', color: 'text-yellow-400' },
-  PAID: { label: 'Pago — em andamento', color: 'text-blue-400' },
-  DELIVERED: { label: 'Entregue', color: 'text-green-400' },
-  CANCELED: { label: 'Cancelado', color: 'text-red-400' },
-  DISPUTED: { label: 'Em disputa', color: 'text-orange-400' },
+export function validateCPF(cpf: string): boolean {
+  const cleanCpf = cpf.replace(/\D/g, "")
+
+  if (cleanCpf.length !== 11) return false
+
+  // Check for common invalid CPFs (all digits same)
+  if (/^(\d)\1{10}$/.test(cleanCpf)) return false
+
+  // Validate first digit
+  let sum = 0
+  for (let i = 0; i < 9; i++) {
+    sum += parseInt(cleanCpf.charAt(i)) * (10 - i)
+  }
+  let rev = 11 - (sum % 11)
+  if (rev === 10 || rev === 11) rev = 0
+  if (rev !== parseInt(cleanCpf.charAt(9))) return false
+
+  // Validate second digit
+  sum = 0
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(cleanCpf.charAt(i)) * (11 - i)
+  }
+  rev = 11 - (sum % 11)
+  if (rev === 10 || rev === 11) rev = 0
+  if (rev !== parseInt(cleanCpf.charAt(10))) return false
+
+  return true
 }
 
-export const DELIVERY_METHOD_MAP: Record<string, string> = {
-  DIGITAL_SPREAD: 'Tiragem Digital',
-  PHYSICAL_PHOTO: 'Tiragem Física (Foto)',
-  VIDEO: 'Vídeo',
-  OTHER: 'Outro',
-}
-
-export const SPECIALTY_MAP: Record<string, string> = {
-  TAROT: 'Tarô',
-  ASTROLOGY: 'Astrologia',
-  NUMEROLOGY: 'Numerologia',
-  CRYSTALS: 'Cristais',
-  ORACLE: 'Oráculo',
-  RUNES: 'Runas',
-  MEDIUMSHIP: 'Mediunidade',
-  OTHER: 'Outro',
-}
-
-export function getInitials(name: string | null | undefined): string {
-  if (!name) return '?'
-  return name
-    .split(' ')
-    .slice(0, 2)
-    .map(w => w[0])
-    .join('')
-    .toUpperCase()
-}
-
-export function truncate(str: string, maxLength: number): string {
-  if (str.length <= maxLength) return str
-  return str.slice(0, maxLength) + '…'
-}
-
-export function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms))
+export function stripEmojis(str: string): string {
+  if (!str) return ""
+  // Regex to match emojis and other non-standard characters
+  return str.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '').trim()
 }
