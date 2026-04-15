@@ -302,7 +302,8 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
                     parsedYear += 2000;
                 }
 
-                const tokenRes = await fastify.mp('/v1/card_tokens', {
+                const mpPublicKey = process.env.MERCADOPAGO_PUBLIC_KEY!
+                const tokenRes = await fastify.mp(`/v1/card_tokens?public_key=${mpPublicKey}`, {
                     method: 'POST',
                     body: JSON.stringify({
                         card_number: sanitizedCardNumber,
