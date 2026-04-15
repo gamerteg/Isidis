@@ -297,12 +297,17 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
 
         try {
             if (!finalCardToken && hasRawCard) {
+                let parsedYear = parseInt(sanitizedExpiryYear!);
+                if (parsedYear < 100) {
+                    parsedYear += 2000;
+                }
+
                 const tokenRes = await fastify.mp('/v1/card_tokens', {
                     method: 'POST',
                     body: JSON.stringify({
                         card_number: sanitizedCardNumber,
                         expiration_month: parseInt(sanitizedExpiryMonth!),
-                        expiration_year: parseInt(sanitizedExpiryYear!),
+                        expiration_year: parsedYear,
                         security_code: sanitizedCardCvv,
                         cardholder: {
                             name: card_holder_name ?? clientProfile.full_name,
