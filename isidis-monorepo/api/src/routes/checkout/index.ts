@@ -445,6 +445,7 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
           '[checkout] Erro no MP PIX'
         )
 
+        const statusCode = typeof mpErr?.statusCode === 'number' ? mpErr.statusCode : 502
         let errorMessage = mpErr.message ?? 'Erro ao gerar pagamento PIX. Tente novamente.'
         if (errorMessage.includes('without key enabled for QR render')) {
           errorMessage = 'A conta Mercado Pago desta plataforma nao possui uma Chave PIX configurada. Adicione uma chave no painel do MP para receber via PIX.'
