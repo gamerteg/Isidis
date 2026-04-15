@@ -123,7 +123,7 @@ export async function signup(prevState: any, formData: FormData) {
 
                 const arrayBuffer = await file.arrayBuffer()
                 const buffer = new Uint8Array(arrayBuffer)
-                const { data, error } = await supabaseAdmin.storage
+                const { data, error } = await supabase.storage
                     .from('verification_documents')
                     .upload(`${userId}/${path}`, buffer, {
                         contentType: file.type,
@@ -165,8 +165,8 @@ export async function signup(prevState: any, formData: FormData) {
             }
         }
 
-        // Update profile using regular client (RLS policy required for INSERT)
-        const { error: profileError } = await supabaseAdmin
+        // Update profile using the same authenticated client instance
+        const { error: profileError } = await supabase
             .from('profiles')
             .upsert(updateData)
 

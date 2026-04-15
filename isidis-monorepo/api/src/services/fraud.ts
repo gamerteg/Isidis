@@ -58,20 +58,8 @@ export async function checkFraud(
     flags.push('new_account_high_value')
   }
 
-  const { count: activeGigCount } = await supabase
-    .from('orders')
-    .select('id', { count: 'exact', head: true })
-    .eq('client_id', params.clientId)
-    .eq('gig_id', params.gigId)
-    .in('status', ['PENDING_PAYMENT', 'PAID', 'DELIVERED'])
-
-  if ((activeGigCount ?? 0) >= 1) {
-    return {
-      allowed: false,
-      reason: 'Voce ja possui um pedido ativo deste servico. Aguarde a conclusao antes de comprar novamente.',
-      flags: ['active_duplicate_gig'],
-    }
-  }
+  // Restriction for active_duplicate_gig removed by user request
+  // Multiple concurrent orders for the same gig by the same user are now permitted.
 
   const { count: expiredPix } = await supabase
     .from('orders')

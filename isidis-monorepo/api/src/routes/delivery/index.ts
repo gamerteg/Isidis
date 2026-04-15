@@ -13,6 +13,7 @@ const ALLOWED_AUDIO_MIMES = new Set([
   'audio/wav',
   'audio/x-m4a',
   'audio/aac',
+  'audio/webm', // MediaRecorder padrão do Chrome/Firefox
 ])
 
 const MIME_TO_EXT: Record<string, string> = {
@@ -25,6 +26,7 @@ const MIME_TO_EXT: Record<string, string> = {
   'audio/wav': 'wav',
   'audio/x-m4a': 'm4a',
   'audio/aac': 'aac',
+  'audio/webm': 'webm',
 }
 
 const deliveryCardSchema = z
@@ -151,7 +153,7 @@ const deliveryRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Tipo de upload invalido' })
       }
 
-      const actualMime = data.mimetype ?? ''
+      const actualMime = (data.mimetype ?? '').split(';')[0].trim()
       const isPhoto = fileType === 'photo'
       const allowedMimes = isPhoto ? ALLOWED_PHOTO_MIMES : ALLOWED_AUDIO_MIMES
 
