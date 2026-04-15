@@ -165,11 +165,10 @@ export async function signup(prevState: any, formData: FormData) {
             }
         }
 
-        // Update profile using Admin client to bypass RLS
+        // Update profile using regular client (RLS policy required for INSERT)
         const { error: profileError } = await supabaseAdmin
             .from('profiles')
-            .update(updateData)
-            .eq('id', userId)
+            .upsert(updateData)
 
         if (profileError) {
             console.error('Profile update error:', profileError)
