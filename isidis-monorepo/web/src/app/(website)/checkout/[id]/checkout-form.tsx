@@ -216,7 +216,18 @@ export function CheckoutForm({
 
   const copyToClipboard = async () => {
     if (!pixData?.content) return
-    await navigator.clipboard.writeText(pixData.content)
+    try {
+      await navigator.clipboard.writeText(pixData.content)
+    } catch {
+      const el = document.createElement('textarea')
+      el.value = pixData.content
+      el.style.position = 'fixed'
+      el.style.opacity = '0'
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+    }
     setCopied(true)
     toast.success('Codigo PIX copiado!')
     setTimeout(() => setCopied(false), 2000)
@@ -325,7 +336,11 @@ export function CheckoutForm({
                   </div>
 
                   <div className="mx-auto mt-5 w-fit rounded-[1.25rem] bg-white p-4 shadow-xl">
-                    <img src={pixData.qrcode} alt="QR Code PIX" className="h-52 w-52 rounded-lg" />
+                    <img
+                      src={pixData.qrcode.startsWith('data:') ? pixData.qrcode : `data:image/png;base64,${pixData.qrcode}`}
+                      alt="QR Code PIX"
+                      className="h-52 w-52 rounded-lg"
+                    />
                   </div>
 
                   <p className="mt-4 text-sm text-slate-300">
