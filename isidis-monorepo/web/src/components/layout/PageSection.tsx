@@ -51,7 +51,7 @@ export function PageSection({
                     <div className="absolute bottom-[-10%] left-[20%] w-[45vw] h-[45vw] min-w-[350px] min-h-[350px] rounded-full bg-fuchsia-600/15 blur-[110px] animate-float opacity-20 mix-blend-screen delay-1000" />
 
                     {/* Noise Texture Overlay for Texture/Premium feel */}
-                    <div className="absolute inset-0 opacity-[0.03] bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+                    <div className="absolute inset-0 opacity-[0.03] [background-image:radial-gradient(rgba(255,255,255,0.35)_0.7px,transparent_0.7px)] [background-size:14px_14px]" />
                 </div>
             )}
             {withShootingStars && <ShootingStars />}

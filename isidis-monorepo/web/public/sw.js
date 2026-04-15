@@ -1,7 +1,7 @@
 // Service Worker for Isidis PWA
 // Caches core assets for offline use
 
-const CACHE_NAME = "isidis-cache-v1";
+const CACHE_NAME = "isidis-cache-v2";
 const OFFLINE_URL = "/offline";
 
 // Assets to pre-cache on install
@@ -50,7 +50,9 @@ self.addEventListener("fetch", (event) => {
     // Skip Supabase / API requests — always go to network
     const url = new URL(event.request.url);
     if (
+        url.origin !== self.location.origin ||
         url.pathname.startsWith("/api/") ||
+        url.hostname.startsWith("api.") ||
         url.hostname.includes("supabase.co")
     ) {
         return;
@@ -72,9 +74,23 @@ self.addEventListener("fetch", (event) => {
             .catch(() => {
                 // Offline fallback
                 if (event.request.mode === "navigate") {
-                    return caches.match(OFFLINE_URL);
+                    return caches.match(OFFLINE_URL).then((cachedOfflinePage) => {
+                        if (cachedOfflinePage) return cachedOfflinePage;
+
+                        return new Response("Offline", {
+                            status: 503,
+                            headers: { "Content-Type": "text/plain; charset=utf-8" },
+                        });
+                    });
                 }
-                return caches.match(event.request);
+                return caches.match(event.request).then((cachedResponse) => {
+                    if (cachedResponse) return cachedResponse;
+
+                    return new Response("", {
+                        status: 504,
+                        statusText: "Gateway Timeout",
+                    });
+                });
             })
     );
 });

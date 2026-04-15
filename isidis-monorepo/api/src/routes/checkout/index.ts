@@ -12,6 +12,15 @@ const toAsaas = (centavos: number) => centavos / 100
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+function getAsaasErrorMessage(error: any, fallback: string) {
+  return (
+    error?.responseBody?.errors?.[0]?.description ??
+    error?.responseBody?.error ??
+    error?.message ??
+    fallback
+  )
+}
+
 function calculateCardFee(amountInCents: number) {
   return Math.ceil(amountInCents * ASAAS_CARD_FEE_PERCENT) + ASAAS_CARD_FEE_FIXED
 }
@@ -377,8 +386,19 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
             .update({ status: 'CANCELED' })
             .eq('id', order.id)
 
-          request.log.error({ err: asaasErr.message }, '[checkout] Erro no Asaas CARD')
-          return reply.status(500).send({ error: 'Erro ao processar cartao. Tente novamente.' })
+          request.log.error(
+            {
+              err: asaasErr.message,
+              statusCode: asaasErr.statusCode,
+              responseBody: asaasErr.responseBody,
+            },
+            '[checkout] Erro no Asaas CARD'
+          )
+
+          const statusCode = typeof asaasErr?.statusCode === 'number' ? asaasErr.statusCode : 502
+          const errorMessage = getAsaasErrorMessage(asaasErr, 'Erro ao processar cartao. Tente novamente.')
+
+          return reply.status(statusCode >= 400 && statusCode < 500 ? 400 : 502).send({ error: errorMessage })
         }
 
         await fastify.supabase
@@ -430,8 +450,19 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
           .update({ status: 'CANCELED' })
           .eq('id', order.id)
 
-        request.log.error({ err: asaasErr.message }, '[checkout] Erro no Asaas PIX')
-        return reply.status(500).send({ error: 'Erro ao gerar pagamento. Tente novamente.' })
+        request.log.error(
+          {
+            err: asaasErr.message,
+            statusCode: asaasErr.statusCode,
+            responseBody: asaasErr.responseBody,
+          },
+          '[checkout] Erro no Asaas PIX'
+        )
+
+        const statusCode = typeof asaasErr?.statusCode === 'number' ? asaasErr.statusCode : 502
+        const errorMessage = getAsaasErrorMessage(asaasErr, 'Erro ao gerar pagamento. Tente novamente.')
+
+        return reply.status(statusCode >= 400 && statusCode < 500 ? 400 : 502).send({ error: errorMessage })
       }
 
       await fastify.supabase
@@ -444,10 +475,15 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
         pixData = await getPixQrCodeWithRetry(fastify.asaas, charge.id)
       } catch (asaasErr: any) {
         request.log.error(
-          { err: asaasErr.message, paymentId: charge.id },
+          {
+            err: asaasErr.message,
+            paymentId: charge.id,
+            statusCode: asaasErr.statusCode,
+            responseBody: asaasErr.responseBody,
+          },
           '[checkout] Erro ao buscar QR Code PIX no Asaas'
         )
-        return reply.status(500).send({ error: 'PIX criado, mas o QR Code ainda nao ficou disponivel. Tente novamente em instantes.' })
+        return reply.status(502).send({ error: 'PIX criado, mas o QR Code ainda nao ficou disponivel. Tente novamente em instantes.' })
       }
 
       return reply.status(201).send({
