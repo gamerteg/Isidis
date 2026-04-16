@@ -342,7 +342,12 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
                 // Get bin for payment method
                 const binRes = await fastify.mp(`/v1/payment_methods/search?bin=${sanitizedCardNumber!.substring(0, 6)}&public_key=${mpPublicKey}`)
                 if (binRes.results && binRes.results.length > 0) {
-                    derivedPaymentMethodId = binRes.results[0].id
+                    // Prefer credit_card type to avoid picking debit/prepaid variants (diff_param_bins error)
+                    const creditMethod = binRes.results.find(
+                        (m: any) => m.payment_type_id === 'credit_card' && m.status === 'active'
+                    ) ?? binRes.results[0]
+                    derivedPaymentMethodId = creditMethod.id
+                    request.log.info({ paymentMethodId: derivedPaymentMethodId, resultsCount: binRes.results.length }, '[checkout] BIN lookup payment_method')
                 }
             } else if (card_token) {
                  // if token provided by MP SDK, SDK handles payment_method mapping. Let's fallback to infering or maybe client sends it. Currently we don't have it so we just supply generic credit_card or visa
