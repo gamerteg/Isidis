@@ -354,6 +354,15 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
                  derivedPaymentMethodId = 'master' // MP typically validates via token anyway
             }
         
+            const nameParts = clientProfile.full_name.trim().split(/\s+/)
+            const payerFirstName = nameParts[0]
+            const payerLastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0]
+
+            // Parse BR phone: "11999999999" → area_code="11", number="999999999"
+            const rawPhone = clientProfile.cellphone?.replace(/\D/g, '') ?? ''
+            const phoneAreaCode = rawPhone.length >= 10 ? rawPhone.substring(0, 2) : undefined
+            const phoneNumber = rawPhone.length >= 10 ? rawPhone.substring(2) : rawPhone || undefined
+
             const charge = await fastify.mp('/v1/payments', {
               method: 'POST',
               body: JSON.stringify({
@@ -361,14 +370,38 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
                 token: finalCardToken,
                 description: sanitizePixDescription(order.id, gig.title),
                 installments: 1,
-                payment_method_id: derivedPaymentMethodId, // MP typically reads from token / BIN
+                payment_method_id: derivedPaymentMethodId,
+                statement_descriptor: 'ISIDIS',
                 payer: {
                   email: clientEmail,
-                  first_name: clientProfile.full_name.split(' ')[0],
+                  first_name: payerFirstName,
+                  last_name: payerLastName,
                   identification: {
                     type: 'CPF',
                     number: clientProfile.tax_id.replace(/\D/g, '')
-                  }
+                  },
+                },
+                additional_info: {
+                  items: [{
+                    id: gig_id,
+                    title: gig.title,
+                    description: gig.title,
+                    quantity: 1,
+                    unit_price: toDecimal(totalAmount),
+                  }],
+                  payer: {
+                    first_name: payerFirstName,
+                    last_name: payerLastName,
+                    ...(phoneAreaCode && phoneNumber && {
+                      phone: { area_code: phoneAreaCode, number: phoneNumber },
+                    }),
+                    ...(card_holder_postal_code && {
+                      address: {
+                        zip_code: card_holder_postal_code.replace(/\D/g, ''),
+                        ...(card_holder_address_number && { street_number: card_holder_address_number }),
+                      },
+                    }),
+                  },
                 },
                 external_reference: order.id,
               }),
