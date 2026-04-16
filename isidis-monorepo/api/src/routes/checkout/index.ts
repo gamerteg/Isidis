@@ -340,7 +340,7 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
                 finalCardToken = tokenRes.id
                 
                 // Get bin for payment method
-                const binRes = await fastify.mp(`/v1/payment_methods/search?bin=${sanitizedCardNumber!.substring(0, 6)}`)
+                const binRes = await fastify.mp(`/v1/payment_methods/search?bin=${sanitizedCardNumber!.substring(0, 6)}&public_key=${mpPublicKey}`)
                 if (binRes.results && binRes.results.length > 0) {
                     derivedPaymentMethodId = binRes.results[0].id
                 }
