@@ -303,16 +303,21 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
                 }
 
                 const mpPublicKey = process.env.MERCADOPAGO_PUBLIC_KEY
+                const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN
                 if (!mpPublicKey) {
                     request.log.error('[checkout] MERCADOPAGO_PUBLIC_KEY nao esta definida nas variaveis de ambiente!')
                     throw new Error('Configuracao do gateway de pagamento incompleta. Contate o suporte.')
                 }
                 request.log.info({ mpPublicKey: mpPublicKey.slice(0, 20) + '...' }, '[checkout] Tokenizando cartao com public_key')
 
-                const tokenRes = await fastify.mp(`/v1/card_tokens?public_key=${mpPublicKey}`, {
+                // /v1/card_tokens requires public_key auth (not access_token) - call raw fetch
+                const tokenRaw = await fetch(`https://api.mercadopago.com/v1/card_tokens?public_key=${mpPublicKey}`, {
                     method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${mpAccessToken}`,
+                        'Content-Type': 'application/json',
+                    },
                     body: JSON.stringify({
-                        public_key: mpPublicKey,
                         card_number: sanitizedCardNumber,
                         expiration_month: parseInt(sanitizedExpiryMonth!),
                         expiration_year: parsedYear,
@@ -326,6 +331,12 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
                         }
                     })
                 })
+                const tokenRes: any = await tokenRaw.json()
+                request.log.info({ tokenStatus: tokenRaw.status, tokenId: tokenRes?.id }, '[checkout] Resposta MP card_tokens')
+                if (!tokenRaw.ok || !tokenRes?.id) {
+                    const errMsg = tokenRes?.message ?? tokenRes?.error ?? 'Erro ao tokenizar cartao'
+                    throw Object.assign(new Error(errMsg), { statusCode: tokenRaw.status, responseBody: tokenRes })
+                }
                 finalCardToken = tokenRes.id
                 
                 // Get bin for payment method
