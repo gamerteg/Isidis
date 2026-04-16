@@ -363,6 +363,10 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
             const phoneAreaCode = rawPhone.length >= 10 ? rawPhone.substring(0, 2) : undefined
             const phoneNumber = rawPhone.length >= 10 ? rawPhone.substring(2) : rawPhone || undefined
 
+            const notificationUrl = process.env.API_URL
+              ? `${process.env.API_URL}/webhooks/mercadopago`
+              : undefined
+
             const charge = await fastify.mp('/v1/payments', {
               method: 'POST',
               body: JSON.stringify({
@@ -370,8 +374,10 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
                 token: finalCardToken,
                 description: sanitizePixDescription(order.id, gig.title),
                 installments: 1,
+                capture: true,
                 payment_method_id: derivedPaymentMethodId,
                 statement_descriptor: 'ISIDIS',
+                ...(notificationUrl && { notification_url: notificationUrl }),
                 payer: {
                   email: clientEmail,
                   first_name: payerFirstName,
@@ -406,7 +412,31 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
                 external_reference: order.id,
               }),
             })
-            
+
+            request.log.info(
+              { chargeId: charge.id, chargeStatus: charge.status, statusDetail: charge.status_detail },
+              '[checkout] MP CARD charge criado'
+            )
+
+            // Rejected = banco/MP recusou o cartão (não é erro de API, é decisão de negócio)
+            if (charge.status === 'rejected') {
+              const rejectionMap: Record<string, string> = {
+                cc_rejected_insufficient_amount: 'Cartão sem limite suficiente.',
+                cc_rejected_bad_filled_date: 'Data de validade inválida.',
+                cc_rejected_bad_filled_security_code: 'CVV inválido.',
+                cc_rejected_bad_filled_other: 'Dados do cartão inválidos.',
+                cc_rejected_blacklist: 'Cartão recusado pelo emissor.',
+                cc_rejected_call_for_authorize: 'Autorização necessária. Entre em contato com seu banco.',
+                cc_rejected_card_disabled: 'Cartão desativado. Entre em contato com seu banco.',
+                cc_rejected_duplicated_payment: 'Pagamento duplicado detectado.',
+                cc_rejected_high_risk: 'Transação recusada por segurança. Tente outro cartão.',
+                cc_rejected_max_attempts: 'Muitas tentativas. Aguarde e tente novamente.',
+                cc_rejected_other_reason: 'Cartão recusado. Tente outro cartão ou forma de pagamento.',
+              }
+              const userMsg = rejectionMap[charge.status_detail] ?? 'Cartão recusado. Tente outro cartão ou forma de pagamento.'
+              throw Object.assign(new Error(userMsg), { statusCode: 422, responseBody: { status: charge.status, status_detail: charge.status_detail } })
+            }
+
             await fastify.supabase
               .from('orders')
               .update({ asaas_payment_id: charge.id?.toString(), metadata: orderMetadata })
@@ -420,8 +450,7 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
                 amount_service_total: serviceAmount,
                 amount_card_fee: cardFee,
                 card_fee_responsibility: 'READER',
-                // Keep the property name to avoid breaking frontend immediately
-                asaas_payment_id: charge.id?.toString(), 
+                asaas_payment_id: charge.id?.toString(),
                 status: charge.status === 'approved' ? 'CONFIRMED' : 'PENDING',
               },
             })
