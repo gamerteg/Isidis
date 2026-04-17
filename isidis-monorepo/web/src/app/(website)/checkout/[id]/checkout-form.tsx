@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CardPayment, initMercadoPago } from '@mercadopago/sdk-react'
+import { loadMercadoPago } from '@mercadopago/sdk-js'
 import type {
   ICardPaymentBrickPayer,
   ICardPaymentFormData,
@@ -24,6 +24,12 @@ import type { CheckoutConfigResponse, GigAddOn, GigRequirement } from '@/types'
 declare global {
   interface Window {
     MP_DEVICE_SESSION_ID?: string
+    MercadoPago?: new (
+      publicKey: string,
+      options?: {
+        locale?: string
+      }
+    ) => MercadoPagoClient
   }
 }
 
@@ -38,6 +44,65 @@ interface CardFormState {
   holder_name: string
   postal_code: string
   address_number: string
+}
+
+interface MercadoPagoBrickController {
+  unmount?: () => void | Promise<void>
+}
+
+interface MercadoPagoBricksBuilder {
+  create: (
+    name: 'cardPayment',
+    containerId: string,
+    settings: {
+      initialization: {
+        amount: number
+      }
+      customization: {
+        paymentMethods: {
+          minInstallments: number
+          maxInstallments: number
+          types: {
+            included: readonly string[]
+          }
+        }
+        visual: {
+          hideFormTitle: boolean
+        }
+      }
+      callbacks: {
+        onSubmit: (formData: ICardPaymentFormData<ICardPaymentBrickPayer>) => Promise<void>
+        onError: (error?: { message?: string }) => void
+      }
+      locale: string
+    },
+  ) => Promise<MercadoPagoBrickController>
+}
+
+interface MercadoPagoClient {
+  bricks: () => MercadoPagoBricksBuilder
+}
+
+interface MercadoPagoCardBrickProps {
+  publicKey: string
+  locale: string
+  initialization: {
+    amount: number
+  }
+  customization: {
+    paymentMethods: {
+      minInstallments: number
+      maxInstallments: number
+      types: {
+        included: readonly string[]
+      }
+    }
+    visual: {
+      hideFormTitle: boolean
+    }
+  }
+  onSubmit: (formData: ICardPaymentFormData<ICardPaymentBrickPayer>) => Promise<void>
+  onError: (error?: { message?: string }) => void
 }
 
 interface CheckoutFormProps {
@@ -86,6 +151,86 @@ function loadMercadoPagoSecurityScript(onDeviceId: (deviceId: string) => void) {
 
   return () => undefined
 }
+
+function getBrickErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message
+  }
+
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = (error as { message?: unknown }).message
+    if (typeof message === 'string' && message.trim()) {
+      return message
+    }
+  }
+
+  return 'Nao foi possivel carregar o formulario do Mercado Pago.'
+}
+
+const MercadoPagoCardBrick = memo(function MercadoPagoCardBrick({
+  publicKey,
+  locale,
+  initialization,
+  customization,
+  onSubmit,
+  onError,
+}: MercadoPagoCardBrickProps) {
+  const containerId = useMemo(() => `mp-card-brick-${crypto.randomUUID()}`, [])
+  const controllerRef = useRef<MercadoPagoBrickController | null>(null)
+
+  useEffect(() => {
+    let disposed = false
+
+    const renderBrick = async () => {
+      try {
+        await loadMercadoPago()
+
+        if (disposed) return
+
+        if (!window.MercadoPago) {
+          throw new Error('SDK do Mercado Pago indisponivel no navegador.')
+        }
+
+        const mercadoPago = new window.MercadoPago(publicKey, { locale })
+        const bricksBuilder = mercadoPago.bricks()
+
+        if (controllerRef.current?.unmount) {
+          await Promise.resolve(controllerRef.current.unmount())
+          controllerRef.current = null
+        }
+
+        if (disposed) return
+
+        controllerRef.current = await bricksBuilder.create('cardPayment', containerId, {
+          initialization,
+          customization,
+          callbacks: {
+            onSubmit,
+            onError,
+          },
+          locale,
+        })
+      } catch (brickError) {
+        if (disposed) return
+        onError({ message: getBrickErrorMessage(brickError) })
+      }
+    }
+
+    void renderBrick()
+
+    return () => {
+      disposed = true
+      const currentController = controllerRef.current
+      controllerRef.current = null
+
+      if (currentController?.unmount) {
+        void Promise.resolve(currentController.unmount()).catch(() => undefined)
+      }
+    }
+  }, [containerId, customization, initialization, locale, onError, onSubmit, publicKey])
+
+  return <div id={containerId} />
+})
 
 export function CheckoutForm({
   gigId,
@@ -161,7 +306,6 @@ export function CheckoutForm({
         if (cancelled) return
 
         setCheckoutConfig(config)
-        initMercadoPago(config.public_key, { locale: config.locale })
       })
       .catch(() => {
         if (cancelled) return
@@ -636,10 +780,11 @@ export function CheckoutForm({
               </div>
             ) : checkoutConfig ? (
               <div className="rounded-[1.5rem] border border-white/10 bg-white p-4 text-slate-950 shadow-[0_20px_60px_rgba(8,6,24,0.22)]">
-                <CardPayment
+                <MercadoPagoCardBrick
+                  publicKey={checkoutConfig.public_key}
+                  locale={checkoutConfig.locale}
                   initialization={brickInitialization}
                   customization={brickCustomization}
-                  locale={checkoutConfig.locale}
                   onSubmit={handleCardBrickSubmit}
                   onError={handleBrickError}
                 />
