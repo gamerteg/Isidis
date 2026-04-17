@@ -1,48 +1,111 @@
 import fp from 'fastify-plugin'
 import { FastifyPluginAsync } from 'fastify'
-import { randomUUID } from 'crypto'
+import { MercadoPagoConfig, Payment, PaymentRefund } from 'mercadopago'
 
-const MP_BASE_URL = 'https://api.mercadopago.com'
+type MpRequestOptions = {
+  idempotencyKey?: string
+  meliSessionId?: string
+}
 
-export async function mpRequest(path: string, options: RequestInit = {}): Promise<any> {
-  const headers: any = {
-    Authorization: `Bearer ${process.env.MERCADOPAGO_ACCESS_TOKEN!}`,
-    'Content-Type': 'application/json',
-    'X-Idempotency-Key': randomUUID(),
-    ...(options.headers ?? {}),
-  }
+type MpCreatePaymentParams = {
+  body: Record<string, unknown>
+  requestOptions?: MpRequestOptions
+}
 
-  const res = await fetch(`${MP_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  })
-  
-  let data: any = {}
+type MpRefundPaymentParams = {
+  paymentId: string | number
+  body?: Record<string, unknown>
+  requestOptions?: MpRequestOptions
+}
+
+type MpError = Error & {
+  statusCode?: number
+  responseBody?: unknown
+}
+
+type MpClient = {
+  createPayment: (params: MpCreatePaymentParams) => Promise<any>
+  getPayment: (paymentId: string | number, requestOptions?: MpRequestOptions) => Promise<any>
+  refundPayment: (params: MpRefundPaymentParams) => Promise<any>
+}
+
+function normalizeMpError(error: unknown): MpError {
+  const responseBody = error as Record<string, any>
+  const statusCode =
+    responseBody?.api_response?.status ??
+    responseBody?.status ??
+    responseBody?.cause?.[0]?.api_response?.status
+
+  const message =
+    responseBody?.message ??
+    responseBody?.error ??
+    responseBody?.cause?.[0]?.description ??
+    responseBody?.cause?.[0]?.message ??
+    `Mercado Pago HTTP ${statusCode ?? 'UNKNOWN'}`
+
+  const normalized = new Error(message) as MpError
+  normalized.statusCode = statusCode
+  normalized.responseBody = responseBody
+  return normalized
+}
+
+async function runMercadoPagoCall<T>(handler: () => Promise<T>) {
   try {
-    data = await res.json()
-  } catch (err) {
-    // some endpoints like refunds might just be 204 or empty
+    return await handler()
+  } catch (error) {
+    throw normalizeMpError(error)
   }
-
-  if (!res.ok) {
-    const errorMsg = data.message ?? data.error ?? `MercadoPago HTTP ${res.status}`
-    const error = new Error(errorMsg) as Error & { statusCode?: number; responseBody?: any }
-    error.statusCode = res.status
-    error.responseBody = data
-    throw error
-  }
-  
-  return data
 }
 
 declare module 'fastify' {
   interface FastifyInstance {
-    mp: typeof mpRequest
+    mp: MpClient
   }
 }
 
 const mpPlugin: FastifyPluginAsync = async (fastify) => {
-  fastify.decorate('mp', mpRequest)
+  const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN
+
+  if (!accessToken) {
+    throw new Error('MERCADOPAGO_ACCESS_TOKEN nao configurado')
+  }
+
+  const client = new MercadoPagoConfig({
+    accessToken,
+    options: {
+      timeout: 10000,
+    },
+  })
+
+  const payments = new Payment(client)
+  const refunds = new PaymentRefund(client)
+
+  fastify.decorate('mp', {
+    createPayment: ({ body, requestOptions }) =>
+      runMercadoPagoCall(() =>
+        payments.create({
+          body: body as any,
+          requestOptions: requestOptions as any,
+        })
+      ),
+
+    getPayment: (paymentId, requestOptions) =>
+      runMercadoPagoCall(() =>
+        payments.get({
+          id: paymentId,
+          requestOptions: requestOptions as any,
+        })
+      ),
+
+    refundPayment: ({ paymentId, body, requestOptions }) =>
+      runMercadoPagoCall(() =>
+        refunds.create({
+          payment_id: paymentId,
+          body: body as any,
+          requestOptions: requestOptions as any,
+        })
+      ),
+  })
 }
 
 export default fp(mpPlugin, { name: 'mercadopago' })

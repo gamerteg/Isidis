@@ -106,12 +106,19 @@ export interface Gig {
 
 export interface CheckoutCardInput {
   holder_name: string
-  number: string
-  expiry_month: string
-  expiry_year: string
-  ccv: string
+  token: string
+  payment_method_id: string
+  installments: number
+  issuer_id?: string
   postal_code: string
   address_number: string
+  device_id?: string
+}
+
+export interface CheckoutConfigResponse {
+  gateway: 'mercadopago'
+  public_key: string
+  locale: 'pt-BR'
 }
 
 export interface CheckoutCreatePayload {
@@ -121,13 +128,17 @@ export interface CheckoutCreatePayload {
   requirements_answers?: Record<string, string>
   payment_method: PaymentMethod
   card_token?: string
+  payment_method_id?: string
+  installments?: number
+  issuer_id?: string
+  device_id?: string
+  card_holder_name?: string
+  card_holder_postal_code?: string
+  card_holder_address_number?: string
   card_number?: string
   card_expiry_month?: string
   card_expiry_year?: string
   card_cvv?: string
-  card_holder_name?: string
-  card_holder_postal_code?: string
-  card_holder_address_number?: string
 }
 
 export interface CheckoutPixResponse {
@@ -150,6 +161,7 @@ export interface CheckoutCardResponse {
   amount_card_fee: number | null
   card_fee_responsibility: 'READER' | null
   asaas_payment_id: string
+  payment_id?: string
   status: 'CONFIRMED' | 'PENDING'
 }
 

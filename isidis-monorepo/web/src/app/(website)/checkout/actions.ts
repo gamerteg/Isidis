@@ -2,6 +2,7 @@ import apiClient from '@/lib/apiClient'
 import type {
   CheckoutCardInput,
   CheckoutCardResponse,
+  CheckoutConfigResponse,
   CheckoutCreatePayload,
   CheckoutPixResponse,
   OrderDetail,
@@ -69,10 +70,11 @@ export async function createCardPayment(
       add_on_ids: selectedAddOnIds,
       requirements_answers: requirementsAnswers,
       payment_method: 'CARD',
-      card_number: card.number,
-      card_expiry_month: card.expiry_month,
-      card_expiry_year: card.expiry_year,
-      card_cvv: card.ccv,
+      card_token: card.token,
+      payment_method_id: card.payment_method_id,
+      installments: card.installments,
+      issuer_id: card.issuer_id,
+      device_id: card.device_id,
       card_holder_name: card.holder_name,
       card_holder_postal_code: card.postal_code,
       card_holder_address_number: card.address_number,
@@ -80,7 +82,7 @@ export async function createCardPayment(
 
     return {
       orderId: result.order_id,
-      paymentId: result.asaas_payment_id,
+      paymentId: result.payment_id ?? result.asaas_payment_id,
       status: result.status,
       amountTotal: result.amount_total,
       amountCardFee: result.amount_card_fee,
@@ -97,6 +99,11 @@ export async function checkPaymentStatus(paymentId: string) {
     status: response.data.data.status,
     orderId: response.data.data.order_id,
   }
+}
+
+export async function getCheckoutConfig() {
+  const response = await apiClient.get<{ data: CheckoutConfigResponse }>('/checkout/config')
+  return response.data.data
 }
 
 export async function saveOrderRequirements(orderId: string, answers: Record<string, string>) {

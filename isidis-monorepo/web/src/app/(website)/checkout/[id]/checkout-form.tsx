@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { CardPayment, initMercadoPago } from '@mercadopago/sdk-react'
+import type {
+  ICardPaymentBrickPayer,
+  ICardPaymentFormData,
+} from '@mercadopago/sdk-react/esm/bricks/cardPayment/type'
 import { Loader2, Copy, CheckCircle2, QrCode, ShieldCheck, CreditCard, LockKeyhole } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -8,8 +13,19 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { createCardPayment, createPixPayment, checkPaymentStatus } from '@/app/(website)/checkout/actions'
-import type { CheckoutCardInput, GigAddOn, GigRequirement } from '@/types'
+import {
+  checkPaymentStatus,
+  createCardPayment,
+  createPixPayment,
+  getCheckoutConfig,
+} from '@/app/(website)/checkout/actions'
+import type { CheckoutConfigResponse, GigAddOn, GigRequirement } from '@/types'
+
+declare global {
+  interface Window {
+    MP_DEVICE_SESSION_ID?: string
+  }
+}
 
 interface PixData {
   qrcode: string
@@ -18,22 +34,19 @@ interface PixData {
   expiresAt?: string | null
 }
 
+interface CardFormState {
+  holder_name: string
+  postal_code: string
+  address_number: string
+}
+
 interface CheckoutFormProps {
   gigId: string
   readerId: string
+  amountTotal: number
   selectedAddOns?: GigAddOn[]
   requirements?: GigRequirement[]
   existingOrderId?: string
-}
-
-function maskCardNumber(value: string) {
-  return value.replace(/\D/g, '').slice(0, 16).replace(/(\d{4})(?=\d)/g, '$1 ').trim()
-}
-
-function formatExpiry(value: string) {
-  const digits = value.replace(/\D/g, '').slice(0, 4)
-  if (digits.length <= 2) return digits
-  return `${digits.slice(0, 2)}/${digits.slice(2)}`
 }
 
 function formatCurrency(cents?: number | null) {
@@ -41,9 +54,43 @@ function formatCurrency(cents?: number | null) {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
+function loadMercadoPagoSecurityScript(onDeviceId: (deviceId: string) => void) {
+  const updateDeviceId = () => {
+    const nextDeviceId = window.MP_DEVICE_SESSION_ID
+    if (nextDeviceId) {
+      onDeviceId(nextDeviceId)
+    }
+  }
+
+  updateDeviceId()
+
+  const existingScript = document.getElementById('mercadopago-security-js') as HTMLScriptElement | null
+  if (existingScript) {
+    if (existingScript.dataset.loaded === 'true') {
+      updateDeviceId()
+    }
+
+    return () => undefined
+  }
+
+  const script = document.createElement('script')
+  script.id = 'mercadopago-security-js'
+  script.src = 'https://www.mercadopago.com/v2/security.js'
+  script.async = true
+  script.setAttribute('view', 'checkout')
+  script.onload = () => {
+    script.dataset.loaded = 'true'
+    updateDeviceId()
+  }
+  document.body.appendChild(script)
+
+  return () => undefined
+}
+
 export function CheckoutForm({
   gigId,
   readerId,
+  amountTotal,
   selectedAddOns = [],
   requirements = [],
   existingOrderId,
@@ -53,6 +100,7 @@ export function CheckoutForm({
 
   const [method, setMethod] = useState<'PIX' | 'CARD'>('PIX')
   const [loading, setLoading] = useState(false)
+  const [cardSubmitting, setCardSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [pixData, setPixData] = useState<PixData | null>(null)
   const [paymentId, setPaymentId] = useState<string | null>(null)
@@ -60,12 +108,11 @@ export function CheckoutForm({
   const [copied, setCopied] = useState(false)
   const [cardFee, setCardFee] = useState<number | null>(null)
   const [requirementsAnswers, setRequirementsAnswers] = useState<Record<string, string>>({})
-  const [cardData, setCardData] = useState<CheckoutCardInput>({
+  const [checkoutConfig, setCheckoutConfig] = useState<CheckoutConfigResponse | null>(null)
+  const [checkoutConfigError, setCheckoutConfigError] = useState('')
+  const [deviceId, setDeviceId] = useState('')
+  const [cardForm, setCardForm] = useState<CardFormState>({
     holder_name: '',
-    number: '',
-    expiry_month: '',
-    expiry_year: '',
-    ccv: '',
     postal_code: '',
     address_number: '',
   })
@@ -74,6 +121,43 @@ export function CheckoutForm({
     () => requirements.filter((requirement) => requirement.required),
     [requirements],
   )
+
+  useEffect(() => {
+    let cancelled = false
+
+    void getCheckoutConfig()
+      .then((config) => {
+        if (cancelled) return
+
+        setCheckoutConfig(config)
+        initMercadoPago(config.public_key, { locale: config.locale })
+      })
+      .catch(() => {
+        if (cancelled) return
+        setCheckoutConfigError('Nao foi possivel carregar o checkout do Mercado Pago agora.')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    const dispose = loadMercadoPagoSecurityScript((nextDeviceId) => {
+      setDeviceId(nextDeviceId)
+    })
+
+    const intervalId = window.setInterval(() => {
+      if (window.MP_DEVICE_SESSION_ID) {
+        setDeviceId(window.MP_DEVICE_SESSION_ID)
+      }
+    }, 1500)
+
+    return () => {
+      dispose()
+      window.clearInterval(intervalId)
+    }
+  }, [])
 
   useEffect(() => {
     if (!paymentId) return
@@ -86,8 +170,8 @@ export function CheckoutForm({
           toast.success('Pagamento confirmado com sucesso!')
           navigate(`/dashboard/pedido/${result.orderId}`)
         }
-      } catch (statusError) {
-        // Keep polling quietly until a definitive result arrives.
+      } catch {
+        // Continua o polling ate chegar a confirmacao oficial.
       }
     }, 4000)
 
@@ -96,14 +180,28 @@ export function CheckoutForm({
     }
   }, [navigate, paymentId])
 
-  const updateCardField = (field: keyof CheckoutCardInput, value: string) => {
-    setCardData((current) => ({ ...current, [field]: value }))
-  }
-
   const validateRequirements = () => {
     const missing = requiredQuestions.filter((question) => !requirementsAnswers[question.id]?.trim())
     if (missing.length === 0) return null
     return 'Preencha as informacoes obrigatorias para continuar com o pedido.'
+  }
+
+  const validateCardSupplementalFields = () => {
+    const sanitizedPostalCode = cardForm.postal_code.replace(/\D/g, '')
+
+    if (!cardForm.holder_name.trim()) {
+      return 'Informe o nome impresso no cartao.'
+    }
+
+    if (sanitizedPostalCode.length !== 8) {
+      return 'Informe um CEP valido para o titular do cartao.'
+    }
+
+    if (!cardForm.address_number.trim()) {
+      return 'Informe o numero do endereco do titular.'
+    }
+
+    return null
   }
 
   const handlePixCheckout = async () => {
@@ -121,7 +219,7 @@ export function CheckoutForm({
         gigId,
         selectedAddOns.map((addOn) => addOn.id),
         requirementsAnswers,
-        existingOrderId,
+        orderId ?? existingOrderId,
       )
 
       if (result.error) {
@@ -148,30 +246,22 @@ export function CheckoutForm({
     }
   }
 
-  const handleCardCheckout = async () => {
+  const handleCardBrickSubmit = async (
+    formData: ICardPaymentFormData<ICardPaymentBrickPayer>
+  ) => {
     const requirementsError = validateRequirements()
     if (requirementsError) {
       setError(requirementsError)
-      return
+      throw new Error(requirementsError)
     }
 
-    const sanitizedCardNumber = cardData.number.replace(/\D/g, '')
-    const sanitizedPostalCode = cardData.postal_code.replace(/\D/g, '')
-
-    if (
-      !cardData.holder_name.trim() ||
-      sanitizedCardNumber.length !== 16 ||
-      !cardData.expiry_month ||
-      !cardData.expiry_year ||
-      cardData.ccv.replace(/\D/g, '').length < 3 ||
-      sanitizedPostalCode.length !== 8 ||
-      !cardData.address_number.trim()
-    ) {
-      setError('Confira os dados do cartao e do endereco antes de finalizar.')
-      return
+    const cardSupplementalError = validateCardSupplementalFields()
+    if (cardSupplementalError) {
+      setError(cardSupplementalError)
+      throw new Error(cardSupplementalError)
     }
 
-    setLoading(true)
+    setCardSubmitting(true)
     setError('')
 
     try {
@@ -180,22 +270,27 @@ export function CheckoutForm({
         selectedAddOns.map((addOn) => addOn.id),
         requirementsAnswers,
         {
-          ...cardData,
-          number: sanitizedCardNumber,
-          ccv: cardData.ccv.replace(/\D/g, ''),
-          postal_code: sanitizedPostalCode,
+          token: formData.token,
+          payment_method_id: formData.payment_method_id,
+          installments: formData.installments,
+          issuer_id: formData.issuer_id || undefined,
+          holder_name: cardForm.holder_name.trim(),
+          postal_code: cardForm.postal_code.replace(/\D/g, ''),
+          address_number: cardForm.address_number.trim(),
+          device_id: deviceId || undefined,
         },
-        existingOrderId,
+        orderId ?? existingOrderId,
       )
 
       if (result.error) {
         setError(result.error)
-        return
+        throw new Error(result.error)
       }
 
       if (!result.orderId || !result.paymentId) {
-        setError('Nao foi possivel iniciar a cobranca no cartao.')
-        return
+        const genericError = 'Nao foi possivel iniciar a cobranca no cartao.'
+        setError(genericError)
+        throw new Error(genericError)
       }
 
       setOrderId(result.orderId)
@@ -210,7 +305,7 @@ export function CheckoutForm({
 
       toast.success('Pagamento em analise. Vamos acompanhar o status automaticamente.')
     } finally {
-      setLoading(false)
+      setCardSubmitting(false)
     }
   }
 
@@ -257,7 +352,7 @@ export function CheckoutForm({
               </div>
               <div>
                 <p className="text-sm font-semibold text-white">Pagamento processado pelo backend da Isidis</p>
-                <p className="text-xs text-slate-400">Checkout seguro com conciliacao oficial pelo Asaas.</p>
+                <p className="text-xs text-slate-400">Checkout seguro com tokenizacao oficial do Mercado Pago.</p>
               </div>
             </div>
             <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[11px] font-semibold text-slate-300 sm:flex">
@@ -415,50 +510,9 @@ export function CheckoutForm({
                 <Label htmlFor="holder_name" className="text-slate-200">Nome impresso no cartao</Label>
                 <Input
                   id="holder_name"
-                  value={cardData.holder_name}
-                  onChange={(event) => updateCardField('holder_name', event.target.value)}
+                  value={cardForm.holder_name}
+                  onChange={(event) => setCardForm((current) => ({ ...current, holder_name: event.target.value }))}
                   placeholder="Como aparece no cartao"
-                  className="h-12 rounded-xl border-white/10 bg-[#0c0b17] text-slate-100"
-                />
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="card_number" className="text-slate-200">Numero do cartao</Label>
-                <Input
-                  id="card_number"
-                  inputMode="numeric"
-                  value={cardData.number}
-                  onChange={(event) => updateCardField('number', maskCardNumber(event.target.value))}
-                  placeholder="0000 0000 0000 0000"
-                  className="h-12 rounded-xl border-white/10 bg-[#0c0b17] text-slate-100"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="expiry" className="text-slate-200">Validade</Label>
-                <Input
-                  id="expiry"
-                  inputMode="numeric"
-                  value={formatExpiry(`${cardData.expiry_month}${cardData.expiry_year}`)}
-                  onChange={(event) => {
-                    const formatted = formatExpiry(event.target.value)
-                    const [month = '', year = ''] = formatted.split('/')
-                    updateCardField('expiry_month', month)
-                    updateCardField('expiry_year', year)
-                  }}
-                  placeholder="MM/AA"
-                  className="h-12 rounded-xl border-white/10 bg-[#0c0b17] text-slate-100"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="card_cvv" className="text-slate-200">CVV</Label>
-                <Input
-                  id="card_cvv"
-                  inputMode="numeric"
-                  value={cardData.ccv}
-                  onChange={(event) => updateCardField('ccv', event.target.value.replace(/\D/g, '').slice(0, 4))}
-                  placeholder="123"
                   className="h-12 rounded-xl border-white/10 bg-[#0c0b17] text-slate-100"
                 />
               </div>
@@ -468,8 +522,13 @@ export function CheckoutForm({
                 <Input
                   id="postal_code"
                   inputMode="numeric"
-                  value={cardData.postal_code}
-                  onChange={(event) => updateCardField('postal_code', event.target.value.replace(/\D/g, '').slice(0, 8))}
+                  value={cardForm.postal_code}
+                  onChange={(event) =>
+                    setCardForm((current) => ({
+                      ...current,
+                      postal_code: event.target.value.replace(/\D/g, '').slice(0, 8),
+                    }))
+                  }
                   placeholder="00000000"
                   className="h-12 rounded-xl border-white/10 bg-[#0c0b17] text-slate-100"
                 />
@@ -479,8 +538,8 @@ export function CheckoutForm({
                 <Label htmlFor="address_number" className="text-slate-200">Numero do endereco</Label>
                 <Input
                   id="address_number"
-                  value={cardData.address_number}
-                  onChange={(event) => updateCardField('address_number', event.target.value)}
+                  value={cardForm.address_number}
+                  onChange={(event) => setCardForm((current) => ({ ...current, address_number: event.target.value }))}
                   placeholder="123"
                   className="h-12 rounded-xl border-white/10 bg-[#0c0b17] text-slate-100"
                 />
@@ -495,14 +554,53 @@ export function CheckoutForm({
                 </span>
               </div>
               <p className="mt-2 text-slate-400">
-                O pedido sera criado no backend da Isidis e conciliado automaticamente pelo Asaas.
+                O cartao e tokenizado no navegador pelo Mercado Pago, e a Isidis recebe apenas o token para criar o pagamento.
               </p>
+              {deviceId ? (
+                <p className="mt-2 text-xs text-slate-500">Protecao antifraude ativa para este checkout.</p>
+              ) : null}
               {cardFee ? (
                 <p className="mt-3 text-xs text-sky-200">
                   Taxa operacional desta cobranca: {formatCurrency(cardFee)}.
                 </p>
               ) : null}
             </div>
+
+            {checkoutConfigError ? (
+              <div className="rounded-[1.5rem] border border-rose-500/20 bg-rose-500/5 p-4 text-sm text-rose-200">
+                {checkoutConfigError}
+              </div>
+            ) : checkoutConfig ? (
+              <div className="rounded-[1.5rem] border border-white/10 bg-white p-4 text-slate-950 shadow-[0_20px_60px_rgba(8,6,24,0.22)]">
+                <CardPayment
+                  key={`${checkoutConfig.public_key}-${amountTotal}`}
+                  initialization={{ amount: amountTotal }}
+                  customization={{
+                    paymentMethods: {
+                      minInstallments: 1,
+                      maxInstallments: 1,
+                      types: {
+                        included: ['credit_card'],
+                      },
+                    },
+                    visual: {
+                      hideFormTitle: true,
+                    },
+                  }}
+                  locale={checkoutConfig.locale}
+                  onSubmit={handleCardBrickSubmit}
+                  onError={(brickError) => {
+                    const message = brickError?.message || 'Nao foi possivel carregar o formulario do Mercado Pago.'
+                    setError(message)
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center rounded-[1.5rem] border border-white/10 bg-black/20 px-4 py-10 text-sm text-slate-400">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Carregando checkout do Mercado Pago...
+              </div>
+            )}
 
             {isPollingCard ? (
               <div className="rounded-[1.5rem] border border-amber-500/20 bg-amber-500/5 p-4">
@@ -516,24 +614,12 @@ export function CheckoutForm({
               </div>
             ) : null}
 
-            <Button
-              type="button"
-              onClick={handleCardCheckout}
-              disabled={loading}
-              className="h-14 w-full rounded-2xl bg-sky-500 text-base font-semibold text-slate-950 hover:bg-sky-400"
-            >
-              {loading && method === 'CARD' ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Processando cartao
-                </>
-              ) : (
-                <>
-                  <CreditCard className="mr-2 h-5 w-5" />
-                  Pagar com cartao
-                </>
-              )}
-            </Button>
+            {cardSubmitting ? (
+              <div className="flex items-center justify-center gap-2 rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3 text-sm text-sky-200">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Enviando pagamento tokenizado ao Mercado Pago...
+              </div>
+            ) : null}
           </TabsContent>
         </div>
       </Tabs>

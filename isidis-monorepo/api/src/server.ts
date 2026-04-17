@@ -13,12 +13,14 @@ const CORE_ENV_VARS = [
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
   'SUPABASE_ANON_KEY',
+  'MERCADOPAGO_ACCESS_TOKEN',
+  'MERCADOPAGO_PUBLIC_KEY',
+  'API_URL',
 ] as const
 
 const OPTIONAL_ENV_VARS = [
   'APP_URL',
   'APP_URLS',
-  'ASAAS_API_KEY',
   'RESEND_API_KEY',
   'CRON_SECRET',
 ] as const
@@ -29,6 +31,12 @@ const start = async () => {
     if (missingCoreVars.length > 0) {
       throw new Error(
         `Variavel de ambiente obrigatoria ausente: ${missingCoreVars.join(', ')}`
+      )
+    }
+
+    if (process.env.NODE_ENV === 'production' && !process.env.MERCADOPAGO_WEBHOOK_SECRET) {
+      throw new Error(
+        'Variavel de ambiente obrigatoria ausente em producao: MERCADOPAGO_WEBHOOK_SECRET'
       )
     }
 

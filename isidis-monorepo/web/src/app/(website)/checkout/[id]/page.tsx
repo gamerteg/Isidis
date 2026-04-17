@@ -107,6 +107,7 @@ export default function CheckoutPage() {
             <CheckoutForm
               gigId={gig.id}
               readerId={gig.owner_id}
+              amountTotal={orderTotal}
               selectedAddOns={selectedAddOns}
               requirements={requirements}
               existingOrderId={orderId}

@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
 import { checkFraud } from '../../services/fraud.js'
@@ -5,9 +6,39 @@ import { processPaidMpOrder } from '../../services/payment-reconciliation.js'
 
 const PLATFORM_FEE_PERCENT = 0.15
 const CARD_FEE_PERCENT = parseFloat(process.env.MERCADOPAGO_CARD_FEE_PERCENT ?? '0.0499')
-const CARD_FEE_FIXED = parseInt(process.env.MERCADOPAGO_CARD_FEE_FIXED ?? '30', 10) // 30 centavos
+const CARD_FEE_FIXED = parseInt(process.env.MERCADOPAGO_CARD_FEE_FIXED ?? '30', 10)
+const MP_BASE_URL = 'https://api.mercadopago.com'
 
-const toDecimal = (centavos: number) => Number((centavos / 100).toFixed(2))
+const optionalPositiveInteger = z.preprocess((value) => {
+  if (value === undefined || value === null || value === '') {
+    return undefined
+  }
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : value
+}, z.number().int().positive().optional())
+
+const createCheckoutSchema = z.object({
+  order_id: z.string().uuid().optional(),
+  gig_id: z.string().uuid(),
+  add_on_ids: z.array(z.string()).default([]),
+  requirements_answers: z.record(z.string(), z.string()).default({}),
+  payment_method: z.enum(['PIX', 'CARD']).default('PIX'),
+  card_token: z.string().optional(),
+  payment_method_id: z.string().optional(),
+  installments: optionalPositiveInteger,
+  issuer_id: optionalPositiveInteger,
+  device_id: z.string().optional(),
+  card_holder_name: z.string().optional(),
+  card_holder_postal_code: z.string().optional(),
+  card_holder_address_number: z.string().optional(),
+  card_number: z.string().optional(),
+  card_expiry_month: z.string().optional(),
+  card_expiry_year: z.string().optional(),
+  card_cvv: z.string().optional(),
+})
+
+const toDecimal = (cents: number) => Number((cents / 100).toFixed(2))
 
 function calculateCardFee(amountInCents: number) {
   return Math.ceil(amountInCents * CARD_FEE_PERCENT) + CARD_FEE_FIXED
@@ -26,25 +57,160 @@ function sanitizePixDescription(orderId: string, gigTitle: string) {
   return description.slice(0, 140)
 }
 
-const createCheckoutSchema = z.object({
-  order_id: z.string().uuid().optional(),
-  gig_id: z.string().uuid(),
-  add_on_ids: z.array(z.string()).default([]),
-  requirements_answers: z.record(z.string(), z.string()).default({}),
-  payment_method: z.enum(['PIX', 'CARD']).default('PIX'),
-  card_token: z.string().optional(),
-  card_number: z.string().optional(),
-  card_expiry_month: z.string().optional(),
-  card_expiry_year: z.string().optional(),
-  card_cvv: z.string().optional(),
-  card_holder_name: z.string().optional(),
-  card_holder_postal_code: z.string().optional(),
-  card_holder_address_number: z.string().optional(),
-})
+function getNotificationUrl() {
+  if (!process.env.API_URL) {
+    return undefined
+  }
+
+  return `${process.env.API_URL}/webhooks/mercadopago?source_news=webhooks`
+}
+
+function getCardRejectionMessage(statusDetail?: string) {
+  const rejectionMap: Record<string, string> = {
+    cc_rejected_insufficient_amount: 'Cartao sem limite suficiente.',
+    cc_rejected_bad_filled_date: 'Data de validade invalida.',
+    cc_rejected_bad_filled_security_code: 'CVV invalido.',
+    cc_rejected_bad_filled_other: 'Dados do cartao invalidos.',
+    cc_rejected_blacklist: 'Cartao recusado pelo emissor.',
+    cc_rejected_call_for_authorize: 'Autorizacao necessaria. Entre em contato com seu banco.',
+    cc_rejected_card_disabled: 'Cartao desativado. Entre em contato com seu banco.',
+    cc_rejected_duplicated_payment: 'Pagamento duplicado detectado.',
+    cc_rejected_high_risk: 'Transacao recusada por seguranca. Tente outro cartao.',
+    cc_rejected_max_attempts: 'Muitas tentativas. Aguarde e tente novamente.',
+    cc_rejected_other_reason: 'Cartao recusado. Tente outro cartao ou outra forma de pagamento.',
+  }
+
+  return rejectionMap[statusDetail ?? ''] ?? 'Cartao recusado. Tente outro cartao ou outra forma de pagamento.'
+}
+
+function buildPayerName(fullName: string) {
+  const normalized = fullName.trim().replace(/\s+/g, ' ')
+  const nameParts = normalized.split(' ')
+
+  return {
+    firstName: nameParts[0] ?? normalized,
+    lastName: nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0] ?? normalized,
+  }
+}
+
+function buildPhone(cellphone?: string | null) {
+  const rawPhone = cellphone?.replace(/\D/g, '') ?? ''
+
+  if (rawPhone.length < 10) {
+    return null
+  }
+
+  return {
+    area_code: rawPhone.slice(0, 2),
+    number: rawPhone.slice(2),
+  }
+}
+
+async function tokenizeLegacyCard(params: {
+  accessToken: string
+  publicKey: string
+  cardNumber: string
+  expiryMonth: string
+  expiryYear: string
+  cvv: string
+  holderName: string
+  taxId: string
+}) {
+  let parsedYear = parseInt(params.expiryYear, 10)
+  if (parsedYear < 100) {
+    parsedYear += 2000
+  }
+
+  const response = await fetch(
+    `${MP_BASE_URL}/v1/card_tokens?public_key=${params.publicKey}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${params.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        card_number: params.cardNumber,
+        expiration_month: parseInt(params.expiryMonth, 10),
+        expiration_year: parsedYear,
+        security_code: params.cvv,
+        cardholder: {
+          name: params.holderName,
+          identification: {
+            type: 'CPF',
+            number: params.taxId.replace(/\D/g, ''),
+          },
+        },
+      }),
+    }
+  )
+
+  const data = (await response.json().catch(() => ({}))) as Record<string, any>
+
+  if (!response.ok || !data?.id) {
+    const error = new Error(data?.message ?? data?.error ?? 'Erro ao tokenizar cartao') as Error & {
+      statusCode?: number
+      responseBody?: unknown
+    }
+    error.statusCode = response.status
+    error.responseBody = data
+    throw error
+  }
+
+  return data.id as string
+}
+
+async function resolveLegacyPaymentMethodId(params: {
+  accessToken: string
+  publicKey: string
+  cardNumber: string
+}) {
+  const bin = params.cardNumber.slice(0, 6)
+
+  const response = await fetch(
+    `${MP_BASE_URL}/v1/payment_methods/search?bin=${bin}&public_key=${params.publicKey}`,
+    {
+      headers: {
+        Authorization: `Bearer ${params.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  )
+
+  const data = (await response.json().catch(() => ({}))) as Record<string, any>
+
+  if (!response.ok || !Array.isArray(data?.results) || data.results.length === 0) {
+    const error = new Error(data?.message ?? data?.error ?? 'Nao foi possivel identificar a bandeira do cartao') as Error & {
+      statusCode?: number
+      responseBody?: unknown
+    }
+    error.statusCode = response.status
+    error.responseBody = data
+    throw error
+  }
+
+  const creditCardMethod =
+    data.results.find((item: any) => item.payment_type_id === 'credit_card' && item.status === 'active') ??
+    data.results[0]
+
+  return {
+    paymentMethodId: creditCardMethod.id as string,
+    issuerId:
+      typeof creditCardMethod.issuer?.id === 'number' || typeof creditCardMethod.issuer?.id === 'string'
+        ? Number(creditCardMethod.issuer.id)
+        : undefined,
+  }
+}
 
 const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/checkout/config', async (_request, reply) => {
-    return reply.send({ data: { gateway: 'mercadopago' } })
+    return reply.send({
+      data: {
+        gateway: 'mercadopago',
+        public_key: process.env.MERCADOPAGO_PUBLIC_KEY,
+        locale: 'pt-BR',
+      },
+    })
   })
 
   fastify.post(
@@ -63,13 +229,17 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
         requirements_answers,
         payment_method,
         card_token,
+        payment_method_id,
+        installments,
+        issuer_id,
+        device_id,
+        card_holder_name,
+        card_holder_postal_code,
+        card_holder_address_number,
         card_number,
         card_expiry_month,
         card_expiry_year,
         card_cvv,
-        card_holder_name,
-        card_holder_postal_code,
-        card_holder_address_number,
       } = body.data
       const clientId = request.user.id
 
@@ -134,6 +304,13 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Complete seu perfil com CPF e telefone antes de comprar' })
       }
 
+      const { data: clientAuthData } = await fastify.supabase.auth.admin.getUserById(clientId)
+      const clientEmail = clientAuthData.user?.email ?? ''
+
+      if (!clientEmail) {
+        return reply.status(400).send({ error: 'Nao foi possivel identificar o email da sua conta para processar o pagamento' })
+      }
+
       const addOns = (gig.add_ons as any[]) ?? []
       const selectedAddOns = addOns.filter((item) => add_on_ids.includes(item.id))
       const addOnTotal = selectedAddOns.reduce(
@@ -156,7 +333,6 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
       const clientIp = Array.isArray(forwardedFor)
         ? forwardedFor[0]
         : forwardedFor?.split(',')[0]?.trim() ?? request.ip
-      const { data: clientAuthData } = await fastify.supabase.auth.admin.getUserById(clientId)
 
       const fraudCheck = await checkFraud(fastify.supabase, {
         clientId,
@@ -175,7 +351,6 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
         user_agent: request.headers['user-agent'] ?? '',
         fraud_flags: fraudCheck.flags,
       }
-      const clientEmail = clientAuthData.user?.email ?? ''
 
       let order: { id: string } | null = null
 
@@ -272,189 +447,195 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       if (payment_method === 'CARD') {
+        const mpPublicKey = process.env.MERCADOPAGO_PUBLIC_KEY
+        const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN
+        const holderName = card_holder_name?.trim() || clientProfile.full_name
         const sanitizedCardNumber = card_number?.replace(/\D/g, '')
         const sanitizedCardCvv = card_cvv?.replace(/\D/g, '')
         const sanitizedExpiryMonth = card_expiry_month?.replace(/\D/g, '')
         const sanitizedExpiryYear = card_expiry_year?.replace(/\D/g, '')
-
-        const hasRawCard =
+        const hasLegacyRawCard =
           Boolean(sanitizedCardNumber) &&
           Boolean(sanitizedCardCvv) &&
           Boolean(sanitizedExpiryMonth) &&
           Boolean(sanitizedExpiryYear)
 
-        if (!card_token && !hasRawCard) {
+        const hasTokenizedCard = Boolean(card_token && payment_method_id && installments)
+
+        if (!hasTokenizedCard && !hasLegacyRawCard) {
           await fastify.supabase
             .from('orders')
             .update({ status: 'CANCELED' })
             .eq('id', order.id)
 
-          return reply.status(400).send({ error: 'Dados do cartao sao obrigatorios para pagamento com cartao' })
+          return reply.status(400).send({
+            error: 'Dados tokenizados do cartao sao obrigatorios para pagamento com cartao',
+          })
         }
 
         let finalCardToken = card_token
-        let derivedPaymentMethodId = 'visa' // standard fallback
+        let finalPaymentMethodId = payment_method_id
+        let finalIssuerId = issuer_id
+        let finalInstallments = installments ?? 1
 
         try {
-            if (!finalCardToken && hasRawCard) {
-                let parsedYear = parseInt(sanitizedExpiryYear!);
-                if (parsedYear < 100) {
-                    parsedYear += 2000;
-                }
-
-                const mpPublicKey = process.env.MERCADOPAGO_PUBLIC_KEY
-                const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN
-                if (!mpPublicKey) {
-                    request.log.error('[checkout] MERCADOPAGO_PUBLIC_KEY nao esta definida nas variaveis de ambiente!')
-                    throw new Error('Configuracao do gateway de pagamento incompleta. Contate o suporte.')
-                }
-                request.log.info({ mpPublicKey: mpPublicKey.slice(0, 20) + '...' }, '[checkout] Tokenizando cartao com public_key')
-
-                // /v1/card_tokens requires public_key auth (not access_token) - call raw fetch
-                const tokenRaw = await fetch(`https://api.mercadopago.com/v1/card_tokens?public_key=${mpPublicKey}`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${mpAccessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        card_number: sanitizedCardNumber,
-                        expiration_month: parseInt(sanitizedExpiryMonth!),
-                        expiration_year: parsedYear,
-                        security_code: sanitizedCardCvv,
-                        cardholder: {
-                            name: card_holder_name ?? clientProfile.full_name,
-                            identification: {
-                                type: 'CPF',
-                                number: clientProfile.tax_id.replace(/\D/g, '')
-                            }
-                        }
-                    })
-                })
-                const tokenRes: any = await tokenRaw.json()
-                request.log.info({ tokenStatus: tokenRaw.status, tokenId: tokenRes?.id }, '[checkout] Resposta MP card_tokens')
-                if (!tokenRaw.ok || !tokenRes?.id) {
-                    const errMsg = tokenRes?.message ?? tokenRes?.error ?? 'Erro ao tokenizar cartao'
-                    throw Object.assign(new Error(errMsg), { statusCode: tokenRaw.status, responseBody: tokenRes })
-                }
-                finalCardToken = tokenRes.id
-                
-                // Get bin for payment method
-                const binRes = await fastify.mp(`/v1/payment_methods/search?bin=${sanitizedCardNumber!.substring(0, 6)}&public_key=${mpPublicKey}`)
-                if (binRes.results && binRes.results.length > 0) {
-                    // Prefer credit_card type to avoid picking debit/prepaid variants (diff_param_bins error)
-                    const creditMethod = binRes.results.find(
-                        (m: any) => m.payment_type_id === 'credit_card' && m.status === 'active'
-                    ) ?? binRes.results[0]
-                    derivedPaymentMethodId = creditMethod.id
-                    request.log.info({ paymentMethodId: derivedPaymentMethodId, resultsCount: binRes.results.length }, '[checkout] BIN lookup payment_method')
-                }
-            } else if (card_token) {
-                 // if token provided by MP SDK, SDK handles payment_method mapping. Let's fallback to infering or maybe client sends it. Currently we don't have it so we just supply generic credit_card or visa
-                 derivedPaymentMethodId = 'master' // MP typically validates via token anyway
+          if (!hasTokenizedCard && hasLegacyRawCard) {
+            if (!mpPublicKey || !mpAccessToken) {
+              throw new Error('Configuracao do Mercado Pago incompleta para compatibilidade legada de cartao')
             }
-        
-            const nameParts = clientProfile.full_name.trim().split(/\s+/)
-            const payerFirstName = nameParts[0]
-            const payerLastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0]
 
-            // Parse BR phone: "11999999999" → area_code="11", number="999999999"
-            const rawPhone = clientProfile.cellphone?.replace(/\D/g, '') ?? ''
-            const phoneAreaCode = rawPhone.length >= 10 ? rawPhone.substring(0, 2) : undefined
-            const phoneNumber = rawPhone.length >= 10 ? rawPhone.substring(2) : rawPhone || undefined
+            request.log.warn(
+              { orderId: order.id },
+              '[checkout] Fluxo legado de cartao acionado; o web deve usar tokenizacao no cliente'
+            )
 
-            const notificationUrl = process.env.API_URL
-              ? `${process.env.API_URL}/webhooks/mercadopago`
-              : undefined
+            finalCardToken = await tokenizeLegacyCard({
+              accessToken: mpAccessToken,
+              publicKey: mpPublicKey,
+              cardNumber: sanitizedCardNumber!,
+              expiryMonth: sanitizedExpiryMonth!,
+              expiryYear: sanitizedExpiryYear!,
+              cvv: sanitizedCardCvv!,
+              holderName,
+              taxId: clientProfile.tax_id,
+            })
 
-            const charge = await fastify.mp('/v1/payments', {
-              method: 'POST',
-              body: JSON.stringify({
-                transaction_amount: toDecimal(totalAmount),
-                token: finalCardToken,
-                description: sanitizePixDescription(order.id, gig.title),
-                installments: 1,
-                capture: true,
-                payment_method_id: derivedPaymentMethodId,
-                statement_descriptor: 'ISIDIS',
-                ...(notificationUrl && { notification_url: notificationUrl }),
-                payer: {
-                  email: clientEmail,
-                  first_name: payerFirstName,
-                  last_name: payerLastName,
-                  identification: {
-                    type: 'CPF',
-                    number: clientProfile.tax_id.replace(/\D/g, '')
-                  },
+            const legacyMethod = await resolveLegacyPaymentMethodId({
+              accessToken: mpAccessToken,
+              publicKey: mpPublicKey,
+              cardNumber: sanitizedCardNumber!,
+            })
+
+            finalPaymentMethodId = legacyMethod.paymentMethodId
+            finalIssuerId = legacyMethod.issuerId
+            finalInstallments = 1
+          }
+
+          if (!finalCardToken || !finalPaymentMethodId) {
+            throw Object.assign(
+              new Error('payment_method_id e card_token sao obrigatorios para pagamentos tokenizados'),
+              { statusCode: 400 }
+            )
+          }
+
+          if (finalInstallments !== 1) {
+            throw Object.assign(
+              new Error('No momento, pagamentos com cartao estao disponiveis somente em 1 parcela'),
+              { statusCode: 400 }
+            )
+          }
+
+          const { firstName, lastName } = buildPayerName(clientProfile.full_name)
+          const phone = buildPhone(clientProfile.cellphone)
+          const postalCode = card_holder_postal_code?.replace(/\D/g, '')
+          const notificationUrl = getNotificationUrl()
+
+          const charge = await fastify.mp.createPayment({
+            body: {
+              transaction_amount: toDecimal(totalAmount),
+              token: finalCardToken,
+              description: sanitizePixDescription(order.id, gig.title),
+              installments: finalInstallments,
+              capture: true,
+              payment_method_id: finalPaymentMethodId,
+              issuer_id: finalIssuerId,
+              statement_descriptor: 'ISIDIS',
+              ...(notificationUrl && { notification_url: notificationUrl }),
+              payer: {
+                email: clientEmail,
+                first_name: firstName,
+                last_name: lastName,
+                entity_type: 'individual',
+                identification: {
+                  type: 'CPF',
+                  number: clientProfile.tax_id.replace(/\D/g, ''),
                 },
-                additional_info: {
-                  items: [{
+                ...(phone && { phone }),
+                ...(postalCode && {
+                  address: {
+                    zip_code: postalCode,
+                    ...(card_holder_address_number && { street_number: card_holder_address_number }),
+                  },
+                }),
+              },
+              additional_info: {
+                ip_address: clientIp,
+                items: [
+                  {
                     id: gig_id,
                     title: gig.title,
                     description: gig.title,
                     quantity: 1,
                     unit_price: toDecimal(totalAmount),
-                  }],
-                  payer: {
-                    first_name: payerFirstName,
-                    last_name: payerLastName,
-                    ...(phoneAreaCode && phoneNumber && {
-                      phone: { area_code: phoneAreaCode, number: phoneNumber },
-                    }),
-                    ...(card_holder_postal_code && {
-                      address: {
-                        zip_code: card_holder_postal_code.replace(/\D/g, ''),
-                        ...(card_holder_address_number && { street_number: card_holder_address_number }),
-                      },
-                    }),
                   },
+                ],
+                payer: {
+                  first_name: firstName,
+                  last_name: lastName,
+                  ...(phone && { phone }),
+                  ...(postalCode && {
+                    address: {
+                      zip_code: postalCode,
+                      ...(card_holder_address_number && { street_number: card_holder_address_number }),
+                    },
+                  }),
                 },
-                external_reference: order.id,
-              }),
-            })
+              },
+              external_reference: order.id,
+            },
+            requestOptions: {
+              ...(device_id && { meliSessionId: device_id }),
+              idempotencyKey: randomUUID(),
+            },
+          })
 
-            request.log.info(
-              { chargeId: charge.id, chargeStatus: charge.status, statusDetail: charge.status_detail },
-              '[checkout] MP CARD charge criado'
-            )
+          request.log.info(
+            { chargeId: charge.id, chargeStatus: charge.status, statusDetail: charge.status_detail },
+            '[checkout] MP CARD charge criado'
+          )
 
-            // Rejected = banco/MP recusou o cartão (não é erro de API, é decisão de negócio)
-            if (charge.status === 'rejected') {
-              const rejectionMap: Record<string, string> = {
-                cc_rejected_insufficient_amount: 'Cartão sem limite suficiente.',
-                cc_rejected_bad_filled_date: 'Data de validade inválida.',
-                cc_rejected_bad_filled_security_code: 'CVV inválido.',
-                cc_rejected_bad_filled_other: 'Dados do cartão inválidos.',
-                cc_rejected_blacklist: 'Cartão recusado pelo emissor.',
-                cc_rejected_call_for_authorize: 'Autorização necessária. Entre em contato com seu banco.',
-                cc_rejected_card_disabled: 'Cartão desativado. Entre em contato com seu banco.',
-                cc_rejected_duplicated_payment: 'Pagamento duplicado detectado.',
-                cc_rejected_high_risk: 'Transação recusada por segurança. Tente outro cartão.',
-                cc_rejected_max_attempts: 'Muitas tentativas. Aguarde e tente novamente.',
-                cc_rejected_other_reason: 'Cartão recusado. Tente outro cartão ou forma de pagamento.',
+          if (charge.status === 'rejected') {
+            throw Object.assign(
+              new Error(getCardRejectionMessage(charge.status_detail)),
+              {
+                statusCode: 422,
+                responseBody: {
+                  status: charge.status,
+                  status_detail: charge.status_detail,
+                },
               }
-              const userMsg = rejectionMap[charge.status_detail] ?? 'Cartão recusado. Tente outro cartão ou forma de pagamento.'
-              throw Object.assign(new Error(userMsg), { statusCode: 422, responseBody: { status: charge.status, status_detail: charge.status_detail } })
-            }
+            )
+          }
 
-            await fastify.supabase
-              .from('orders')
-              .update({ asaas_payment_id: charge.id?.toString(), metadata: orderMetadata })
-              .eq('id', order.id)
-
-            return reply.status(201).send({
-              data: {
-                order_id: order.id,
-                payment_method: 'CARD',
-                amount_total: totalAmount,
-                amount_service_total: serviceAmount,
-                amount_card_fee: cardFee,
-                card_fee_responsibility: 'READER',
-                asaas_payment_id: charge.id?.toString(),
-                status: charge.status === 'approved' ? 'CONFIRMED' : 'PENDING',
+          await fastify.supabase
+            .from('orders')
+            .update({
+              asaas_payment_id: charge.id?.toString(),
+              metadata: {
+                ...orderMetadata,
+                mercadopago: {
+                  payment_method_id: finalPaymentMethodId,
+                  issuer_id: finalIssuerId ?? null,
+                  installments: finalInstallments,
+                  last_four_digits: charge.card?.last_four_digits ?? null,
+                },
               },
             })
+            .eq('id', order.id)
 
+          return reply.status(201).send({
+            data: {
+              order_id: order.id,
+              payment_method: 'CARD',
+              amount_total: totalAmount,
+              amount_service_total: serviceAmount,
+              amount_card_fee: cardFee,
+              card_fee_responsibility: 'READER',
+              asaas_payment_id: charge.id?.toString(),
+              payment_id: charge.id?.toString(),
+              status: ['approved', 'authorized'].includes(charge.status ?? '') ? 'CONFIRMED' : 'PENDING',
+            },
+          })
         } catch (mpErr: any) {
           await fastify.supabase
             .from('orders')
@@ -473,37 +654,50 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
           const statusCode = typeof mpErr?.statusCode === 'number' ? mpErr.statusCode : 502
           const errorMessage = mpErr.message ?? 'Erro ao processar cartao. Tente novamente.'
 
-          return reply.status(statusCode >= 400 && statusCode < 500 ? 400 : 502).send({ error: errorMessage })
+          return reply
+            .status(statusCode >= 400 && statusCode < 500 ? statusCode : 502)
+            .send({ error: errorMessage })
         }
       }
 
-      // PIX Flow
       try {
-        const dueDate = new Date(Date.now() + 15 * 60 * 1000) // MP supports 15min well
-        const pixDescription = sanitizePixDescription(order.id, gig.title)
+        const { firstName } = buildPayerName(clientProfile.full_name)
+        const dueDate = new Date(Date.now() + 15 * 60 * 1000)
+        const notificationUrl = getNotificationUrl()
 
-        const charge = await fastify.mp('/v1/payments', {
-          method: 'POST',
-          body: JSON.stringify({
+        const charge = await fastify.mp.createPayment({
+          body: {
             transaction_amount: toDecimal(totalAmount),
-            description: pixDescription,
+            description: sanitizePixDescription(order.id, gig.title),
             payment_method_id: 'pix',
             payer: {
               email: clientEmail,
-              first_name: clientProfile.full_name.split(' ')[0],
+              first_name: firstName,
               identification: {
                 type: 'CPF',
-                number: clientProfile.tax_id.replace(/\D/g, '')
-              }
+                number: clientProfile.tax_id.replace(/\D/g, ''),
+              },
             },
             date_of_expiration: dueDate.toISOString(),
             external_reference: order.id,
-          }),
+            ...(notificationUrl && { notification_url: notificationUrl }),
+          },
+          requestOptions: {
+            idempotencyKey: randomUUID(),
+          },
         })
 
         await fastify.supabase
           .from('orders')
-          .update({ asaas_payment_id: charge.id?.toString(), metadata: orderMetadata })
+          .update({
+            asaas_payment_id: charge.id?.toString(),
+            metadata: {
+              ...orderMetadata,
+              mercadopago: {
+                payment_method_id: 'pix',
+              },
+            },
+          })
           .eq('id', order.id)
 
         const transactionData = charge.point_of_interaction?.transaction_data
@@ -514,6 +708,7 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
             pix_qr_code_id: charge.id?.toString(),
             amount_total: totalAmount,
             amount_service_total: serviceAmount,
+            payment_id: charge.id?.toString(),
             pix: {
               qr_code_base64: transactionData?.qr_code_base64 ?? null,
               copy_paste_code: transactionData?.qr_code ?? null,
@@ -538,11 +733,14 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
 
         const statusCode = typeof mpErr?.statusCode === 'number' ? mpErr.statusCode : 502
         let errorMessage = mpErr.message ?? 'Erro ao gerar pagamento PIX. Tente novamente.'
+
         if (errorMessage.includes('without key enabled for QR render')) {
           errorMessage = 'A conta Mercado Pago desta plataforma nao possui uma Chave PIX configurada. Adicione uma chave no painel do MP para receber via PIX.'
         }
 
-        return reply.status(statusCode >= 400 && statusCode < 500 ? 400 : 502).send({ error: errorMessage })
+        return reply
+          .status(statusCode >= 400 && statusCode < 500 ? statusCode : 502)
+          .send({ error: errorMessage })
       }
     }
   )
@@ -568,9 +766,9 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       try {
-        const charge = await fastify.mp(`/v1/payments/${paymentId}`)
+        const charge = await fastify.mp.getPayment(paymentId)
         const mpStatus = charge.status
-        const mappedStatus = ['approved', 'authorized'].includes(mpStatus) ? 'PAID' : mpStatus.toUpperCase()
+        const mappedStatus = ['approved', 'authorized'].includes(mpStatus) ? 'PAID' : mpStatus?.toUpperCase() ?? 'PENDING'
 
         if (mappedStatus === 'PAID' && order.status === 'PENDING_PAYMENT') {
           try {

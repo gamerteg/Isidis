@@ -98,7 +98,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (order.status === 'PENDING_PAYMENT' && (order as any).asaas_payment_id) {
         try {
-          const charge = await fastify.mp(`/v1/payments/${(order as any).asaas_payment_id}`)
+          const charge = await fastify.mp.getPayment((order as any).asaas_payment_id)
           if (['approved', 'authorized'].includes(charge.status)) {
             await processPaidMpOrder(fastify, (order as any).asaas_payment_id)
 
@@ -246,8 +246,8 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       try {
-        await fastify.mp(`/v1/payments/${order.asaas_payment_id}/refunds`, {
-          method: 'POST',
+        await fastify.mp.refundPayment({
+          paymentId: order.asaas_payment_id,
         })
       } catch (mpErr: any) {
         request.log.error({ mpErr: mpErr.message }, '[cancel] Erro ao criar reembolso Mercado Pago')
