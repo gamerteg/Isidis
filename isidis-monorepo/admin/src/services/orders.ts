@@ -18,8 +18,7 @@ export interface AdminOrder {
   client_name: string
   reader_name: string
   gig_title: string
-  stripe_payment_intent_id: string | null
-  asaas_payment_id: string | null
+  mercadopago_payment_id: string | null
 }
 
 export interface OrderFilters {
@@ -35,7 +34,7 @@ export async function listOrders(filters: OrderFilters = {}): Promise<{ data: Ad
 
   let query = supabaseAdmin
     .from('orders')
-    .select('id, created_at, status, amount_total, amount_platform_fee, amount_reader_net, amount_card_fee, payment_method, has_dispute, disputed_at, delivered_at, client_id, reader_id, gig_id, stripe_payment_intent_id, asaas_payment_id', { count: 'exact' })
+    .select('id, created_at, status, amount_total, amount_platform_fee, amount_reader_net, amount_card_fee, payment_method, has_dispute, disputed_at, delivered_at, client_id, reader_id, gig_id, mercadopago_payment_id', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(page * pageSize, (page + 1) * pageSize - 1)
 

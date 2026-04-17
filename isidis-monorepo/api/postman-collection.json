@@ -1,6 +1,6 @@
-{
+﻿{
   "info": {
-    "name": "IsidisApp API — Fase 1",
+    "name": "IsidisApp API â€” Fase 1",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -13,7 +13,7 @@
   ],
   "item": [
     {
-      "name": "🟢 Health Check",
+      "name": "ðŸŸ¢ Health Check",
       "item": [
         {
           "name": "GET /health",
@@ -25,10 +25,10 @@
       ]
     },
     {
-      "name": "🔐 Auth",
+      "name": "ðŸ” Auth",
       "item": [
         {
-          "name": "POST /auth/login — obter token",
+          "name": "POST /auth/login â€” obter token",
           "event": [
             {
               "listen": "test",
@@ -57,7 +57,7 @@
           }
         },
         {
-          "name": "GET /me — perfil autenticado",
+          "name": "GET /me â€” perfil autenticado",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/me",
@@ -67,7 +67,7 @@
           }
         },
         {
-          "name": "PATCH /me — atualizar perfil",
+          "name": "PATCH /me â€” atualizar perfil",
           "request": {
             "method": "PATCH",
             "url": "{{base_url}}/me",
@@ -84,17 +84,17 @@
       ]
     },
     {
-      "name": "🔮 Readers (Marketplace)",
+      "name": "ðŸ”® Readers (Marketplace)",
       "item": [
         {
-          "name": "GET /readers — todos",
+          "name": "GET /readers â€” todos",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/readers"
           }
         },
         {
-          "name": "GET /readers — filtro por especialidade",
+          "name": "GET /readers â€” filtro por especialidade",
           "request": {
             "method": "GET",
             "url": {
@@ -107,7 +107,7 @@
           }
         },
         {
-          "name": "GET /readers — busca por texto",
+          "name": "GET /readers â€” busca por texto",
           "request": {
             "method": "GET",
             "url": {
@@ -120,7 +120,7 @@
           }
         },
         {
-          "name": "GET /readers — paginação",
+          "name": "GET /readers â€” paginaÃ§Ã£o",
           "request": {
             "method": "GET",
             "url": {
@@ -133,7 +133,7 @@
           }
         },
         {
-          "name": "GET /readers/:id — perfil público",
+          "name": "GET /readers/:id â€” perfil pÃºblico",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/readers/{{reader_id}}"
@@ -142,17 +142,17 @@
       ]
     },
     {
-      "name": "🃏 Gigs",
+      "name": "ðŸƒ Gigs",
       "item": [
         {
-          "name": "GET /gigs/:id — detalhe público",
+          "name": "GET /gigs/:id â€” detalhe pÃºblico",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/gigs/{{gig_id}}"
           }
         },
         {
-          "name": "GET /gigs — meus gigs (reader autenticado)",
+          "name": "GET /gigs â€” meus gigs (reader autenticado)",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/gigs",
@@ -162,7 +162,7 @@
           }
         },
         {
-          "name": "POST /gigs — criar gig",
+          "name": "POST /gigs â€” criar gig",
           "request": {
             "method": "POST",
             "url": "{{base_url}}/gigs",
@@ -172,12 +172,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Tiragem de 3 cartas — Amor e Relacionamentos\",\n  \"description\": \"Uma leitura focada em amor e relacionamentos com interpretação detalhada de cada carta, áudio explicativo e texto completo.\",\n  \"category\": \"amor\",\n  \"price\": 4900,\n  \"delivery_time_hours\": 48,\n  \"delivery_method\": \"DIGITAL_SPREAD\",\n  \"tags\": [\"amor\", \"tarot\", \"relacionamento\"],\n  \"pricing_type\": \"ONE_TIME\",\n  \"requirements\": [\n    {\n      \"id\": \"req1\",\n      \"question\": \"Qual é a sua dúvida principal?\",\n      \"type\": \"text\",\n      \"required\": true\n    }\n  ],\n  \"add_ons\": [\n    {\n      \"id\": \"addon1\",\n      \"title\": \"Entrega expressa (24h)\",\n      \"description\": \"Receba sua leitura em até 24 horas\",\n      \"price\": 1500,\n      \"type\": \"SPEED\"\n    }\n  ]\n}"
+              "raw": "{\n  \"title\": \"Tiragem de 3 cartas â€” Amor e Relacionamentos\",\n  \"description\": \"Uma leitura focada em amor e relacionamentos com interpretaÃ§Ã£o detalhada de cada carta, Ã¡udio explicativo e texto completo.\",\n  \"category\": \"amor\",\n  \"price\": 4900,\n  \"delivery_time_hours\": 48,\n  \"delivery_method\": \"DIGITAL_SPREAD\",\n  \"tags\": [\"amor\", \"tarot\", \"relacionamento\"],\n  \"pricing_type\": \"ONE_TIME\",\n  \"requirements\": [\n    {\n      \"id\": \"req1\",\n      \"question\": \"Qual Ã© a sua dÃºvida principal?\",\n      \"type\": \"text\",\n      \"required\": true\n    }\n  ],\n  \"add_ons\": [\n    {\n      \"id\": \"addon1\",\n      \"title\": \"Entrega expressa (24h)\",\n      \"description\": \"Receba sua leitura em atÃ© 24 horas\",\n      \"price\": 1500,\n      \"type\": \"SPEED\"\n    }\n  ]\n}"
             }
           }
         },
         {
-          "name": "PATCH /gigs/:id — editar gig",
+          "name": "PATCH /gigs/:id â€” editar gig",
           "request": {
             "method": "PATCH",
             "url": "{{base_url}}/gigs/{{gig_id}}",
@@ -192,7 +192,7 @@
           }
         },
         {
-          "name": "PATCH /gigs/:id/toggle — ativar ou desativar",
+          "name": "PATCH /gigs/:id/toggle â€” ativar ou desativar",
           "request": {
             "method": "PATCH",
             "url": "{{base_url}}/gigs/{{gig_id}}/toggle",
@@ -204,10 +204,10 @@
       ]
     },
     {
-      "name": "📦 Orders (Pedidos)",
+      "name": "ðŸ“¦ Orders (Pedidos)",
       "item": [
         {
-          "name": "GET /orders — meus pedidos",
+          "name": "GET /orders â€” meus pedidos",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/orders",
@@ -217,7 +217,7 @@
           }
         },
         {
-          "name": "GET /orders — filtrar por status",
+          "name": "GET /orders â€” filtrar por status",
           "request": {
             "method": "GET",
             "url": {
@@ -232,7 +232,7 @@
           }
         },
         {
-          "name": "GET /orders/:id — detalhe do pedido",
+          "name": "GET /orders/:id â€” detalhe do pedido",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/orders/{{order_id}}",
@@ -244,10 +244,10 @@
       ]
     },
     {
-      "name": "💰 Wallet (Carteira)",
+      "name": "ðŸ’° Wallet (Carteira)",
       "item": [
         {
-          "name": "GET /wallet/balance — saldo com timeline",
+          "name": "GET /wallet/balance â€” saldo com timeline",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/wallet/balance",
@@ -257,7 +257,7 @@
           }
         },
         {
-          "name": "GET /wallet/transactions — histórico",
+          "name": "GET /wallet/transactions â€” histÃ³rico",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/wallet/transactions",
@@ -267,7 +267,7 @@
           }
         },
         {
-          "name": "GET /wallet/transactions — filtrar por tipo",
+          "name": "GET /wallet/transactions â€” filtrar por tipo",
           "request": {
             "method": "GET",
             "url": {
@@ -284,10 +284,10 @@
       ]
     },
     {
-      "name": "💳 Checkout (Stripe PIX)",
+      "name": "ðŸ’³ Checkout (Mercado Pago)",
       "item": [
         {
-          "name": "POST /checkout/create — criar pagamento PIX",
+          "name": "POST /checkout/create â€” criar pagamento PIX",
           "request": {
             "method": "POST",
             "url": "{{base_url}}/checkout/create",
@@ -302,7 +302,7 @@
           }
         },
         {
-          "name": "GET /checkout/status/:paymentIntentId — polling status",
+          "name": "GET /checkout/status/:paymentIntentId â€” polling status",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/checkout/status/{{payment_intent_id}}",
@@ -314,10 +314,10 @@
       ]
     },
     {
-      "name": "🚫 Cancel & Disputa",
+      "name": "ðŸš« Cancel & Disputa",
       "item": [
         {
-          "name": "POST /orders/:id/cancel — reader cancela pedido",
+          "name": "POST /orders/:id/cancel â€” reader cancela pedido",
           "request": {
             "method": "POST",
             "url": "{{base_url}}/orders/{{order_id}}/cancel",
@@ -327,12 +327,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"reason\": \"Tive um imprevisto e não conseguirei realizar a leitura no prazo.\"\n}"
+              "raw": "{\n  \"reason\": \"Tive um imprevisto e nÃ£o conseguirei realizar a leitura no prazo.\"\n}"
             }
           }
         },
         {
-          "name": "POST /orders/:id/dispute — cliente abre disputa",
+          "name": "POST /orders/:id/dispute â€” cliente abre disputa",
           "request": {
             "method": "POST",
             "url": "{{base_url}}/orders/{{order_id}}/dispute",
@@ -342,17 +342,17 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"reason\": \"A leitura entregue não corresponde ao que foi contratado. As cartas estão sem interpretação e o áudio está ausente.\"\n}"
+              "raw": "{\n  \"reason\": \"A leitura entregue nÃ£o corresponde ao que foi contratado. As cartas estÃ£o sem interpretaÃ§Ã£o e o Ã¡udio estÃ¡ ausente.\"\n}"
             }
           }
         }
       ]
     },
     {
-      "name": "⏰ Crons",
+      "name": "â° Crons",
       "item": [
         {
-          "name": "POST /cron/expire-orders — cancelar PIX expirados",
+          "name": "POST /cron/expire-orders â€” cancelar PIX expirados",
           "request": {
             "method": "POST",
             "url": "{{base_url}}/cron/expire-orders",
@@ -362,7 +362,7 @@
           }
         },
         {
-          "name": "POST /cron/release-hold — liberar hold 48h",
+          "name": "POST /cron/release-hold â€” liberar hold 48h",
           "request": {
             "method": "POST",
             "url": "{{base_url}}/cron/release-hold",
@@ -372,7 +372,7 @@
           }
         },
         {
-          "name": "POST /cron/complete-orders — auto-completar pedidos 72h",
+          "name": "POST /cron/complete-orders â€” auto-completar pedidos 72h",
           "request": {
             "method": "POST",
             "url": "{{base_url}}/cron/complete-orders",
@@ -382,7 +382,7 @@
           }
         },
         {
-          "name": "POST /cron/late-deliveries — alertar atrasos",
+          "name": "POST /cron/late-deliveries â€” alertar atrasos",
           "request": {
             "method": "POST",
             "url": "{{base_url}}/cron/late-deliveries",
@@ -392,7 +392,7 @@
           }
         },
         {
-          "name": "POST /cron/reader-quality — suspender readers com rating baixo",
+          "name": "POST /cron/reader-quality â€” suspender readers com rating baixo",
           "request": {
             "method": "POST",
             "url": "{{base_url}}/cron/reader-quality",
@@ -405,3 +405,4 @@
     }
   ]
 }
+

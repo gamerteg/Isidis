@@ -28,12 +28,12 @@ async function findOrderByMercadoPagoReference(
   externalReference?: string | null
 ) {
   const select =
-    'id, status, client_id, reader_id, amount_total, amount_service_total, amount_platform_fee, amount_reader_net, payment_method, asaas_payment_id, metadata, gigs(title, delivery_time_hours)'
+    'id, status, client_id, reader_id, amount_total, amount_service_total, amount_platform_fee, amount_reader_net, payment_method, mercadopago_payment_id, metadata, gigs(title, delivery_time_hours)'
 
   const byPaymentId = await fastify.supabase
     .from('orders')
     .select(select)
-    .eq('asaas_payment_id', paymentId)
+    .eq('mercadopago_payment_id', paymentId)
     .maybeSingle()
 
   if (byPaymentId.data) {
@@ -72,11 +72,11 @@ export async function processPaidMpOrder(
     return { found: false, processed: false }
   }
 
-  if ((order as any).asaas_payment_id !== paymentId) {
+  if ((order as any).mercadopago_payment_id !== paymentId) {
     await fastify.supabase
       .from('orders')
       .update({
-        asaas_payment_id: paymentId,
+        mercadopago_payment_id: paymentId,
         metadata: {
           ...((order as any).metadata ?? {}),
           mercadopago: {
@@ -110,7 +110,7 @@ export async function processPaidMpOrder(
             ...(((order as any).metadata as Record<string, any> | undefined)?.mercadopago ?? {}),
             payment_method_id: options.paymentMethodId ?? null,
             payment_type_id: options.paymentTypeId,
-            checkout_mode: 'checkout_pro',
+            checkout_mode: 'checkout_bricks',
           },
         },
       })

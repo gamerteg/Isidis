@@ -17,8 +17,8 @@ async function processMercadoPagoNotification(
   const findOrder = async () => {
     const byPaymentId = await fastify.supabase
       .from('orders')
-      .select('id, status, reader_id, client_id, amount_total, asaas_payment_id')
-      .eq('asaas_payment_id', paymentId)
+      .select('id, status, reader_id, client_id, amount_total, mercadopago_payment_id')
+      .eq('mercadopago_payment_id', paymentId)
       .maybeSingle()
 
     if (byPaymentId.data) {
@@ -31,7 +31,7 @@ async function processMercadoPagoNotification(
 
     const byExternalReference = await fastify.supabase
       .from('orders')
-      .select('id, status, reader_id, client_id, amount_total, asaas_payment_id')
+      .select('id, status, reader_id, client_id, amount_total, mercadopago_payment_id')
       .eq('id', externalReference)
       .maybeSingle()
 
@@ -67,7 +67,7 @@ async function processMercadoPagoNotification(
         .from('orders')
         .update({
           status: 'CANCELED',
-          ...(order.asaas_payment_id ? {} : { asaas_payment_id: paymentId }),
+          ...(order.mercadopago_payment_id ? {} : { mercadopago_payment_id: paymentId }),
         })
         .eq('id', order.id)
 
@@ -104,7 +104,7 @@ async function processMercadoPagoNotification(
       .update({
         has_dispute: true,
         disputed_at: disputedAt,
-        ...(order.asaas_payment_id ? {} : { asaas_payment_id: paymentId }),
+        ...(order.mercadopago_payment_id ? {} : { mercadopago_payment_id: paymentId }),
       })
       .eq('id', order.id)
 

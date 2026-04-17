@@ -24,11 +24,12 @@ class CheckoutScreen extends StatefulWidget {
   State<CheckoutScreen> createState() => _CheckoutScreenState();
 }
 
-const double _asaasCardFeePercent = 0.0349;
-const int _asaasCardFeeFixed = 39;
+const double _mercadoPagoCardFeePercent = 0.0499;
+const int _mercadoPagoCardFeeFixed = 30;
 
 int _calculateCardFee(int amountInCents) {
-  return (amountInCents * _asaasCardFeePercent).ceil() + _asaasCardFeeFixed;
+  return (amountInCents * _mercadoPagoCardFeePercent).ceil() +
+      _mercadoPagoCardFeeFixed;
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
@@ -525,8 +526,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           const Divider(height: 24),
                         if (_acceptsCard)
                           _PaymentMethodOption(
-                            label: 'Cartao de credito',
-                            subtitle: 'Visa, Mastercard e outros',
+                            label: 'Cartao',
+                            subtitle: 'Credito e debito via Mercado Pago',
                             icon: Icons.credit_card,
                             iconColor: AppColors.primaryLight,
                             selected: _paymentMethod == 'CARD',
@@ -537,7 +538,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           if (_acceptsPix) const Divider(height: 24),
                           const _InfoBanner(
                             text:
-                                'Cartao de credito fica indisponivel na versao web por enquanto. Use PIX ou finalize o pagamento pelo app mobile.',
+                                'Cartao fica indisponivel na versao web por enquanto. Use PIX ou finalize o pagamento pelo app mobile.',
                           ),
                         ],
                         if (_paymentMethod == 'CARD') ...[

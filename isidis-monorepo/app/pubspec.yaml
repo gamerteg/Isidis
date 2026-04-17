@@ -1,5 +1,5 @@
-name: isidis_app
-description: Isidis — Plataforma de Tarot & Espiritualidade
+﻿name: isidis_app
+description: Isidis â€” Plataforma de Tarot & Espiritualidade
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -17,7 +17,7 @@ dependencies:
   # HTTP client para a Fastify API
   dio: ^5.8.0
 
-  # Navegação
+  # NavegaÃ§Ã£o
   go_router: ^14.8.1
 
   # State management
@@ -29,31 +29,31 @@ dependencies:
   flutter_svg: ^2.0.17
   google_fonts: ^6.3.2
 
-  # Storage local (flag de onboarding, preferências)
+  # Storage local (flag de onboarding, preferÃªncias)
   shared_preferences: ^2.5.3
 
-  # Formatação de moeda e datas
+  # FormataÃ§Ã£o de moeda e datas
   intl: ^0.20.2
 
-  # Animações
+  # AnimaÃ§Ãµes
   flutter_animate: ^4.5.2
 
-  # Fase 7 — Chat + Notificações Push
+  # Fase 7 â€” Chat + NotificaÃ§Ãµes Push
   firebase_core: ^3.6.0
   firebase_messaging: ^15.1.3
   flutter_local_notifications: ^18.0.0
   sentry_flutter: ^8.0.0
 
-  # Pagamentos com cartão via WebView Asaas
+  # Pagamentos com cartao via WebView do Mercado Pago Brick
   webview_flutter: ^4.10.0
 
-  # Fase 5 — Entrega de Leitura
-  record: ^6.0.0            # Gravação de áudio
-  just_audio: ^0.9.43       # Reprodução de áudio
-  image_picker: ^1.1.2      # Câmera / galeria
+  # Fase 5 â€” Entrega de Leitura
+  record: ^6.0.0            # GravaÃ§Ã£o de Ã¡udio
+  just_audio: ^0.9.43       # ReproduÃ§Ã£o de Ã¡udio
+  image_picker: ^1.1.2      # CÃ¢mera / galeria
   share_plus: ^10.1.4       # Compartilhar carta
   screenshot: ^3.0.0        # Capturar widget para compartilhar
-  path_provider: ^2.1.5     # Caminhos de arquivo temporário
+  path_provider: ^2.1.5     # Caminhos de arquivo temporÃ¡rio
   file_picker: ^11.0.2
 
 dev_dependencies:
@@ -68,3 +68,4 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { DollarSign, TrendingUp, ArrowUpRight, Clock, AlertCircle, Check, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -13,7 +13,7 @@ import {
 import { formatCurrency, formatDate, pixKeyTypeLabel } from '@/lib/utils'
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
-  PAID: 'Pago', DELIVERED: 'Entregue', COMPLETED: 'Concluído',
+  PAID: 'Pago', DELIVERED: 'Entregue', COMPLETED: 'ConcluÃ­do',
 }
 
 export function FinancialsPage() {
@@ -51,7 +51,7 @@ export function FinancialsPage() {
     setProcessing(id)
     try {
       await updateWithdrawalStatus(id, action)
-      toast.success(action === 'COMPLETED' ? 'Saque marcado como concluído!' : 'Saque marcado como falhou.')
+      toast.success(action === 'COMPLETED' ? 'Saque marcado como concluÃ­do!' : 'Saque marcado como falhou.')
       await load()
     } catch {
       toast.error('Erro ao atualizar status do saque.')
@@ -60,7 +60,7 @@ export function FinancialsPage() {
     }
   }
 
-  if (loading) return <div className="p-8 text-muted-foreground">Carregando dados financeiros…</div>
+  if (loading) return <div className="p-8 text-muted-foreground">Carregando dados financeirosâ€¦</div>
 
   const totalRevenue = stats?.total_revenue ?? 0
   const platformFee = stats?.platform_fee ?? 0
@@ -87,7 +87,7 @@ export function FinancialsPage() {
         </Card>
         <Card className="border-green-500/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Taxa da Plataforma 🏢</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">Taxa da Plataforma ðŸ¢</CardTitle>
             <TrendingUp className="w-4 h-4 text-green-400" />
           </CardHeader>
           <CardContent>
@@ -99,7 +99,7 @@ export function FinancialsPage() {
         </Card>
         <Card className="border-amber-500/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Repasse Cartomantes 🔮</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">Repasse Cartomantes ðŸ”®</CardTitle>
             <ArrowUpRight className="w-4 h-4 text-amber-400" />
           </CardHeader>
           <CardContent>
@@ -130,7 +130,7 @@ export function FinancialsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-blue-400">{formatCurrency(stats?.pending_repasse ?? 0)}</p>
-            <p className="text-xs text-muted-foreground mt-1">Saldo não sacado pelas cartomantes</p>
+            <p className="text-xs text-muted-foreground mt-1">Saldo nÃ£o sacado pelas cartomantes</p>
           </CardContent>
         </Card>
       </div>
@@ -143,7 +143,7 @@ export function FinancialsPage() {
             Saques Pendentes ({withdrawals.length})
           </CardTitle>
           <CardDescription className="text-amber-500/60">
-            Saques automáticos via AbacatePay. Use os botões para confirmar ou marcar como falhou manualmente.
+            Saques acompanhados pela operacao financeira da plataforma. Use os botoes para confirmar ou marcar como falhou manualmente.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -157,9 +157,9 @@ export function FinancialsPage() {
                   <TableHead>Cartomante</TableHead>
                   <TableHead>Tipo PIX</TableHead>
                   <TableHead>Chave PIX</TableHead>
-                  <TableHead>Observação</TableHead>
+                  <TableHead>ObservaÃ§Ã£o</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="text-center">Ações</TableHead>
+                  <TableHead className="text-center">AÃ§Ãµes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -173,7 +173,7 @@ export function FinancialsPage() {
                     <TableCell>
                       <code className="text-xs bg-background/50 px-2 py-0.5 rounded text-amber-200/80">{w.pix_key}</code>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{w.notes ?? '—'}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{w.notes ?? 'â€”'}</TableCell>
                     <TableCell className="text-right font-bold text-lg">{formatCurrency(w.amount)}</TableCell>
                     <TableCell className="text-center">
                       <div className="flex gap-2 justify-center">
@@ -210,7 +210,7 @@ export function FinancialsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-violet-400" />
-            Pedidos Recentes — Detalhamento Financeiro
+            Pedidos Recentes â€” Detalhamento Financeiro
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -220,7 +220,7 @@ export function FinancialsPage() {
                 <TableHead>Data</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Cartomante</TableHead>
-                <TableHead>Serviço</TableHead>
+                <TableHead>ServiÃ§o</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead className="text-right text-green-400">Plataforma</TableHead>
                 <TableHead className="text-right text-amber-400">Repasse</TableHead>
@@ -280,8 +280,8 @@ export function FinancialsPage() {
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             {confirmDialog?.action === 'COMPLETED'
-              ? 'O saldo será debitado definitivamente da carteira da cartomante.'
-              : 'O saldo voltará a ser disponível para a cartomante.'}
+              ? 'O saldo serÃ¡ debitado definitivamente da carteira da cartomante.'
+              : 'O saldo voltarÃ¡ a ser disponÃ­vel para a cartomante.'}
           </p>
           <div className="flex gap-3 justify-end">
             <Button variant="outline" onClick={() => setConfirmDialog(null)}>Cancelar</Button>
@@ -297,3 +297,4 @@ export function FinancialsPage() {
     </div>
   )
 }
+

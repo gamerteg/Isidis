@@ -69,7 +69,7 @@ docker build -t isidis-web \
   --build-arg API_URL=https://api.seudominio.com \
   --build-arg SUPABASE_URL=https://xxxxx.supabase.co \
   --build-arg SUPABASE_ANON_KEY=xxxxx \
-  --build-arg ASAAS_ENV=production \
+  --build-arg MERCADOPAGO_ENV=production \
   .
 ```
 

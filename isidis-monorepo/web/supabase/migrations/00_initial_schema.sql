@@ -53,7 +53,7 @@ create table orders (
   gig_id uuid references gigs(id) not null,
   reader_id uuid references profiles(id) not null,
   status text check (status in ('PENDING_PAYMENT', 'PAID', 'DELIVERED', 'COMPLETED', 'CANCELED')) default 'PENDING_PAYMENT',
-  asaas_payment_id text,
+  mercadopago_payment_id text,
   amount_total integer not null,
   amount_platform_fee integer not null,
   amount_reader_net integer not null,

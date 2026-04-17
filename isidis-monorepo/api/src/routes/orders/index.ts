@@ -9,7 +9,7 @@ import { signDeliveryContentUrls } from '../../services/readings-storage.js'
 const orderDetailSelect = `
   id, status, amount_total, amount_service_total, amount_reader_net, amount_platform_fee,
   payment_method, amount_card_fee, card_fee_responsibility,
-  stripe_payment_intent_id, asaas_payment_id, created_at, delivered_at, requirements_answers,
+  mercadopago_payment_id, created_at, delivered_at, requirements_answers,
   selected_addons, delivery_content, reader_viewed_at,
   gigs(id, title, description, price, image_url, delivery_time_hours, delivery_method, requirements, add_ons),
   client:profiles!client_id(id, full_name, avatar_url, cellphone),
@@ -96,11 +96,11 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Pedido nao encontrado' })
       }
 
-      if (order.status === 'PENDING_PAYMENT' && (order as any).asaas_payment_id) {
+      if (order.status === 'PENDING_PAYMENT' && (order as any).mercadopago_payment_id) {
         try {
-          const charge = await fastify.mp.getPayment((order as any).asaas_payment_id)
+          const charge = await fastify.mp.getPayment((order as any).mercadopago_payment_id)
           if (['approved', 'authorized'].includes(charge.status)) {
-            await processPaidMpOrder(fastify, (order as any).asaas_payment_id)
+            await processPaidMpOrder(fastify, (order as any).mercadopago_payment_id)
 
             const refreshed = await fastify.supabase
               .from('orders')
@@ -201,7 +201,7 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
 
       const { data: order } = await fastify.supabase
         .from('orders')
-        .select('id, status, client_id, reader_id, asaas_payment_id, amount_total, created_at, reader_viewed_at, gigs(title)')
+        .select('id, status, client_id, reader_id, mercadopago_payment_id, amount_total, created_at, reader_viewed_at, gigs(title)')
         .eq('id', id)
         .single()
 
@@ -240,14 +240,14 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Informe o motivo do cancelamento (minimo 10 caracteres)' })
       }
 
-      if (!order.asaas_payment_id) {
-        request.log.error({ orderId: id }, '[cancel] Pedido sem asaas_payment_id para reembolso')
+      if (!order.mercadopago_payment_id) {
+        request.log.error({ orderId: id }, '[cancel] Pedido sem mercadopago_payment_id para reembolso')
         return reply.status(500).send({ error: 'Erro ao localizar pagamento para reembolso. Tente novamente.' })
       }
 
       try {
         await fastify.mp.refundPayment({
-          paymentId: order.asaas_payment_id,
+          paymentId: order.mercadopago_payment_id,
         })
       } catch (mpErr: any) {
         request.log.error({ mpErr: mpErr.message }, '[cancel] Erro ao criar reembolso Mercado Pago')

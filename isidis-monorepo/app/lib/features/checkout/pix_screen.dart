@@ -232,9 +232,9 @@ class _PixScreenState extends State<PixScreen> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.15),
+                  color: Colors.green.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.green.withOpacity(0.4)),
+                  border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -344,8 +344,8 @@ class _PixScreenState extends State<PixScreen> {
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: _copied
-                          ? Colors.green.withOpacity(0.2)
-                          : AppColors.primary.withOpacity(0.2),
+                          ? Colors.green.withValues(alpha: 0.2)
+                          : AppColors.primary.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -478,7 +478,7 @@ class _Step extends StatelessWidget {
             width: 20,
             height: 20,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.3),
+              color: AppColors.primary.withValues(alpha: 0.3),
               shape: BoxShape.circle,
             ),
             child: Center(

@@ -43,7 +43,7 @@ export default function CheckoutPage() {
 
     supabase
       .from('gigs')
-      .select('id, title, description, price, image_url, owner_id, add_ons, requirements, delivery_time_hours')
+      .select('id, title, description, price, image_url, owner_id, add_ons, requirements, delivery_time_hours, payment_methods')
       .eq('id', id)
       .single()
       .then(async ({ data: gigData }) => {
@@ -87,9 +87,14 @@ export default function CheckoutPage() {
   }
 
   const basePrice = gig.price / 100
-  const addOnsTotal = selectedAddOns.reduce((sum, addOn) => sum + addOn.price, 0)
+  const addOnsTotal = selectedAddOns.reduce((sum, addOn) => sum + (addOn.price / 100), 0)
   const orderTotal = basePrice + addOnsTotal
   const requirements = (gig.requirements || []) as GigRequirement[]
+  const paymentMethods = Array.isArray(gig.payment_methods)
+    ? gig.payment_methods.filter((method: unknown): method is 'PIX' | 'CARD' =>
+        method === 'PIX' || method === 'CARD',
+      )
+    : ['PIX', 'CARD']
 
   return (
     <div className="relative overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.12),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.16),_transparent_24%),linear-gradient(180deg,_#05040d,_#0b0916_32%,_#07060f_100%)]">
@@ -111,6 +116,7 @@ export default function CheckoutPage() {
               selectedAddOns={selectedAddOns}
               requirements={requirements}
               existingOrderId={orderId}
+              availablePaymentMethods={paymentMethods}
             />
           </Suspense>
         </section>
@@ -187,7 +193,7 @@ export default function CheckoutPage() {
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
                       {addOn.title}
                     </span>
-                    <span>{formatCurrencyFromReais(addOn.price)}</span>
+                    <span>{formatCurrencyFromCents(addOn.price)}</span>
                   </div>
                 ))}
 

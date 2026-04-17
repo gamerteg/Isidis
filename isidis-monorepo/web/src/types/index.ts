@@ -123,11 +123,39 @@ export interface CheckoutCreatePayload {
   add_on_ids?: string[]
   requirements_answers?: Record<string, string>
   payment_method: PaymentMethod
+  transaction_amount?: number
   card_token?: string
   payment_method_id?: string
   installments?: number
   issuer_id?: string
   device_id?: string
+  payer?: {
+    email?: string
+    first_name?: string
+    last_name?: string
+    firstName?: string
+    lastName?: string
+    identification?: {
+      type?: string
+      number?: string
+    }
+    address?: {
+      zip_code?: string
+      street_number?: string | number
+      federal_unit?: string
+      city?: string
+      neighborhood?: string
+      street_name?: string
+    }
+  }
+  brick_payment_type?: string
+  brick_selected_payment_method?: string
+  brick_additional_data?: {
+    bin?: string
+    lastFourDigits?: string
+    cardholderName?: string
+    paymentTypeId?: string
+  }
   card_holder_name?: string
   card_holder_postal_code?: string
   card_holder_address_number?: string
@@ -156,11 +184,29 @@ export interface CheckoutCardResponse {
   amount_service_total: number
   amount_card_fee: number | null
   card_fee_responsibility: 'READER' | null
-  asaas_payment_id?: string
+  mercadopago_payment_id?: string
   payment_id?: string
   preference_id?: string
   checkout_url?: string
   status: 'CONFIRMED' | 'PENDING'
+}
+
+export interface CheckoutPaymentResponse {
+  order_id: string
+  payment_method?: PaymentMethod
+  amount_total: number
+  amount_service_total: number
+  amount_card_fee?: number | null
+  card_fee_responsibility?: 'READER' | null
+  mercadopago_payment_id?: string
+  payment_id?: string
+  status?: 'CONFIRMED' | 'PENDING'
+  pix_qr_code_id?: string
+  pix?: {
+    qr_code_base64: string | null
+    copy_paste_code: string | null
+    expires_at: string | null
+  }
 }
 
 export interface PaymentStatusResponse {
@@ -189,8 +235,7 @@ export interface OrderSummary {
 
 export interface OrderDetail extends OrderSummary {
   delivered_at?: string | null
-  asaas_payment_id?: string | null
-  stripe_payment_intent_id?: string | null
+  mercadopago_payment_id?: string | null
   delivery_content?: any
   gigs?: Gig
   client?: Profile

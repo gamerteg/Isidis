@@ -18,17 +18,64 @@ const optionalPositiveInteger = z.preprocess((value) => {
   return Number.isFinite(parsed) ? parsed : value
 }, z.number().int().positive().optional())
 
+const optionalPositiveAmount = z.preprocess((value) => {
+  if (value === undefined || value === null || value === '') {
+    return undefined
+  }
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : value
+}, z.number().positive().optional())
+
+const checkoutIdentificationSchema = z.object({
+  type: z.string().optional(),
+  number: z.string().optional(),
+}).passthrough()
+
+const checkoutAddressSchema = z.object({
+  zip_code: z.string().optional(),
+  street_number: z.union([z.string(), z.number()]).optional(),
+  federal_unit: z.string().optional(),
+  city: z.string().optional(),
+  neighborhood: z.string().optional(),
+  street_name: z.string().optional(),
+}).passthrough()
+
+const checkoutPayerSchema = z.object({
+  email: z.string().optional(),
+  type: z.string().optional(),
+  id: z.string().optional(),
+  first_name: z.string().optional(),
+  last_name: z.string().optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  identification: checkoutIdentificationSchema.optional(),
+  address: checkoutAddressSchema.optional(),
+}).passthrough()
+
+const checkoutBrickAdditionalDataSchema = z.object({
+  bin: z.string().optional(),
+  lastFourDigits: z.string().optional(),
+  cardholderName: z.string().optional(),
+  paymentTypeId: z.string().optional(),
+}).passthrough()
+
 const createCheckoutSchema = z.object({
   order_id: z.string().uuid().optional(),
   gig_id: z.string().uuid(),
   add_on_ids: z.array(z.string()).default([]),
   requirements_answers: z.record(z.string(), z.string()).default({}),
   payment_method: z.enum(['PIX', 'CARD']).default('PIX'),
+  transaction_amount: optionalPositiveAmount,
   card_token: z.string().optional(),
   payment_method_id: z.string().optional(),
   installments: optionalPositiveInteger,
   issuer_id: optionalPositiveInteger,
   device_id: z.string().optional(),
+  payer: checkoutPayerSchema.optional(),
+  brick_payment_type: z.string().optional(),
+  brick_selected_payment_method: z.string().optional(),
+  brick_additional_data: checkoutBrickAdditionalDataSchema.optional(),
   card_holder_name: z.string().optional(),
   card_holder_postal_code: z.string().optional(),
   card_holder_address_number: z.string().optional(),
@@ -42,6 +89,38 @@ const toDecimal = (cents: number) => Number((cents / 100).toFixed(2))
 
 function calculateCardFee(amountInCents: number) {
   return Math.ceil(amountInCents * CARD_FEE_PERCENT) + CARD_FEE_FIXED
+}
+
+function normalizeDigits(value?: string | number | null) {
+  if (value === undefined || value === null) {
+    return undefined
+  }
+
+  const digits = String(value).replace(/\D/g, '')
+  return digits || undefined
+}
+
+function normalizeMercadoPagoAmount(amount?: number) {
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) {
+    return undefined
+  }
+
+  return Number(amount.toFixed(2))
+}
+
+function ensureTransactionAmountMatches(expectedAmountInCents: number, providedAmount?: number) {
+  const normalizedProvidedAmount = normalizeMercadoPagoAmount(providedAmount)
+  if (normalizedProvidedAmount === undefined) {
+    return
+  }
+
+  const expectedAmount = toDecimal(expectedAmountInCents)
+  if (Math.abs(normalizedProvidedAmount - expectedAmount) > 0.01) {
+    throw Object.assign(
+      new Error('O valor informado pelo checkout diverge do valor calculado no servidor. Recarregue a pagina e tente novamente.'),
+      { statusCode: 400 }
+    )
+  }
 }
 
 function sanitizePixDescription(orderId: string, gigTitle: string) {
@@ -303,6 +382,58 @@ function buildPhone(cellphone?: string | null) {
   }
 }
 
+function resolveMercadoPagoPayer(params: {
+  clientEmail: string
+  clientFullName: string
+  clientTaxId: string
+  clientCellphone?: string | null
+  payer?: z.infer<typeof checkoutPayerSchema>
+  holderName?: string
+  legacyPostalCode?: string
+  legacyAddressNumber?: string
+}) {
+  const payer = params.payer
+  const payerName =
+    [
+      payer?.first_name?.trim() || payer?.firstName?.trim(),
+      payer?.last_name?.trim() || payer?.lastName?.trim(),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim() ||
+    params.holderName?.trim() ||
+    params.clientFullName
+
+  const { firstName, lastName } = buildPayerName(payerName)
+  const identificationNumber =
+    normalizeDigits(payer?.identification?.number) ??
+    normalizeDigits(params.clientTaxId) ??
+    ''
+
+  const rawStreetNumber = payer?.address?.street_number
+  const streetNumber =
+    (typeof rawStreetNumber === 'string' ? rawStreetNumber.trim() : undefined) ||
+    (typeof rawStreetNumber === 'number' ? String(rawStreetNumber) : undefined) ||
+    params.legacyAddressNumber?.trim() ||
+    undefined
+
+  return {
+    email: payer?.email?.trim() || params.clientEmail,
+    firstName,
+    lastName,
+    phone: buildPhone(params.clientCellphone),
+    identification: {
+      type: payer?.identification?.type?.trim() || 'CPF',
+      number: identificationNumber,
+    },
+    postalCode:
+      normalizeDigits(payer?.address?.zip_code) ??
+      normalizeDigits(params.legacyPostalCode) ??
+      undefined,
+    streetNumber,
+  }
+}
+
 async function tokenizeLegacyCard(params: {
   accessToken: string
   publicKey: string
@@ -446,11 +577,16 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
         add_on_ids,
         requirements_answers,
         payment_method,
+        transaction_amount,
         card_token,
         payment_method_id,
         installments,
         issuer_id,
         device_id,
+        payer,
+        brick_payment_type,
+        brick_selected_payment_method,
+        brick_additional_data,
         card_holder_name,
         card_holder_postal_code,
         card_holder_address_number,
@@ -664,6 +800,19 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
         order = createdOrder
       }
 
+      try {
+        ensureTransactionAmountMatches(totalAmount, transaction_amount)
+      } catch (amountErr: any) {
+        await fastify.supabase
+          .from('orders')
+          .update({ status: 'CANCELED' })
+          .eq('id', order.id)
+
+        return reply
+          .status(amountErr?.statusCode === 400 ? 400 : 502)
+          .send({ error: amountErr?.message ?? 'Valor do pagamento invalido.' })
+      }
+
       if (payment_method === 'CARD') {
         const mpPublicKey = process.env.MERCADOPAGO_PUBLIC_KEY
         const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN
@@ -677,9 +826,17 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
           Boolean(sanitizedCardCvv) &&
           Boolean(sanitizedExpiryMonth) &&
           Boolean(sanitizedExpiryYear)
-        const hasTokenizedCard = Boolean(card_token && payment_method_id && installments)
-        const { firstName, lastName } = buildPayerName(clientProfile.full_name)
-        const phone = buildPhone(clientProfile.cellphone)
+        const hasTokenizedCard = Boolean(card_token && payment_method_id)
+        const resolvedPayer = resolveMercadoPagoPayer({
+          clientEmail,
+          clientFullName: clientProfile.full_name,
+          clientTaxId: clientProfile.tax_id,
+          clientCellphone: clientProfile.cellphone,
+          payer,
+          holderName,
+          legacyPostalCode: card_holder_postal_code,
+          legacyAddressNumber: card_holder_address_number,
+        })
         const notificationUrl = getNotificationUrl(request)
 
         let finalCardToken = card_token
@@ -689,102 +846,10 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
 
         try {
           if (!hasTokenizedCard && !hasLegacyRawCard) {
-            const backUrls = getCheckoutProBackUrls(request, order.id)
-
-            if (!backUrls) {
-              throw Object.assign(
-                new Error('APP_URL nao configurada para redirecionar ao Checkout Pro do Mercado Pago'),
-                { statusCode: 500 }
-              )
-            }
-
-            const preference = await createPreferenceWithNotificationFallback({
-              fastify,
-              request,
-              notificationUrl,
-              requestOptions: {
-                idempotencyKey: randomUUID(),
-              },
-              body: {
-                items: [
-                  {
-                    id: gig_id,
-                    title: gig.title,
-                    description: gig.title,
-                    quantity: 1,
-                    currency_id: 'BRL',
-                    unit_price: toDecimal(totalAmount),
-                  },
-                ],
-                payer: {
-                  name: firstName,
-                  surname: lastName,
-                  email: clientEmail,
-                  identification: {
-                    type: 'CPF',
-                    number: clientProfile.tax_id.replace(/\D/g, ''),
-                  },
-                  ...(phone && { phone }),
-                },
-                back_urls: backUrls,
-                auto_return: 'approved',
-                payment_methods: {
-                  installments: 1,
-                  default_installments: 1,
-                  excluded_payment_types: [
-                    { id: 'ticket' },
-                    { id: 'bank_transfer' },
-                    { id: 'atm' },
-                    { id: 'debit_card' },
-                    { id: 'prepaid_card' },
-                  ],
-                },
-                external_reference: order.id,
-                statement_descriptor: 'ISIDIS',
-                additional_info: `Pedido ${order.id} - Cartao Checkout Pro`,
-              },
-            })
-
-            const checkoutUrl =
-              (process.env.NODE_ENV === 'production'
-                ? preference.init_point
-                : preference.sandbox_init_point ?? preference.init_point) ?? preference.init_point
-
-            if (!checkoutUrl || !preference.id) {
-              throw Object.assign(
-                new Error('Mercado Pago nao retornou a URL do Checkout Pro'),
-                { statusCode: 502 }
-              )
-            }
-
-            await fastify.supabase
-              .from('orders')
-              .update({
-                metadata: {
-                  ...orderMetadata,
-                  mercadopago: {
-                    checkout_mode: 'checkout_pro',
-                    preference_id: preference.id,
-                    back_urls: backUrls,
-                    payment_type: 'credit_card',
-                  },
-                },
-              })
-              .eq('id', order.id)
-
-            return reply.status(201).send({
-              data: {
-                order_id: order.id,
-                payment_method: 'CARD',
-                amount_total: totalAmount,
-                amount_service_total: serviceAmount,
-                amount_card_fee: cardFee,
-                card_fee_responsibility: 'READER',
-                preference_id: preference.id,
-                checkout_url: checkoutUrl,
-                status: 'PENDING',
-              },
-            })
+            throw Object.assign(
+              new Error('O Checkout Bricks nao retornou os dados do cartao. Recarregue a pagina e tente novamente.'),
+              { statusCode: 400 }
+            )
           }
 
           if (!hasTokenizedCard && hasLegacyRawCard) {
@@ -833,7 +898,6 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
             )
           }
 
-          const postalCode = card_holder_postal_code?.replace(/\D/g, '')
           const requestOptions = {
             ...(device_id && { meliSessionId: device_id }),
             idempotencyKey: randomUUID(),
@@ -854,19 +918,16 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
               issuer_id: finalIssuerId,
               statement_descriptor: 'ISIDIS',
               payer: {
-                email: clientEmail,
-                first_name: firstName,
-                last_name: lastName,
+                email: resolvedPayer.email,
+                first_name: resolvedPayer.firstName,
+                last_name: resolvedPayer.lastName,
                 entity_type: 'individual',
-                identification: {
-                  type: 'CPF',
-                  number: clientProfile.tax_id.replace(/\D/g, ''),
-                },
-                ...(phone && { phone }),
-                ...(postalCode && {
+                identification: resolvedPayer.identification,
+                ...(resolvedPayer.phone && { phone: resolvedPayer.phone }),
+                ...(resolvedPayer.postalCode && {
                   address: {
-                    zip_code: postalCode,
-                    ...(card_holder_address_number && { street_number: card_holder_address_number }),
+                    zip_code: resolvedPayer.postalCode,
+                    ...(resolvedPayer.streetNumber && { street_number: resolvedPayer.streetNumber }),
                   },
                 }),
               },
@@ -882,13 +943,13 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
                   },
                 ],
                 payer: {
-                  first_name: firstName,
-                  last_name: lastName,
-                  ...(phone && { phone }),
-                  ...(postalCode && {
+                  first_name: resolvedPayer.firstName,
+                  last_name: resolvedPayer.lastName,
+                  ...(resolvedPayer.phone && { phone: resolvedPayer.phone }),
+                  ...(resolvedPayer.postalCode && {
                     address: {
-                      zip_code: postalCode,
-                      ...(card_holder_address_number && { street_number: card_holder_address_number }),
+                      zip_code: resolvedPayer.postalCode,
+                      ...(resolvedPayer.streetNumber && { street_number: resolvedPayer.streetNumber }),
                     },
                   }),
                 },
@@ -919,13 +980,20 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
           await fastify.supabase
             .from('orders')
             .update({
-              asaas_payment_id: charge.id?.toString(),
+              mercadopago_payment_id: charge.id?.toString(),
               metadata: {
                 ...orderMetadata,
                 mercadopago: {
+                  checkout_mode: 'checkout_bricks',
                   payment_method_id: finalPaymentMethodId,
+                  payment_type_id:
+                    brick_additional_data?.paymentTypeId ??
+                    brick_payment_type ??
+                    brick_selected_payment_method ??
+                    null,
                   issuer_id: finalIssuerId ?? null,
                   installments: finalInstallments,
+                  bin: brick_additional_data?.bin ?? null,
                   last_four_digits: charge.card?.last_four_digits ?? null,
                 },
               },
@@ -940,7 +1008,7 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
               amount_service_total: serviceAmount,
               amount_card_fee: cardFee,
               card_fee_responsibility: 'READER',
-              asaas_payment_id: charge.id?.toString(),
+              mercadopago_payment_id: charge.id?.toString(),
               payment_id: charge.id?.toString(),
               status: ['approved', 'authorized'].includes(charge.status ?? '') ? 'CONFIRMED' : 'PENDING',
             },
@@ -970,7 +1038,13 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       try {
-        const { firstName } = buildPayerName(clientProfile.full_name)
+        const resolvedPayer = resolveMercadoPagoPayer({
+          clientEmail,
+          clientFullName: clientProfile.full_name,
+          clientTaxId: clientProfile.tax_id,
+          clientCellphone: clientProfile.cellphone,
+          payer,
+        })
         const dueDate = new Date(Date.now() + 15 * 60 * 1000)
         const notificationUrl = getNotificationUrl(request)
         const requestOptions = {
@@ -987,12 +1061,10 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
             description: sanitizePixDescription(order.id, gig.title),
             payment_method_id: 'pix',
             payer: {
-              email: clientEmail,
-              first_name: firstName,
-              identification: {
-                type: 'CPF',
-                number: clientProfile.tax_id.replace(/\D/g, ''),
-              },
+              email: resolvedPayer.email,
+              first_name: resolvedPayer.firstName,
+              last_name: resolvedPayer.lastName,
+              identification: resolvedPayer.identification,
             },
             date_of_expiration: dueDate.toISOString(),
             external_reference: order.id,
@@ -1003,10 +1075,11 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
         await fastify.supabase
           .from('orders')
           .update({
-            asaas_payment_id: charge.id?.toString(),
+            mercadopago_payment_id: charge.id?.toString(),
             metadata: {
               ...orderMetadata,
               mercadopago: {
+                checkout_mode: transaction_amount ? 'checkout_bricks' : 'direct_api',
                 payment_method_id: 'pix',
               },
             },
@@ -1067,7 +1140,7 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
       const { data: order } = await fastify.supabase
         .from('orders')
         .select('id, status, client_id')
-        .eq('asaas_payment_id', paymentId)
+        .eq('mercadopago_payment_id', paymentId)
         .single()
 
       if (!order || order.client_id !== request.user.id) {

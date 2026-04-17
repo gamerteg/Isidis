@@ -1,13 +1,13 @@
-import { FastifyInstance } from 'fastify'
+﻿import { FastifyInstance } from 'fastify'
 
 /**
  * CRON 2: Limpeza de orders PIX expiradas
  * Roda a cada 15 minutos.
- * PIX expira em ~30 min. Pedidos PENDING_PAYMENT com mais de 35 min são cancelados silenciosamente.
+ * PIX expira em ~30 min. Pedidos PENDING_PAYMENT com mais de 35 min sÃ£o cancelados silenciosamente.
  */
 export async function runExpireOrders(fastify: FastifyInstance) {
   // BUG-20: PIX expira em ~30min. Usar 32min em vez de 35min para fechar a janela
-  // onde um PIX expirado ainda poderia ser pago (Stripe rejeitaria mas o pedido ficaria preso)
+  // onde um PIX expirado ainda poderia ser pago e o pedido ficaria preso em PENDING_PAYMENT
   const cutoff = new Date()
   cutoff.setMinutes(cutoff.getMinutes() - 32)
 
@@ -41,3 +41,4 @@ export async function runExpireOrders(fastify: FastifyInstance) {
   fastify.log.info({ count: ids.length }, '[cron:expire-orders] Pedidos PIX expirados cancelados')
   return { expired: ids.length, errors: 0 }
 }
+

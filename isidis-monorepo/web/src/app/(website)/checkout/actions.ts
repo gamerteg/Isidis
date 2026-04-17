@@ -1,9 +1,8 @@
 import apiClient from '@/lib/apiClient'
 import type {
-  CheckoutCardResponse,
   CheckoutConfigResponse,
   CheckoutCreatePayload,
-  CheckoutPixResponse,
+  CheckoutPaymentResponse,
   OrderDetail,
   PaymentStatusResponse,
 } from '@/types'
@@ -19,7 +18,7 @@ function getApiErrorMessage(error: any, fallback: string) {
 }
 
 async function createCheckoutPayment(payload: CheckoutCreatePayload) {
-  const response = await apiClient.post<{ data: CheckoutPixResponse | CheckoutCardResponse }>(
+  const response = await apiClient.post<{ data: CheckoutPaymentResponse }>(
     '/checkout/create',
     payload,
   )
@@ -27,61 +26,13 @@ async function createCheckoutPayment(payload: CheckoutCreatePayload) {
   return response.data.data
 }
 
-export async function createPixPayment(
-  gigId: string,
-  selectedAddOnIds: string[] = [],
-  requirementsAnswers: Record<string, string> = {},
-  existingOrderId?: string,
-) {
+export async function submitCheckoutPayment(payload: CheckoutCreatePayload) {
   try {
-    const result = await createCheckoutPayment({
-      order_id: existingOrderId,
-      gig_id: gigId,
-      add_on_ids: selectedAddOnIds,
-      requirements_answers: requirementsAnswers,
-      payment_method: 'PIX',
-    }) as CheckoutPixResponse
-
-    return {
-      orderId: result.order_id,
-      pixId: result.pix_qr_code_id,
-      qrcode: result.pix.qr_code_base64,
-      content: result.pix.copy_paste_code,
-      expiresAt: result.pix.expires_at,
-    }
+    return await createCheckoutPayment(payload)
   } catch (error: any) {
-    const message = getApiErrorMessage(error, 'Nao foi possivel gerar o PIX.')
-    return { error: message, needsProfile: message.includes('Complete seu perfil') }
-  }
-}
-
-export async function createCardPayment(
-  gigId: string,
-  selectedAddOnIds: string[] = [],
-  requirementsAnswers: Record<string, string> = {},
-  existingOrderId?: string,
-) {
-  try {
-    const result = await createCheckoutPayment({
-      order_id: existingOrderId,
-      gig_id: gigId,
-      add_on_ids: selectedAddOnIds,
-      requirements_answers: requirementsAnswers,
-      payment_method: 'CARD',
-    }) as CheckoutCardResponse
-
-    return {
-      orderId: result.order_id,
-      paymentId: result.payment_id ?? result.asaas_payment_id,
-      checkoutUrl: result.checkout_url,
-      preferenceId: result.preference_id,
-      status: result.status,
-      amountTotal: result.amount_total,
-      amountCardFee: result.amount_card_fee,
-    }
-  } catch (error: any) {
-    const message = getApiErrorMessage(error, 'Nao foi possivel processar o cartao.')
-    return { error: message, needsProfile: message.includes('Complete seu perfil') }
+    throw Object.assign(new Error(getApiErrorMessage(error, 'Nao foi possivel processar o pagamento.')), {
+      cause: error,
+    })
   }
 }
 

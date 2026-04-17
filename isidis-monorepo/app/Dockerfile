@@ -4,7 +4,7 @@ ARG FLUTTER_CHANNEL=stable
 ARG API_URL
 ARG SUPABASE_URL
 ARG SUPABASE_ANON_KEY
-ARG ASAAS_ENV=sandbox
+ARG MERCADOPAGO_ENV=sandbox
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV FLUTTER_HOME=/opt/flutter
@@ -45,7 +45,7 @@ RUN flutter build web --release \
       --dart-define=API_URL="${API_URL}" \
       --dart-define=SUPABASE_URL="${SUPABASE_URL}" \
       --dart-define=SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY}" \
-      --dart-define=ASAAS_ENV="${ASAAS_ENV}"
+      --dart-define=MERCADOPAGO_ENV="${MERCADOPAGO_ENV}"
 
 FROM nginx:1.27-alpine AS runner
 

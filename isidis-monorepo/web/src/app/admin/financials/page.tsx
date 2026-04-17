@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { getAdminFinancials, FinancialSummary, updateWithdrawalStatus, adminCancelOrder } from '@/app/actions/admin-financials'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
     PAID: { label: 'PAGO', color: 'text-blue-400 border-blue-500/40 bg-blue-500/10' },
     DELIVERED: { label: 'ENTREGUE', color: 'text-yellow-400 border-yellow-500/40 bg-yellow-500/10' },
-    COMPLETED: { label: 'CONCLUÍDO', color: 'text-green-400 border-green-500/40 bg-green-500/10' },
+    COMPLETED: { label: 'CONCLUÃDO', color: 'text-green-400 border-green-500/40 bg-green-500/10' },
 }
 
 export default function AdminFinancialsPage() {
@@ -44,14 +44,14 @@ export default function AdminFinancialsPage() {
             toast.success(action === 'COMPLETED' ? 'Saque aprovado!' : 'Saque rejeitado.')
             await load()
         } catch (err: any) {
-            toast.error(err.message || 'Erro ao processar ação')
+            toast.error(err.message || 'Erro ao processar aÃ§Ã£o')
         } finally {
             setProcessing(null)
         }
     }
 
     const handleCancelOrder = async (id: string) => {
-        if (!confirm('Tem certeza que deseja cancelar este pedido? Se já foi pago no PIX/Cartão, você também precisará realizar o estorno manualmente no painel da AbacatePay.')) return;
+        if (!confirm('Tem certeza que deseja cancelar este pedido? Se ele ja foi pago no PIX ou cartao, confirme tambem o reembolso no painel do Mercado Pago.')) return;
 
         setProcessing(id)
         try {
@@ -84,10 +84,10 @@ export default function AdminFinancialsPage() {
         <div className="space-y-8 animate-fade-in-up">
             <div>
                 <h2 className="text-3xl font-bold tracking-tight">Financeiro</h2>
-                <p className="text-muted-foreground">Visão geral das receitas, taxas e repasses da plataforma.</p>
+                <p className="text-muted-foreground">VisÃ£o geral das receitas, taxas e repasses da plataforma.</p>
             </div>
 
-            {/* KPIs — linha 1 */}
+            {/* KPIs â€” linha 1 */}
             <div className="grid gap-4 md:grid-cols-3">
                 {/* Receita Bruta */}
                 <Card className="bg-card-deep border-border/50">
@@ -103,16 +103,16 @@ export default function AdminFinancialsPage() {
                     </CardContent>
                 </Card>
 
-                {/* Taxa da Plataforma — o que fica pra empresa */}
+                {/* Taxa da Plataforma â€” o que fica pra empresa */}
                 <Card className="bg-card-deep border-green-500/20 border">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Taxa da Plataforma 🏢</CardTitle>
+                        <CardTitle className="text-sm font-medium">Taxa da Plataforma ðŸ¢</CardTitle>
                         <TrendingUp className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-green-400">{formatCurrency(data.platformFee)}</div>
                         <p className="text-xs text-muted-foreground mt-1">
-                            {platformPercent}% da receita bruta — lucro da empresa
+                            {platformPercent}% da receita bruta â€” lucro da empresa
                         </p>
                     </CardContent>
                 </Card>
@@ -120,21 +120,21 @@ export default function AdminFinancialsPage() {
                 {/* Repasse Cartomantes */}
                 <Card className="bg-card-deep border-amber-500/20 border">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Repasse Cartomantes 🔮</CardTitle>
+                        <CardTitle className="text-sm font-medium">Repasse Cartomantes ðŸ”®</CardTitle>
                         <Users className="h-4 w-4 text-amber-400" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-amber-400">{formatCurrency(data.totalRepasse)}</div>
                         <p className="text-xs text-muted-foreground mt-1">
-                            {repassePercent}% da receita bruta — total devido
+                            {repassePercent}% da receita bruta â€” total devido
                         </p>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* KPIs — linha 2 */}
+            {/* KPIs â€” linha 2 */}
             <div className="grid gap-4 md:grid-cols-2">
-                {/* Saques já pagos */}
+                {/* Saques jÃ¡ pagos */}
                 <Card className="bg-card-deep border-border/50">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Saques Pagos</CardTitle>
@@ -154,20 +154,20 @@ export default function AdminFinancialsPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-blue-400">{formatCurrency(data.pendingRepasse)}</div>
-                        <p className="text-xs text-muted-foreground mt-1">Saldo disponível não sacado pelos cartomantes</p>
+                        <p className="text-xs text-muted-foreground mt-1">Saldo disponÃ­vel nÃ£o sacado pelos cartomantes</p>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Gestão de Saques Pendentes */}
+            {/* GestÃ£o de Saques Pendentes */}
             <Card className="border-amber-500/20 bg-amber-500/5 shadow-lg">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-amber-500">
                         <AlertCircle className="h-5 w-5" />
-                        Solicitações de Saque Pendentes
+                        SolicitaÃ§Ãµes de Saque Pendentes
                     </CardTitle>
                     <CardDescription className="text-amber-500/60">
-                        Abaixo estão os pedidos de saque. Você deve fazer o **PIX manualmente** pelo seu aplicativo do banco e, após transferir o valor, clicar no botão de concluir.
+                        Abaixo estÃ£o os pedidos de saque. VocÃª deve fazer o **PIX manualmente** pelo seu aplicativo do banco e, apÃ³s transferir o valor, clicar no botÃ£o de concluir.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -179,14 +179,14 @@ export default function AdminFinancialsPage() {
                                     <th className="text-left py-3 px-2">Cartomante</th>
                                     <th className="text-left py-3 px-2">Chave PIX</th>
                                     <th className="text-right py-3 px-2">Valor</th>
-                                    <th className="text-center py-3 px-2">Ações</th>
+                                    <th className="text-center py-3 px-2">AÃ§Ãµes</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {data.pendingWithdrawals.length === 0 && (
                                     <tr>
                                         <td colSpan={5} className="text-center py-8 text-muted-foreground/50 italic">
-                                            Nenhuma solicitação pendente.
+                                            Nenhuma solicitaÃ§Ã£o pendente.
                                         </td>
                                     </tr>
                                 )}
@@ -223,7 +223,7 @@ export default function AdminFinancialsPage() {
                                                     className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
                                                     disabled={processing === req.id}
                                                     onClick={() => {
-                                                        if (confirm('Rejeitar este saque devolverá o saldo para a carteira do usuário. Continuar?')) {
+                                                        if (confirm('Rejeitar este saque devolverÃ¡ o saldo para a carteira do usuÃ¡rio. Continuar?')) {
                                                             handleWithdrawalAction(req.id, 'FAILED')
                                                         }
                                                     }}
@@ -245,7 +245,7 @@ export default function AdminFinancialsPage() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <DollarSign className="h-5 w-5 text-violet-400" />
-                        Pedidos Recentes — Detalhamento Financeiro
+                        Pedidos Recentes â€” Detalhamento Financeiro
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -256,12 +256,12 @@ export default function AdminFinancialsPage() {
                                     <th className="text-left py-3 px-2">Data</th>
                                     <th className="text-left py-3 px-2">Cliente</th>
                                     <th className="text-left py-3 px-2">Cartomante</th>
-                                    <th className="text-left py-3 px-2">Serviço</th>
+                                    <th className="text-left py-3 px-2">ServiÃ§o</th>
                                     <th className="text-right py-3 px-2">Total</th>
                                     <th className="text-right py-3 px-2 text-green-400">Empresa</th>
                                     <th className="text-right py-3 px-2 text-amber-400">Repasse</th>
                                     <th className="text-center py-3 px-2">Status</th>
-                                    <th className="text-center py-3 px-2">Ações</th>
+                                    <th className="text-center py-3 px-2">AÃ§Ãµes</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -328,3 +328,4 @@ export default function AdminFinancialsPage() {
         </div>
     )
 }
+

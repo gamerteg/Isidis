@@ -438,7 +438,7 @@ class _GigEditorScreenState extends State<GigEditorScreen> {
             _PaymentMethodTile(
               icon: Icons.credit_card,
               title: 'Aceitar cartao',
-              subtitle: 'Credito com processamento pela Stripe',
+              subtitle: 'Credito e debito com processamento via Mercado Pago',
               value: _acceptCard,
               onChanged: (value) => setState(() => _acceptCard = value),
             ),
