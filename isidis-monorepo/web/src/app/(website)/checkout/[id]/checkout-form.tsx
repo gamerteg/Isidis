@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CardPayment, initMercadoPago } from '@mercadopago/sdk-react'
 import type {
@@ -97,6 +97,14 @@ export function CheckoutForm({
 }: CheckoutFormProps) {
   const navigate = useNavigate()
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const latestRequirementsAnswersRef = useRef<Record<string, string>>({})
+  const latestCardFormRef = useRef<CardFormState>({
+    holder_name: '',
+    postal_code: '',
+    address_number: '',
+  })
+  const latestOrderIdRef = useRef<string | null>(existingOrderId || null)
+  const latestDeviceIdRef = useRef('')
 
   const [method, setMethod] = useState<'PIX' | 'CARD'>('PIX')
   const [loading, setLoading] = useState(false)
@@ -120,6 +128,29 @@ export function CheckoutForm({
   const requiredQuestions = useMemo(
     () => requirements.filter((requirement) => requirement.required),
     [requirements],
+  )
+  const selectedAddOnIds = useMemo(
+    () => selectedAddOns.map((addOn) => addOn.id),
+    [selectedAddOns],
+  )
+  const brickInitialization = useMemo(
+    () => ({ amount: amountTotal }),
+    [amountTotal],
+  )
+  const brickCustomization = useMemo(
+    () => ({
+      paymentMethods: {
+        minInstallments: 1,
+        maxInstallments: 1,
+        types: {
+          included: ['credit_card' as const],
+        },
+      },
+      visual: {
+        hideFormTitle: true,
+      },
+    }),
+    [],
   )
 
   useEffect(() => {
@@ -160,6 +191,22 @@ export function CheckoutForm({
   }, [])
 
   useEffect(() => {
+    latestRequirementsAnswersRef.current = requirementsAnswers
+  }, [requirementsAnswers])
+
+  useEffect(() => {
+    latestCardFormRef.current = cardForm
+  }, [cardForm])
+
+  useEffect(() => {
+    latestOrderIdRef.current = orderId
+  }, [orderId])
+
+  useEffect(() => {
+    latestDeviceIdRef.current = deviceId
+  }, [deviceId])
+
+  useEffect(() => {
     if (!paymentId) return
 
     pollingIntervalRef.current = setInterval(async () => {
@@ -180,16 +227,16 @@ export function CheckoutForm({
     }
   }, [navigate, paymentId])
 
-  const validateRequirements = () => {
-    const missing = requiredQuestions.filter((question) => !requirementsAnswers[question.id]?.trim())
+  const validateRequirements = useCallback((answers: Record<string, string>) => {
+    const missing = requiredQuestions.filter((question) => !answers[question.id]?.trim())
     if (missing.length === 0) return null
     return 'Preencha as informacoes obrigatorias para continuar com o pedido.'
-  }
+  }, [requiredQuestions])
 
-  const validateCardSupplementalFields = () => {
-    const sanitizedPostalCode = cardForm.postal_code.replace(/\D/g, '')
+  const validateCardSupplementalFields = useCallback((cardFormState: CardFormState) => {
+    const sanitizedPostalCode = cardFormState.postal_code.replace(/\D/g, '')
 
-    if (!cardForm.holder_name.trim()) {
+    if (!cardFormState.holder_name.trim()) {
       return 'Informe o nome impresso no cartao.'
     }
 
@@ -197,15 +244,15 @@ export function CheckoutForm({
       return 'Informe um CEP valido para o titular do cartao.'
     }
 
-    if (!cardForm.address_number.trim()) {
+    if (!cardFormState.address_number.trim()) {
       return 'Informe o numero do endereco do titular.'
     }
 
     return null
-  }
+  }, [])
 
   const handlePixCheckout = async () => {
-    const requirementsError = validateRequirements()
+    const requirementsError = validateRequirements(requirementsAnswers)
     if (requirementsError) {
       setError(requirementsError)
       return
@@ -246,16 +293,21 @@ export function CheckoutForm({
     }
   }
 
-  const handleCardBrickSubmit = async (
+  const handleCardBrickSubmit = useCallback(async (
     formData: ICardPaymentFormData<ICardPaymentBrickPayer>
   ) => {
-    const requirementsError = validateRequirements()
+    const currentRequirementsAnswers = latestRequirementsAnswersRef.current
+    const currentCardForm = latestCardFormRef.current
+    const currentOrderId = latestOrderIdRef.current
+    const currentDeviceId = latestDeviceIdRef.current
+
+    const requirementsError = validateRequirements(currentRequirementsAnswers)
     if (requirementsError) {
       setError(requirementsError)
       throw new Error(requirementsError)
     }
 
-    const cardSupplementalError = validateCardSupplementalFields()
+    const cardSupplementalError = validateCardSupplementalFields(currentCardForm)
     if (cardSupplementalError) {
       setError(cardSupplementalError)
       throw new Error(cardSupplementalError)
@@ -267,19 +319,19 @@ export function CheckoutForm({
     try {
       const result = await createCardPayment(
         gigId,
-        selectedAddOns.map((addOn) => addOn.id),
-        requirementsAnswers,
+        selectedAddOnIds,
+        currentRequirementsAnswers,
         {
           token: formData.token,
           payment_method_id: formData.payment_method_id,
           installments: formData.installments,
           issuer_id: formData.issuer_id || undefined,
-          holder_name: cardForm.holder_name.trim(),
-          postal_code: cardForm.postal_code.replace(/\D/g, ''),
-          address_number: cardForm.address_number.trim(),
-          device_id: deviceId || undefined,
+          holder_name: currentCardForm.holder_name.trim(),
+          postal_code: currentCardForm.postal_code.replace(/\D/g, ''),
+          address_number: currentCardForm.address_number.trim(),
+          device_id: currentDeviceId || undefined,
         },
-        orderId ?? existingOrderId,
+        currentOrderId ?? existingOrderId,
       )
 
       if (result.error) {
@@ -307,7 +359,19 @@ export function CheckoutForm({
     } finally {
       setCardSubmitting(false)
     }
-  }
+  }, [
+    existingOrderId,
+    gigId,
+    navigate,
+    selectedAddOnIds,
+    validateCardSupplementalFields,
+    validateRequirements,
+  ])
+
+  const handleBrickError = useCallback((brickError?: { message?: string }) => {
+    const message = brickError?.message || 'Nao foi possivel carregar o formulario do Mercado Pago.'
+    setError(message)
+  }, [])
 
   const copyToClipboard = async () => {
     if (!pixData?.content) return
@@ -573,26 +637,11 @@ export function CheckoutForm({
             ) : checkoutConfig ? (
               <div className="rounded-[1.5rem] border border-white/10 bg-white p-4 text-slate-950 shadow-[0_20px_60px_rgba(8,6,24,0.22)]">
                 <CardPayment
-                  key={`${checkoutConfig.public_key}-${amountTotal}`}
-                  initialization={{ amount: amountTotal }}
-                  customization={{
-                    paymentMethods: {
-                      minInstallments: 1,
-                      maxInstallments: 1,
-                      types: {
-                        included: ['credit_card'],
-                      },
-                    },
-                    visual: {
-                      hideFormTitle: true,
-                    },
-                  }}
+                  initialization={brickInitialization}
+                  customization={brickCustomization}
                   locale={checkoutConfig.locale}
                   onSubmit={handleCardBrickSubmit}
-                  onError={(brickError) => {
-                    const message = brickError?.message || 'Nao foi possivel carregar o formulario do Mercado Pago.'
-                    setError(message)
-                  }}
+                  onError={handleBrickError}
                 />
               </div>
             ) : (
