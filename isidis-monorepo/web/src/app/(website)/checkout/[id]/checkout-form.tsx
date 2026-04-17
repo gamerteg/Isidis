@@ -71,6 +71,7 @@ interface MercadoPagoBricksBuilder {
         }
       }
       callbacks: {
+        onReady: () => void
         onSubmit: (formData: ICardPaymentFormData<ICardPaymentBrickPayer>) => Promise<void>
         onError: (error?: { message?: string }) => void
       }
@@ -101,6 +102,7 @@ interface MercadoPagoCardBrickProps {
       hideFormTitle: boolean
     }
   }
+  onReady: () => void
   onSubmit: (formData: ICardPaymentFormData<ICardPaymentBrickPayer>) => Promise<void>
   onError: (error?: { message?: string }) => void
 }
@@ -172,6 +174,7 @@ const MercadoPagoCardBrick = memo(function MercadoPagoCardBrick({
   locale,
   initialization,
   customization,
+  onReady,
   onSubmit,
   onError,
 }: MercadoPagoCardBrickProps) {
@@ -205,6 +208,7 @@ const MercadoPagoCardBrick = memo(function MercadoPagoCardBrick({
           initialization,
           customization,
           callbacks: {
+            onReady,
             onSubmit,
             onError,
           },
@@ -227,7 +231,7 @@ const MercadoPagoCardBrick = memo(function MercadoPagoCardBrick({
         void Promise.resolve(currentController.unmount()).catch(() => undefined)
       }
     }
-  }, [containerId, customization, initialization, locale, onError, onSubmit, publicKey])
+  }, [containerId, customization, initialization, locale, onError, onReady, onSubmit, publicKey])
 
   return <div id={containerId} />
 })
@@ -517,6 +521,12 @@ export function CheckoutForm({
     setError(message)
   }, [])
 
+  const handleBrickReady = useCallback(() => {
+    setError((currentError) =>
+      currentError === 'Nao foi possivel carregar o formulario do Mercado Pago.' ? '' : currentError,
+    )
+  }, [])
+
   const copyToClipboard = async () => {
     if (!pixData?.content) return
     try {
@@ -785,6 +795,7 @@ export function CheckoutForm({
                   locale={checkoutConfig.locale}
                   initialization={brickInitialization}
                   customization={brickCustomization}
+                  onReady={handleBrickReady}
                   onSubmit={handleCardBrickSubmit}
                   onError={handleBrickError}
                 />
