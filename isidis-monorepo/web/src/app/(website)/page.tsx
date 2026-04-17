@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Search, ArrowRight, Sparkles, Shield, Zap, Star, Users, Camera, MessageCircle, ShieldCheck, Heart, Play } from 'lucide-react'
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion'
+import { ArrowRight, Sparkles, Shield, Zap, Star, Users, Camera, MessageCircle, ShieldCheck, Heart } from 'lucide-react'
 import { PractitionerCard, type PractitionerProps } from '@/components/practitioner-card'
 
 import { getLandingStats } from '@/lib/data/stats'
@@ -86,10 +87,6 @@ export default function Home() {
               <div className="absolute -inset-10 bg-primary/10 blur-[100px] rounded-full opacity-50" />
               <InteractiveTarotCards />
 
-              {/* Play Button Overlay Mock */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-2xl shadow-primary/50 animate-glow-pulse cursor-pointer z-20 pointer-events-none">
-                <Zap className="w-8 h-8 text-white fill-white" />
-              </div>
             </div>
 
             <div className="order-1 lg:order-2">
@@ -194,8 +191,8 @@ export default function Home() {
                 <div className="p-6 glass rounded-2xl border-white/10 mt-12">
                   <p className="text-lg font-bold italic text-primary">"Isidis me deu a clareza que eu precisava em um momento de transição de carreira. A interface é mágica."</p>
                   <div className="flex items-center gap-3 mt-4">
-                    <div className="w-10 h-10 rounded-full bg-muted overflow-hidden">
-                      <img src="https://i.pravatar.cc/100?u=4" alt="user" width={40} height={40} className="w-full h-full object-cover" />
+                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm select-none">
+                      MS
                     </div>
                     <div className="text-sm">
                       <div className="font-bold">Mariana S.</div>
@@ -262,24 +259,27 @@ export default function Home() {
             description="Tudo o que você precisa saber para começar sua jornada com Isidis."
           />
 
-          <div className="space-y-4">
+          <Accordion type="single" collapsible className="space-y-3">
             {[
               { q: 'Quanto tempo demora para receber a leitura?', a: 'Cada cartomante tem seu prazo de entrega, mas a maioria entrega em menos de 24 horas. Você verá o prazo exato no perfil da profissional antes de contratar.' },
               { q: 'Como recebo o acesso à minha tiragem?', a: 'Assim que a cartomante concluir a leitura, você receberá um e-mail e uma notificação. O conteúdo estará disponível no seu Dashboard em "Minhas Tiragens".' },
               { q: 'O pagamento via PIX é seguro?', a: 'Sim, utilizamos os protocolos de segurança mais rígidos. O pagamento é instantâneo e garantido pela nossa plataforma.' },
               { q: 'E se eu não gostar da leitura?', a: 'Prezamos pela qualidade. Se você tiver qualquer problema com o conteúdo entregue, nosso suporte está pronto para analisar cada caso individualmente.' }
             ].map((faq, i) => (
-              <div key={i} className="glass rounded-2xl p-6 border-white/5 hover:border-white/10 transition-colors cursor-pointer group">
-                <h4 className="font-bold flex items-center justify-between text-lg">
+              <AccordionItem
+                key={i}
+                value={`faq-${i}`}
+                className="glass rounded-2xl px-6 border-white/5 data-[state=open]:border-primary/20 transition-colors"
+              >
+                <AccordionTrigger className="text-base font-bold hover:text-primary py-5">
                   {faq.q}
-                  <ArrowRight className="w-4 h-4 opacity-30 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                </h4>
-                <p className="mt-3 text-muted-foreground text-sm leading-relaxed hidden group-hover:block animate-fade-in">
+                </AccordionTrigger>
+                <AccordionContent className="text-muted-foreground text-sm leading-relaxed pb-5 pt-0">
                   {faq.a}
-                </p>
-              </div>
+                </AccordionContent>
+              </AccordionItem>
             ))}
-          </div>
+          </Accordion>
         </PageContainer>
       </PageSection>
 

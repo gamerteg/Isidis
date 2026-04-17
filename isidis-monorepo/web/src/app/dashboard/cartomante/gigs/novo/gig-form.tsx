@@ -7,7 +7,8 @@ import {
     Loader2, CheckCircle2, ChevronRight, ChevronLeft,
     LayoutGrid, DollarSign, Image as ImageIcon, Sparkles,
     CreditCard, Clock, Star, ArrowRight, User, MousePointerClick,
-    Camera, MessageCircle, AlertCircle, Repeat, CalendarDays
+    Camera, MessageCircle, AlertCircle, Repeat, CalendarDays,
+    Heart, Briefcase, Leaf, Globe, type LucideIcon
 } from 'lucide-react'
 import {  useNavigate  } from 'react-router-dom'
 import { Link } from 'react-router-dom'
@@ -26,12 +27,12 @@ const STEPS = [
     { id: 6, label: 'Método de Entrega' },
 ]
 
-const CATEGORIES = [
-    { id: 'Love & Relationships', label: 'Amor e Relacionamentos', icon: '❤️' },
-    { id: 'Career & Finance', label: 'Carreira e Finanças', icon: '💼' },
-    { id: 'Spiritual Growth', label: 'Crescimento Espiritual', icon: '✨' },
-    { id: 'General Reading', label: 'Leitura Geral', icon: '🔮' },
-    { id: 'Health & Wellness', label: 'Saúde e Bem-estar', icon: '🌿' },
+const CATEGORIES: { id: string; label: string; Icon: LucideIcon }[] = [
+    { id: 'Love & Relationships', label: 'Amor e Relacionamentos', Icon: Heart },
+    { id: 'Career & Finance', label: 'Carreira e Finanças', Icon: Briefcase },
+    { id: 'Spiritual Growth', label: 'Crescimento Espiritual', Icon: Sparkles },
+    { id: 'General Reading', label: 'Leitura Geral', Icon: Globe },
+    { id: 'Health & Wellness', label: 'Saúde e Bem-estar', Icon: Leaf },
 ]
 
 const DECKS = [
@@ -276,7 +277,7 @@ export function GigForm({ initialData }: { initialData?: Gig }) {
                                                     : 'bg-[#12121a] border-white/5 text-slate-400'
                                                     }`}
                                             >
-                                                <div className="text-2xl mb-3">{cat.icon}</div>
+                                                <div className="mb-3"><cat.Icon className="w-6 h-6" /></div>
                                                 <div className="font-semibold text-lg">{cat.label}</div>
                                             </button>
                                         ))}

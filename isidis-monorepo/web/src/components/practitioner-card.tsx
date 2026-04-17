@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Star, ArrowRight, User } from 'lucide-react'
+import { Star, ArrowRight } from 'lucide-react'
 import { usePresence } from '@/components/providers/presence-provider'
 import { AnalyticsTracker } from './analytics-tracker'
 import { ClickTracker } from './click-tracker'
@@ -46,8 +46,10 @@ export function PractitionerCard({ practitioner }: { practitioner: PractitionerP
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
                     />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-                        <User className="w-20 h-20 text-primary/30" />
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 via-primary/10 to-transparent">
+                        <span className="text-5xl font-bold font-display text-primary/40 select-none">
+                            {practitioner.name.charAt(0).toUpperCase()}
+                        </span>
                     </div>
                 )}
                 {/* Gradient overlay */}
@@ -80,7 +82,10 @@ export function PractitionerCard({ practitioner }: { practitioner: PractitionerP
 
             {/* Content */}
             <CardContent className="p-5 flex flex-col flex-grow relative z-20 pointer-events-none">
-                <h3 className="text-lg font-bold mb-3 group-hover:text-primary transition-colors">{practitioner.name}</h3>
+                <h3 className="text-lg font-bold mb-1 group-hover:text-primary transition-colors">{practitioner.name}</h3>
+                {practitioner.title && (
+                    <p className="text-xs text-muted-foreground mb-3 leading-snug line-clamp-1">{practitioner.title}</p>
+                )}
 
                 <div className="flex flex-wrap gap-1.5 mb-4">
                     {practitioner.tags.map(tag => (

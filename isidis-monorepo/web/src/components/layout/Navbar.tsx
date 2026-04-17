@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { LayoutDashboard, LogOut, Sparkles, User, Moon, Menu } from 'lucide-react'
+import { LayoutDashboard, LogOut, Sparkles, User, Moon, Menu, Wand2, Eye } from 'lucide-react'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -76,8 +76,11 @@ export function Navbar() {
                                             <p className="text-sm font-bold">{user.user_metadata?.full_name || 'Minha Conta'}</p>
                                             <p className="text-xs text-muted-foreground">{user.email}</p>
                                             {role && (
-                                                <span className="text-[10px] uppercase tracking-widest text-primary font-bold mt-1">
-                                                    {role === 'READER' ? '✨ Cartomante' : '🔮 Consulente'}
+                                                <span className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-primary font-bold mt-1">
+                                                    {role === 'READER'
+                                                        ? <><Wand2 className="w-3 h-3" /> Cartomante</>
+                                                        : <><Eye className="w-3 h-3" /> Consulente</>
+                                                    }
                                                 </span>
                                             )}
                                         </div>
@@ -168,6 +171,9 @@ export function Navbar() {
                                 </DropdownMenuContent>
                             </DropdownMenu>
 
+                            <Button variant="ghost" size="sm" asChild className="hidden md:flex font-medium text-muted-foreground hover:text-foreground">
+                                <Link to="/cartomantes" className="nav-link">Explorar</Link>
+                            </Button>
                             <Button variant="ghost" size="sm" asChild className="hidden md:flex font-medium text-muted-foreground hover:text-foreground">
                                 <Link to="/login">Entrar</Link>
                             </Button>

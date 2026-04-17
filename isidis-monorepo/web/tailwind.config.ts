@@ -21,6 +21,7 @@ const config = {
             fontFamily: {
                 sans: ["Manrope", "sans-serif"],
                 serif: ["Playfair Display", "serif"],
+                display: ["Playfair Display", "serif"],
             },
             colors: {
                 border: "hsl(var(--border))",
@@ -65,6 +66,14 @@ const config = {
                 lg: "var(--radius)",
                 md: "calc(var(--radius) - 2px)",
                 sm: "calc(var(--radius) - 4px)",
+                xl: "1.25rem",
+                "2xl": "1.75rem",
+                "3xl": "2.25rem",
+            },
+            boxShadow: {
+                glow: "var(--shadow-glow, 0 0 40px -10px hsl(262 83% 65% / 0.35))",
+                "glow-sm": "var(--shadow-glow-sm, 0 0 20px -8px hsl(262 83% 65% / 0.25))",
+                "glow-gold": "var(--shadow-glow-gold, 0 0 40px -10px hsl(43 96% 56% / 0.3))",
             },
             keyframes: {
                 "accordion-down": {

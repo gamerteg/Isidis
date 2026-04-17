@@ -84,7 +84,29 @@ export default function CartomanteDashboard() {
         })
     }, [user, authLoading, navigate, refreshKey])
 
-    if (authLoading || loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-slate-400">Carregando dashboard...</p></div>
+    if (authLoading || loading) return (
+        <div className="min-h-screen p-6 space-y-6 max-w-7xl mx-auto">
+            {/* Header skeleton */}
+            <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                    <div className="skeleton h-8 w-56 rounded-xl" />
+                    <div className="skeleton h-4 w-36 rounded-lg" />
+                </div>
+                <div className="skeleton h-10 w-32 rounded-xl" />
+            </div>
+            {/* Stats skeleton */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[...Array(4)].map((_, i) => (
+                    <div key={i} className="skeleton h-28 rounded-2xl" />
+                ))}
+            </div>
+            {/* Content skeleton */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="skeleton h-64 rounded-2xl lg:col-span-2" />
+                <div className="skeleton h-64 rounded-2xl" />
+            </div>
+        </div>
+    )
     if (!user) return null
 
     const allOrders = orders

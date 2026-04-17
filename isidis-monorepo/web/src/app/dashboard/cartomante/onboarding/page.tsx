@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { createClient } from '@/lib/supabase/client'
 import OnboardingPage from './onboarding-client'
 import { useAuth } from '@/hooks/useAuth'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 
 export default function Page() {
     const { user, loading: authLoading } = useAuth()
@@ -28,7 +29,7 @@ export default function Page() {
             })
     }, [user, authLoading])
 
-    if (authLoading || loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-slate-400">Carregando...</p></div>
+    if (authLoading || loading) return <PageSkeleton rows={2} />
     if (!user) return null
 
     return <OnboardingPage initialProfile={profile} />

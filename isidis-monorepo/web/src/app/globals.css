@@ -27,50 +27,55 @@
   }
 
   .dark {
-    /* Mystic Deep Theme */
-    --background: 240 30% 6%;
-    /* #0a0a14 */
-    --foreground: 0 0% 98%;
+    /* Mystic Deep Theme — Cinema Dark */
+    --background: 240 20% 4%;
+    /* ~#050509 — deeper, less blue, more cinematic */
+    --foreground: 0 0% 97%;
 
-    --card: 240 30% 12%;
-    /* #12122a + bit lighter */
-    --card-foreground: 0 0% 98%;
+    /* Card elevation system */
+    --card: 240 22% 9%;
+    /* base card surface */
+    --card-foreground: 0 0% 97%;
+    --card-elevated: 240 22% 13%;
+    /* elevated card (hover, modals) */
+    --card-surface: 240 20% 7%;
+    /* sunken surface */
 
-    --popover: 240 30% 12%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 240 22% 10%;
+    --popover-foreground: 0 0% 97%;
 
     --primary: 262 83% 65%;
-    /* Vivid Purple for actions */
+    /* Vivid Purple */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 240 50% 60%;
-    /* Indigo for info/secondary */
+    /* Indigo */
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 240 20% 16%;
-    --muted-foreground: 240 10% 65%;
+    --muted: 240 18% 15%;
+    --muted-foreground: 240 8% 62%;
 
     --accent: 43 96% 56%;
-    /* Gold for premium/physical */
+    /* Gold */
     --accent-foreground: 0 0% 10%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 30% 18%;
-    /* Subtle purple/blue border */
-    --input: 240 30% 18%;
+    --border: 240 22% 16%;
+    --input: 240 22% 16%;
     --ring: 262 83% 65%;
 
     /* Deep Theme Specifics */
-    --background-deep: 240 0% 2%;
-    /* #050505 */
-    --card-deep: 240 6% 9%;
-    /* #12121a */
-    --card-item: 240 0% 7%;
-    /* #0f0f13 */
-    --nav-deep: 245 6% 7%;
-    /* #0f0f16 */
+    --background-deep: 240 20% 2%;
+    --card-deep: 240 18% 8%;
+    --card-item: 240 15% 6%;
+    --nav-deep: 240 20% 5%;
+
+    /* Glow system */
+    --shadow-glow: 0 0 40px -10px hsl(262 83% 65% / 0.35);
+    --shadow-glow-gold: 0 0 40px -10px hsl(43 96% 56% / 0.3);
+    --shadow-glow-sm: 0 0 20px -8px hsl(262 83% 65% / 0.25);
   }
 }
 
@@ -348,6 +353,33 @@
 
   to {
     background-position: 200% 0;
+  }
+}
+
+/* ========================================
+   SKELETON LOADING
+   ======================================== */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--card-elevated, var(--card)) / 0.8) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+  border-radius: var(--radius);
+}
+
+@keyframes skeleton-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: hsl(var(--muted));
   }
 }
 

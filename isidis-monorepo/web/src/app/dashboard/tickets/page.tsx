@@ -8,6 +8,7 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { LifeBuoy, Clock, MessageSquare, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 
 const statusMap: Record<string, { label: string, color: string }> = {
     'OPEN': { label: 'Aberto', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
@@ -36,7 +37,7 @@ export default function TicketsPage() {
         getTickets().then((data) => { setTickets(data || []); setLoading(false) })
     }, [user, authLoading])
 
-    if (authLoading || loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-slate-400">Carregando...</p></div>
+    if (authLoading || loading) return <PageSkeleton rows={3} />
 
     return (
         <div className="max-w-6xl mx-auto space-y-6 p-4 md:p-6">

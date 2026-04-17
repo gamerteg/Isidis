@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createClient } from '@/lib/supabase/client'
 import { ProfileForm } from './profile-form'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { useAuth } from '@/hooks/useAuth'
 
 export default function PerfilPage() {
@@ -19,7 +20,7 @@ export default function PerfilPage() {
             .then(({ data }) => { setProfile(data); setLoading(false) })
     }, [user, authLoading])
 
-    if (authLoading || loading) return <div className="min-h-[calc(100vh-80px)] flex items-center justify-center"><p className="text-slate-400">Carregando...</p></div>
+    if (authLoading || loading) return <PageSkeleton rows={3} />
     if (!user) return null
 
     return (

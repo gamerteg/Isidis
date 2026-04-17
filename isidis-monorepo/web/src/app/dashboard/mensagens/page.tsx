@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { createClient } from '@/lib/supabase/client'
 import { getConversations } from '@/app/actions/chat'
 import { MessagesClient } from './messages-client'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { UserSidebar } from '@/components/user-sidebar'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -47,7 +48,7 @@ export default function MessagesPage() {
         fetchAll()
     }, [user, authLoading, cartomanteId])
 
-    if (authLoading || loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-slate-400">Carregando...</p></div>
+    if (authLoading || loading) return <PageSkeleton rows={4} />
     if (!user) return null
 
     return (

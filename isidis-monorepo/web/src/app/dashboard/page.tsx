@@ -49,7 +49,17 @@ export default function DashboardHome() {
         })
     }, [user, authLoading, navigate, refreshKey])
 
-    if (authLoading || !user) return <div className="min-h-screen flex items-center justify-center"><p className="text-slate-400">Carregando...</p></div>
+    if (authLoading || !user) return (
+        <div className="min-h-screen p-6 space-y-6 max-w-4xl mx-auto">
+            <div className="skeleton h-8 w-48 rounded-xl" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {[...Array(3)].map((_, i) => (
+                    <div key={i} className="skeleton h-24 rounded-2xl" />
+                ))}
+            </div>
+            <div className="skeleton h-64 rounded-2xl" />
+        </div>
+    )
 
     const firstName = user.user_metadata?.full_name?.split(' ')[0] || 'Visitante'
 
