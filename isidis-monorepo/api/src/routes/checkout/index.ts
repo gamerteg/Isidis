@@ -57,12 +57,62 @@ function sanitizePixDescription(orderId: string, gigTitle: string) {
   return description.slice(0, 140)
 }
 
-function getNotificationUrl() {
-  if (!process.env.API_URL) {
+function normalizePublicBaseUrl(rawUrl?: string | null) {
+  const trimmed = rawUrl?.trim()
+  if (!trimmed) {
     return undefined
   }
 
-  return `${process.env.API_URL}/webhooks/mercadopago?source_news=webhooks`
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+
+  try {
+    const url = new URL(withProtocol)
+
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      return undefined
+    }
+
+    url.pathname = ''
+    url.search = ''
+    url.hash = ''
+
+    return url.toString().replace(/\/$/, '')
+  } catch {
+    return undefined
+  }
+}
+
+function getNotificationUrl(request: {
+  headers: Record<string, string | string[] | undefined>
+}) {
+  const normalizedEnvUrl = normalizePublicBaseUrl(process.env.API_URL)
+  if (normalizedEnvUrl) {
+    return new URL('/webhooks/mercadopago?source_news=webhooks', normalizedEnvUrl).toString()
+  }
+
+  const forwardedProtoHeader = request.headers['x-forwarded-proto']
+  const forwardedProto = Array.isArray(forwardedProtoHeader)
+    ? forwardedProtoHeader[0]
+    : forwardedProtoHeader?.split(',')[0]?.trim()
+
+  const forwardedHostHeader = request.headers['x-forwarded-host']
+  const forwardedHost = Array.isArray(forwardedHostHeader)
+    ? forwardedHostHeader[0]
+    : forwardedHostHeader?.split(',')[0]?.trim()
+
+  const hostHeader = request.headers.host
+  const host = Array.isArray(hostHeader) ? hostHeader[0] : hostHeader
+  const publicHost = forwardedHost || host
+  const protocol = forwardedProto || (process.env.NODE_ENV === 'production' ? 'https' : 'http')
+  const derivedBaseUrl = normalizePublicBaseUrl(
+    publicHost ? `${protocol}://${publicHost}` : undefined
+  )
+
+  if (!derivedBaseUrl) {
+    return undefined
+  }
+
+  return new URL('/webhooks/mercadopago?source_news=webhooks', derivedBaseUrl).toString()
 }
 
 function getCardRejectionMessage(statusDetail?: string) {
@@ -81,6 +131,69 @@ function getCardRejectionMessage(statusDetail?: string) {
   }
 
   return rejectionMap[statusDetail ?? ''] ?? 'Cartao recusado. Tente outro cartao ou outra forma de pagamento.'
+}
+
+function hasInvalidNotificationUrlError(error: unknown) {
+  const normalizedError = error as {
+    message?: unknown
+    responseBody?: {
+      cause?: Array<{
+        code?: unknown
+        description?: unknown
+      }>
+    }
+  }
+
+  const message = typeof normalizedError?.message === 'string' ? normalizedError.message.toLowerCase() : ''
+  const causes = Array.isArray(normalizedError?.responseBody?.cause) ? normalizedError.responseBody.cause : []
+
+  if (message.includes('notificaction_url') || message.includes('notification_url')) {
+    return true
+  }
+
+  return causes.some((cause) => {
+    const code = Number(cause?.code)
+    const description = typeof cause?.description === 'string' ? cause.description.toLowerCase() : ''
+    return code === 4020 || description.includes('notificaction_url') || description.includes('notification_url')
+  })
+}
+
+async function createPaymentWithNotificationFallback(params: {
+  fastify: any
+  request: any
+  body: Record<string, unknown>
+  requestOptions?: Record<string, unknown>
+  notificationUrl?: string
+  context: 'CARD' | 'PIX'
+}) {
+  const { fastify, request, body, requestOptions, notificationUrl, context } = params
+
+  if (!notificationUrl) {
+    return fastify.mp.createPayment({ body, requestOptions })
+  }
+
+  try {
+    request.log.info({ notificationUrl }, `[checkout] MP ${context} notification URL resolvida`)
+
+    return await fastify.mp.createPayment({
+      body: {
+        ...body,
+        notification_url: notificationUrl,
+      },
+      requestOptions,
+    })
+  } catch (error) {
+    if (!hasInvalidNotificationUrlError(error)) {
+      throw error
+    }
+
+    request.log.warn(
+      { notificationUrl },
+      `[checkout] MP ${context} recusou notification_url; reenviando pagamento sem notification_url`
+    )
+
+    return fastify.mp.createPayment({ body, requestOptions })
+  }
 }
 
 function buildPayerName(fullName: string) {
@@ -528,9 +641,17 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
           const { firstName, lastName } = buildPayerName(clientProfile.full_name)
           const phone = buildPhone(clientProfile.cellphone)
           const postalCode = card_holder_postal_code?.replace(/\D/g, '')
-          const notificationUrl = getNotificationUrl()
+          const notificationUrl = getNotificationUrl(request)
+          const requestOptions = {
+            ...(device_id && { meliSessionId: device_id }),
+            idempotencyKey: randomUUID(),
+          }
 
-          const charge = await fastify.mp.createPayment({
+          const charge = await createPaymentWithNotificationFallback({
+            fastify,
+            request,
+            notificationUrl,
+            context: 'CARD',
             body: {
               transaction_amount: toDecimal(totalAmount),
               token: finalCardToken,
@@ -540,7 +661,6 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
               payment_method_id: finalPaymentMethodId,
               issuer_id: finalIssuerId,
               statement_descriptor: 'ISIDIS',
-              ...(notificationUrl && { notification_url: notificationUrl }),
               payer: {
                 email: clientEmail,
                 first_name: firstName,
@@ -583,10 +703,7 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
               },
               external_reference: order.id,
             },
-            requestOptions: {
-              ...(device_id && { meliSessionId: device_id }),
-              idempotencyKey: randomUUID(),
-            },
+            requestOptions,
           })
 
           request.log.info(
@@ -663,9 +780,16 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
       try {
         const { firstName } = buildPayerName(clientProfile.full_name)
         const dueDate = new Date(Date.now() + 15 * 60 * 1000)
-        const notificationUrl = getNotificationUrl()
+        const notificationUrl = getNotificationUrl(request)
+        const requestOptions = {
+          idempotencyKey: randomUUID(),
+        }
 
-        const charge = await fastify.mp.createPayment({
+        const charge = await createPaymentWithNotificationFallback({
+          fastify,
+          request,
+          notificationUrl,
+          context: 'PIX',
           body: {
             transaction_amount: toDecimal(totalAmount),
             description: sanitizePixDescription(order.id, gig.title),
@@ -680,11 +804,8 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
             },
             date_of_expiration: dueDate.toISOString(),
             external_reference: order.id,
-            ...(notificationUrl && { notification_url: notificationUrl }),
           },
-          requestOptions: {
-            idempotencyKey: randomUUID(),
-          },
+          requestOptions,
         })
 
         await fastify.supabase
