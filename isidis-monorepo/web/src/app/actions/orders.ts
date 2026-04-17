@@ -1,7 +1,12 @@
 
 
 import { createClient } from '@/lib/supabase/client'
+import apiClient from '@/lib/apiClient'
 
+export async function cancelOrder(orderId: string, reason: string) {
+    const response = await apiClient.post(`/orders/${orderId}/cancel`, { reason })
+    return response.data
+}
 
 export async function toggleFavoriteOrder(orderId: string, isFavorite: boolean) {
     const supabase = await createClient()

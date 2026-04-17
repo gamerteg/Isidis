@@ -10,13 +10,30 @@ import {
   ShieldCheck,
   Sparkles,
   UserRound,
+  XCircle,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from '@/components/ui/dialog'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import { getOrderDetail } from '@/app/(website)/checkout/actions'
+import { cancelOrder } from '@/app/actions/orders'
 import { useAuth } from '@/hooks/useAuth'
 import type { OrderDetail, OrderStatus } from '@/types'
+import { toast } from 'sonner'
+
+const CLIENT_CANCEL_REASONS = [
+  'Mudança de planos',
+  'Erro na compra',
+  'Demora na resposta da cartomante',
+  'Encontrei outra opção',
+  'Outro motivo',
+]
 
 const statusMap: Record<OrderStatus, { label: string; tone: string; description: string }> = {
   PENDING_PAYMENT: {
@@ -88,6 +105,9 @@ export default function ClientOrderDetailPage() {
   const [order, setOrder] = useState<OrderDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [cancelDialog, setCancelDialog] = useState<{ open: boolean; reason: string; submitting: boolean }>({
+    open: false, reason: '', submitting: false,
+  })
 
   useEffect(() => {
     if (authLoading) return
@@ -137,6 +157,20 @@ export default function ClientOrderDetailPage() {
   const selectedAddOns = (order.gigs?.add_ons || []).filter((item) => order.selected_addons?.includes(item.id))
   const canOpenReading = order.status === 'DELIVERED' || order.status === 'COMPLETED'
   const canPay = order.status === 'PENDING_PAYMENT'
+  const canCancel = order.status === 'PAID'
+
+  async function handleCancelOrder() {
+    if (!id || !cancelDialog.reason) return
+    setCancelDialog(prev => ({ ...prev, submitting: true }))
+    try {
+      await cancelOrder(id, cancelDialog.reason)
+      toast.success('Pedido cancelado. O reembolso será processado em até 5 dias úteis.')
+      navigate('/dashboard/minhas-tiragens')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Erro ao cancelar o pedido.')
+      setCancelDialog(prev => ({ ...prev, submitting: false }))
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.10),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.18),_transparent_30%),linear-gradient(180deg,_#05040d,_#0a0914_30%,_#06050d_100%)] px-4 py-8 md:px-8">
@@ -288,6 +322,22 @@ export default function ClientOrderDetailPage() {
                   </Link>
                 </Button>
 
+                {canCancel && (
+                  <>
+                    <Button
+                      variant="outline"
+                      className="h-12 w-full rounded-2xl border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                      onClick={() => setCancelDialog({ open: true, reason: '', submitting: false })}
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      Cancelar Pedido
+                    </Button>
+                    <p className="text-center text-xs text-slate-600">
+                      Disponível por 2h após o pagamento, enquanto a leitura não for iniciada.
+                    </p>
+                  </>
+                )}
+
                 <div className="rounded-[1.25rem] border border-white/10 bg-black/20 p-4 text-xs leading-6 text-slate-400">
                   <div className="flex items-center gap-2 font-semibold text-white">
                     <ShieldCheck className="h-4 w-4 text-emerald-300" />
@@ -302,6 +352,54 @@ export default function ClientOrderDetailPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={cancelDialog.open} onOpenChange={(open) => !cancelDialog.submitting && setCancelDialog(prev => ({ ...prev, open }))}>
+        <DialogContent className="bg-[#0f0e1a] border border-white/10 text-slate-100 rounded-[1.5rem] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-red-400" />
+              Cancelar Pedido
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-sm">
+              Ao confirmar, o reembolso será processado automaticamente em até 5 dias úteis. Selecione o motivo:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Select
+              value={cancelDialog.reason}
+              onValueChange={(val) => setCancelDialog(prev => ({ ...prev, reason: val }))}
+            >
+              <SelectTrigger className="bg-white/5 border border-white/10 text-slate-200 rounded-xl h-11">
+                <SelectValue placeholder="Selecione o motivo..." />
+              </SelectTrigger>
+              <SelectContent className="bg-[#0f0e1a] border border-white/10 text-slate-200 rounded-xl">
+                {CLIENT_CANCEL_REASONS.map(reason => (
+                  <SelectItem key={reason} value={reason} className="focus:bg-white/10">
+                    {reason}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              className="rounded-xl border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+              onClick={() => setCancelDialog({ open: false, reason: '', submitting: false })}
+              disabled={cancelDialog.submitting}
+            >
+              Voltar
+            </Button>
+            <Button
+              className="rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30"
+              onClick={handleCancelOrder}
+              disabled={!cancelDialog.reason || cancelDialog.submitting}
+            >
+              {cancelDialog.submitting ? 'Cancelando...' : 'Confirmar Cancelamento'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
     Calendar, Clock, Tag, Sparkles,
     CreditCard, Eye, MessageSquare, MoreVertical,
-    Star, Zap, Package
+    Star, Zap, Package, XCircle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CartomanteSidebar } from '@/components/cartomante-sidebar'
@@ -12,6 +12,17 @@ import { PageContainer } from '@/components/layout/PageContainer'
 import { SearchInput } from '@/components/ui/search-input'
 import { MainHero } from '@/components/marketing/MainHero'
 import { useAuth } from '@/hooks/useAuth'
+import {
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from '@/components/ui/dialog'
+import {
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { cancelOrder } from '@/app/actions/orders'
+import { toast } from 'sonner'
 
 function getTimeSince(createdAt: string) {
     const diff = Date.now() - new Date(createdAt).getTime()
@@ -47,6 +58,14 @@ function getStatusBadge(status: string, price: number) {
     return { label: status, color: 'bg-slate-500/15 text-slate-400 border-slate-500/25' }
 }
 
+const READER_CANCEL_REASONS = [
+    'Acordo com o cliente',
+    'Impossibilidade de entrega no prazo',
+    'Problema técnico',
+    'Solicitação do cliente',
+    'Outro motivo',
+]
+
 export default function OrdersPage() {
     const { user, loading: authLoading } = useAuth()
     const navigate = useNavigate()
@@ -59,6 +78,9 @@ export default function OrdersPage() {
     const [gigDetails, setGigDetails] = useState<Record<string, { title: string; image_url: string | null }>>({})
     const [clientDetails, setClientDetails] = useState<Record<string, { full_name: string; avatar_url: string | null }>>({})
     const [loading, setLoading] = useState(true)
+    const [cancelDialog, setCancelDialog] = useState<{ open: boolean; orderId: string | null; reason: string; submitting: boolean }>({
+        open: false, orderId: null, reason: '', submitting: false,
+    })
 
     useEffect(() => {
         if (authLoading) return
@@ -125,6 +147,20 @@ export default function OrdersPage() {
     }
 
     const fmt = (cents: number) => (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+
+    async function handleCancelOrder() {
+        if (!cancelDialog.orderId || !cancelDialog.reason) return
+        setCancelDialog(prev => ({ ...prev, submitting: true }))
+        try {
+            await cancelOrder(cancelDialog.orderId, cancelDialog.reason)
+            setAllOrders(prev => prev.map(o => o.id === cancelDialog.orderId ? { ...o, status: 'CANCELED' } : o))
+            toast.success('Pedido cancelado e reembolso iniciado.')
+            setCancelDialog({ open: false, orderId: null, reason: '', submitting: false })
+        } catch (err: any) {
+            toast.error(err?.response?.data?.error || 'Erro ao cancelar o pedido.')
+            setCancelDialog(prev => ({ ...prev, submitting: false }))
+        }
+    }
 
     return (
         <div className="min-h-screen bg-background-deep text-slate-200 font-sans selection:bg-purple-500/30 flex overflow-hidden">
@@ -306,9 +342,24 @@ export default function OrdersPage() {
                                                     <Star className="w-4 h-4 fill-amber-500" />
                                                 </button>
                                             ) : (
-                                                <button className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/10 transition-all border border-transparent hover:border-white/10">
-                                                    <MoreVertical className="w-4 h-4" />
-                                                </button>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <button className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-white hover:bg-white/10 transition-all border border-transparent hover:border-white/10">
+                                                            <MoreVertical className="w-4 h-4" />
+                                                        </button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="bg-[#0f0e1a] border border-white/10 text-slate-200 rounded-xl shadow-xl min-w-[180px]">
+                                                        {order.status === 'PAID' && (
+                                                            <DropdownMenuItem
+                                                                className="text-red-400 hover:text-red-300 focus:text-red-300 focus:bg-red-500/10 cursor-pointer gap-2"
+                                                                onClick={() => setCancelDialog({ open: true, orderId: order.id, reason: '', submitting: false })}
+                                                            >
+                                                                <XCircle className="w-4 h-4" />
+                                                                Cancelar Pedido
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             )}
                                         </div>
                                     </div>
@@ -332,6 +383,54 @@ export default function OrdersPage() {
                     )}
                 </PageContainer>
             </main>
+
+            <Dialog open={cancelDialog.open} onOpenChange={(open) => !cancelDialog.submitting && setCancelDialog(prev => ({ ...prev, open }))}>
+                <DialogContent className="bg-[#0f0e1a] border border-white/10 text-slate-100 rounded-[1.5rem] max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-white flex items-center gap-2">
+                            <XCircle className="w-5 h-5 text-red-400" />
+                            Cancelar Pedido
+                        </DialogTitle>
+                        <DialogDescription className="text-slate-400 text-sm">
+                            O cliente será reembolsado automaticamente. Selecione o motivo do cancelamento.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-2">
+                        <Select
+                            value={cancelDialog.reason}
+                            onValueChange={(val) => setCancelDialog(prev => ({ ...prev, reason: val }))}
+                        >
+                            <SelectTrigger className="bg-white/5 border border-white/10 text-slate-200 rounded-xl h-11">
+                                <SelectValue placeholder="Selecione o motivo..." />
+                            </SelectTrigger>
+                            <SelectContent className="bg-[#0f0e1a] border border-white/10 text-slate-200 rounded-xl">
+                                {READER_CANCEL_REASONS.map(reason => (
+                                    <SelectItem key={reason} value={reason} className="focus:bg-white/10">
+                                        {reason}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button
+                            variant="outline"
+                            className="rounded-xl border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                            onClick={() => setCancelDialog({ open: false, orderId: null, reason: '', submitting: false })}
+                            disabled={cancelDialog.submitting}
+                        >
+                            Voltar
+                        </Button>
+                        <Button
+                            className="rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30"
+                            onClick={handleCancelOrder}
+                            disabled={!cancelDialog.reason || cancelDialog.submitting}
+                        >
+                            {cancelDialog.submitting ? 'Cancelando...' : 'Confirmar Cancelamento'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }
