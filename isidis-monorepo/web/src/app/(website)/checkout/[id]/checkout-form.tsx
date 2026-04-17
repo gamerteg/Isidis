@@ -1,15 +1,18 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { loadMercadoPago } from '@mercadopago/sdk-js'
-import type {
-  ICardPaymentBrickPayer,
-  ICardPaymentFormData,
-} from '@mercadopago/sdk-react/esm/bricks/cardPayment/type'
-import { Loader2, Copy, CheckCircle2, QrCode, ShieldCheck, CreditCard, LockKeyhole } from 'lucide-react'
+import {
+  CheckCircle2,
+  Copy,
+  CreditCard,
+  ExternalLink,
+  Loader2,
+  LockKeyhole,
+  QrCode,
+  ShieldCheck,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
@@ -17,108 +20,14 @@ import {
   checkPaymentStatus,
   createCardPayment,
   createPixPayment,
-  getCheckoutConfig,
 } from '@/app/(website)/checkout/actions'
-import type { CheckoutConfigResponse, GigAddOn, GigRequirement } from '@/types'
-
-declare global {
-  interface Window {
-    MP_DEVICE_SESSION_ID?: string
-    MercadoPago?: new (
-      publicKey: string,
-      options?: {
-        locale?: string
-      }
-    ) => MercadoPagoClient
-  }
-}
+import type { GigAddOn, GigRequirement } from '@/types'
 
 interface PixData {
   qrcode: string
   content: string
   paymentId: string
   expiresAt?: string | null
-}
-
-interface CardFormState {
-  holder_name: string
-  postal_code: string
-  address_number: string
-}
-
-interface MercadoPagoBrickController {
-  unmount?: () => void | Promise<void>
-}
-
-interface MercadoPagoBricksBuilder {
-  create: (
-    name: 'cardPayment',
-    containerId: string,
-    settings: {
-      initialization: {
-        amount: number
-        payer?: {
-          email?: string
-          identification?: {
-            type: string
-            number: string
-          }
-        }
-      }
-      customization: {
-        paymentMethods: {
-          minInstallments: number
-          maxInstallments: number
-          types: {
-            included: readonly string[]
-          }
-        }
-        visual: {
-          hideFormTitle: boolean
-        }
-      }
-      callbacks: {
-        onReady: () => void
-        onSubmit: (formData: ICardPaymentFormData<ICardPaymentBrickPayer>) => Promise<void>
-        onError: (error?: { message?: string }) => void
-      }
-      locale: string
-    },
-  ) => Promise<MercadoPagoBrickController>
-}
-
-interface MercadoPagoClient {
-  bricks: () => MercadoPagoBricksBuilder
-}
-
-interface MercadoPagoCardBrickProps {
-  publicKey: string
-  locale: string
-  initialization: {
-    amount: number
-    payer?: {
-      email?: string
-      identification?: {
-        type: string
-        number: string
-      }
-    }
-  }
-  customization: {
-    paymentMethods: {
-      minInstallments: number
-      maxInstallments: number
-      types: {
-        included: readonly string[]
-      }
-    }
-    visual: {
-      hideFormTitle: boolean
-    }
-  }
-  onReady: () => void
-  onSubmit: (formData: ICardPaymentFormData<ICardPaymentBrickPayer>) => Promise<void>
-  onError: (error?: { message?: string }) => void
 }
 
 interface CheckoutFormProps {
@@ -135,124 +44,9 @@ function formatCurrency(cents?: number | null) {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
-function loadMercadoPagoSecurityScript(onDeviceId: (deviceId: string) => void) {
-  const updateDeviceId = () => {
-    const nextDeviceId = window.MP_DEVICE_SESSION_ID
-    if (nextDeviceId) {
-      onDeviceId(nextDeviceId)
-    }
-  }
-
-  updateDeviceId()
-
-  const existingScript = document.getElementById('mercadopago-security-js') as HTMLScriptElement | null
-  if (existingScript) {
-    if (existingScript.dataset.loaded === 'true') {
-      updateDeviceId()
-    }
-
-    return () => undefined
-  }
-
-  const script = document.createElement('script')
-  script.id = 'mercadopago-security-js'
-  script.src = 'https://www.mercadopago.com/v2/security.js'
-  script.async = true
-  script.setAttribute('view', 'checkout')
-  script.onload = () => {
-    script.dataset.loaded = 'true'
-    updateDeviceId()
-  }
-  document.body.appendChild(script)
-
-  return () => undefined
-}
-
-function getBrickErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message
-  }
-
-  if (typeof error === 'object' && error !== null && 'message' in error) {
-    const message = (error as { message?: unknown }).message
-    if (typeof message === 'string' && message.trim()) {
-      return message
-    }
-  }
-
-  return 'Nao foi possivel carregar o formulario do Mercado Pago.'
-}
-
-const MercadoPagoCardBrick = memo(function MercadoPagoCardBrick({
-  publicKey,
-  locale,
-  initialization,
-  customization,
-  onReady,
-  onSubmit,
-  onError,
-}: MercadoPagoCardBrickProps) {
-  const containerId = useMemo(() => `mp-card-brick-${crypto.randomUUID()}`, [])
-  const controllerRef = useRef<MercadoPagoBrickController | null>(null)
-
-  useEffect(() => {
-    let disposed = false
-
-    const renderBrick = async () => {
-      try {
-        await loadMercadoPago()
-
-        if (disposed) return
-
-        if (!window.MercadoPago) {
-          throw new Error('SDK do Mercado Pago indisponivel no navegador.')
-        }
-
-        const mercadoPago = new window.MercadoPago(publicKey, { locale })
-        const bricksBuilder = mercadoPago.bricks()
-
-        if (controllerRef.current?.unmount) {
-          await Promise.resolve(controllerRef.current.unmount())
-          controllerRef.current = null
-        }
-
-        if (disposed) return
-
-        controllerRef.current = await bricksBuilder.create('cardPayment', containerId, {
-          initialization,
-          customization,
-          callbacks: {
-            onReady,
-            onSubmit,
-            onError,
-          },
-          locale,
-        })
-      } catch (brickError) {
-        if (disposed) return
-        onError({ message: getBrickErrorMessage(brickError) })
-      }
-    }
-
-    void renderBrick()
-
-    return () => {
-      disposed = true
-      const currentController = controllerRef.current
-      controllerRef.current = null
-
-      if (currentController?.unmount) {
-        void Promise.resolve(currentController.unmount()).catch(() => undefined)
-      }
-    }
-  }, [containerId, customization, initialization, locale, onError, onReady, onSubmit, publicKey])
-
-  return <div id={containerId} />
-})
-
 export function CheckoutForm({
   gigId,
-  readerId,
+  readerId: _readerId,
   amountTotal,
   selectedAddOns = [],
   requirements = [],
@@ -260,14 +54,6 @@ export function CheckoutForm({
 }: CheckoutFormProps) {
   const navigate = useNavigate()
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const latestRequirementsAnswersRef = useRef<Record<string, string>>({})
-  const latestCardFormRef = useRef<CardFormState>({
-    holder_name: '',
-    postal_code: '',
-    address_number: '',
-  })
-  const latestOrderIdRef = useRef<string | null>(existingOrderId || null)
-  const latestDeviceIdRef = useRef('')
 
   const [method, setMethod] = useState<'PIX' | 'CARD'>('PIX')
   const [loading, setLoading] = useState(false)
@@ -279,14 +65,6 @@ export function CheckoutForm({
   const [copied, setCopied] = useState(false)
   const [cardFee, setCardFee] = useState<number | null>(null)
   const [requirementsAnswers, setRequirementsAnswers] = useState<Record<string, string>>({})
-  const [checkoutConfig, setCheckoutConfig] = useState<CheckoutConfigResponse | null>(null)
-  const [checkoutConfigError, setCheckoutConfigError] = useState('')
-  const [deviceId, setDeviceId] = useState('')
-  const [cardForm, setCardForm] = useState<CardFormState>({
-    holder_name: '',
-    postal_code: '',
-    address_number: '',
-  })
 
   const requiredQuestions = useMemo(
     () => requirements.filter((requirement) => requirement.required),
@@ -296,87 +74,6 @@ export function CheckoutForm({
     () => selectedAddOns.map((addOn) => addOn.id),
     [selectedAddOns],
   )
-  const brickInitialization = useMemo(
-    () => ({
-      amount: amountTotal,
-      ...(checkoutConfig?.payer && {
-        payer: {
-          ...(checkoutConfig.payer.email && { email: checkoutConfig.payer.email }),
-          ...(checkoutConfig.payer.identification && {
-            identification: checkoutConfig.payer.identification,
-          }),
-        },
-      }),
-    }),
-    [amountTotal, checkoutConfig],
-  )
-  const brickCustomization = useMemo(
-    () => ({
-      paymentMethods: {
-        minInstallments: 1,
-        maxInstallments: 1,
-        types: {
-          included: ['credit_card' as const],
-        },
-      },
-      visual: {
-        hideFormTitle: true,
-      },
-    }),
-    [],
-  )
-
-  useEffect(() => {
-    let cancelled = false
-
-    void getCheckoutConfig()
-      .then((config) => {
-        if (cancelled) return
-
-        setCheckoutConfig(config)
-      })
-      .catch(() => {
-        if (cancelled) return
-        setCheckoutConfigError('Nao foi possivel carregar o checkout do Mercado Pago agora.')
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    const dispose = loadMercadoPagoSecurityScript((nextDeviceId) => {
-      setDeviceId(nextDeviceId)
-    })
-
-    const intervalId = window.setInterval(() => {
-      if (window.MP_DEVICE_SESSION_ID) {
-        setDeviceId(window.MP_DEVICE_SESSION_ID)
-      }
-    }, 1500)
-
-    return () => {
-      dispose()
-      window.clearInterval(intervalId)
-    }
-  }, [])
-
-  useEffect(() => {
-    latestRequirementsAnswersRef.current = requirementsAnswers
-  }, [requirementsAnswers])
-
-  useEffect(() => {
-    latestCardFormRef.current = cardForm
-  }, [cardForm])
-
-  useEffect(() => {
-    latestOrderIdRef.current = orderId
-  }, [orderId])
-
-  useEffect(() => {
-    latestDeviceIdRef.current = deviceId
-  }, [deviceId])
 
   useEffect(() => {
     if (!paymentId) return
@@ -405,24 +102,6 @@ export function CheckoutForm({
     return 'Preencha as informacoes obrigatorias para continuar com o pedido.'
   }, [requiredQuestions])
 
-  const validateCardSupplementalFields = useCallback((cardFormState: CardFormState) => {
-    const sanitizedPostalCode = cardFormState.postal_code.replace(/\D/g, '')
-
-    if (!cardFormState.holder_name.trim()) {
-      return 'Informe o nome impresso no cartao.'
-    }
-
-    if (sanitizedPostalCode.length !== 8) {
-      return 'Informe um CEP valido para o titular do cartao.'
-    }
-
-    if (!cardFormState.address_number.trim()) {
-      return 'Informe o numero do endereco do titular.'
-    }
-
-    return null
-  }, [])
-
   const handlePixCheckout = async () => {
     const requirementsError = validateRequirements(requirementsAnswers)
     if (requirementsError) {
@@ -436,7 +115,7 @@ export function CheckoutForm({
     try {
       const result = await createPixPayment(
         gigId,
-        selectedAddOns.map((addOn) => addOn.id),
+        selectedAddOnIds,
         requirementsAnswers,
         orderId ?? existingOrderId,
       )
@@ -465,24 +144,11 @@ export function CheckoutForm({
     }
   }
 
-  const handleCardBrickSubmit = useCallback(async (
-    formData: ICardPaymentFormData<ICardPaymentBrickPayer>
-  ) => {
-    const currentRequirementsAnswers = latestRequirementsAnswersRef.current
-    const currentCardForm = latestCardFormRef.current
-    const currentOrderId = latestOrderIdRef.current
-    const currentDeviceId = latestDeviceIdRef.current
-
-    const requirementsError = validateRequirements(currentRequirementsAnswers)
+  const handleCardCheckout = async () => {
+    const requirementsError = validateRequirements(requirementsAnswers)
     if (requirementsError) {
       setError(requirementsError)
-      throw new Error(requirementsError)
-    }
-
-    const cardSupplementalError = validateCardSupplementalFields(currentCardForm)
-    if (cardSupplementalError) {
-      setError(cardSupplementalError)
-      throw new Error(cardSupplementalError)
+      return
     }
 
     setCardSubmitting(true)
@@ -492,64 +158,34 @@ export function CheckoutForm({
       const result = await createCardPayment(
         gigId,
         selectedAddOnIds,
-        currentRequirementsAnswers,
-        {
-          token: formData.token,
-          payment_method_id: formData.payment_method_id,
-          installments: formData.installments,
-          issuer_id: formData.issuer_id || undefined,
-          holder_name: currentCardForm.holder_name.trim(),
-          postal_code: currentCardForm.postal_code.replace(/\D/g, ''),
-          address_number: currentCardForm.address_number.trim(),
-          device_id: currentDeviceId || undefined,
-        },
-        currentOrderId ?? existingOrderId,
+        requirementsAnswers,
+        orderId ?? existingOrderId,
       )
 
       if (result.error) {
         setError(result.error)
-        throw new Error(result.error)
-      }
-
-      if (!result.orderId || !result.paymentId) {
-        const genericError = 'Nao foi possivel iniciar a cobranca no cartao.'
-        setError(genericError)
-        throw new Error(genericError)
-      }
-
-      setOrderId(result.orderId)
-      setPaymentId(result.paymentId)
-      setCardFee(result.amountCardFee ?? null)
-
-      if (result.status === 'CONFIRMED') {
-        toast.success('Cartao aprovado!')
-        navigate(`/dashboard/pedido/${result.orderId}`)
         return
       }
 
-      toast.success('Pagamento em analise. Vamos acompanhar o status automaticamente.')
+      if (result.amountCardFee !== undefined) {
+        setCardFee(result.amountCardFee ?? null)
+      }
+
+      if (result.orderId) {
+        setOrderId(result.orderId)
+      }
+
+      if (!result.checkoutUrl) {
+        setError('Nao foi possivel abrir o checkout seguro do Mercado Pago.')
+        return
+      }
+
+      toast.success('Redirecionando para o checkout seguro do Mercado Pago...')
+      window.location.assign(result.checkoutUrl)
     } finally {
       setCardSubmitting(false)
     }
-  }, [
-    existingOrderId,
-    gigId,
-    navigate,
-    selectedAddOnIds,
-    validateCardSupplementalFields,
-    validateRequirements,
-  ])
-
-  const handleBrickError = useCallback((brickError?: { message?: string }) => {
-    const message = brickError?.message || 'Nao foi possivel carregar o formulario do Mercado Pago.'
-    setError(message)
-  }, [])
-
-  const handleBrickReady = useCallback(() => {
-    setError((currentError) =>
-      currentError === 'Nao foi possivel carregar o formulario do Mercado Pago.' ? '' : currentError,
-    )
-  }, [])
+  }
 
   const copyToClipboard = async () => {
     if (!pixData?.content) return
@@ -569,8 +205,6 @@ export function CheckoutForm({
     toast.success('Codigo PIX copiado!')
     setTimeout(() => setCopied(false), 2000)
   }
-
-  const isPollingCard = method === 'CARD' && Boolean(paymentId) && Boolean(orderId)
 
   return (
     <div className="w-full space-y-6">
@@ -593,8 +227,14 @@ export function CheckoutForm({
                 <ShieldCheck className="h-5 w-5 text-emerald-300" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-white">Pagamento processado pelo backend da Isidis</p>
-                <p className="text-xs text-slate-400">Checkout seguro com tokenizacao oficial do Mercado Pago.</p>
+                <p className="text-sm font-semibold text-white">
+                  {method === 'CARD' ? 'Checkout externo oficial do Mercado Pago' : 'Pagamento processado pelo backend da Isidis'}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {method === 'CARD'
+                    ? 'Voce sera redirecionado para o ambiente hospedado do Mercado Pago para concluir o cartao.'
+                    : 'Geramos o PIX no backend e acompanhamos a confirmacao automaticamente.'}
+                </p>
               </div>
             </div>
             <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[11px] font-semibold text-slate-300 sm:flex">
@@ -730,7 +370,7 @@ export function CheckoutForm({
                   disabled={loading}
                   className="h-14 w-full rounded-2xl bg-emerald-500 text-base font-semibold text-slate-950 hover:bg-emerald-400"
                 >
-                  {loading && method === 'PIX' ? (
+                  {loading ? (
                     <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                       Gerando PIX
@@ -747,108 +387,53 @@ export function CheckoutForm({
           </TabsContent>
 
           <TabsContent value="CARD" className="mt-0 space-y-4">
-            <div className="grid gap-4 rounded-[1.5rem] border border-white/10 bg-black/20 p-4 md:grid-cols-2">
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="holder_name" className="text-slate-200">Nome impresso no cartao</Label>
-                <Input
-                  id="holder_name"
-                  value={cardForm.holder_name}
-                  onChange={(event) => setCardForm((current) => ({ ...current, holder_name: event.target.value }))}
-                  placeholder="Como aparece no cartao"
-                  className="h-12 rounded-xl border-white/10 bg-[#0c0b17] text-slate-100"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="postal_code" className="text-slate-200">CEP do titular</Label>
-                <Input
-                  id="postal_code"
-                  inputMode="numeric"
-                  value={cardForm.postal_code}
-                  onChange={(event) =>
-                    setCardForm((current) => ({
-                      ...current,
-                      postal_code: event.target.value.replace(/\D/g, '').slice(0, 8),
-                    }))
-                  }
-                  placeholder="00000000"
-                  className="h-12 rounded-xl border-white/10 bg-[#0c0b17] text-slate-100"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="address_number" className="text-slate-200">Numero do endereco</Label>
-                <Input
-                  id="address_number"
-                  value={cardForm.address_number}
-                  onChange={(event) => setCardForm((current) => ({ ...current, address_number: event.target.value }))}
-                  placeholder="123"
-                  className="h-12 rounded-xl border-white/10 bg-[#0c0b17] text-slate-100"
-                />
-              </div>
-            </div>
-
             <div className="rounded-[1.5rem] border border-sky-500/15 bg-sky-500/5 p-4 text-sm text-slate-300">
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-white">Cartao a vista</span>
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium text-white">Cartao hospedado no Mercado Pago</span>
                 <span className="rounded-full border border-sky-400/15 bg-sky-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-200">
-                  1 parcela
+                  redirect
                 </span>
               </div>
               <p className="mt-2 text-slate-400">
-                O cartao e tokenizado no navegador pelo Mercado Pago, e a Isidis recebe apenas o token para criar o pagamento.
+                Ao continuar, voce sera redirecionado para o checkout externo oficial do Mercado Pago para concluir o pagamento com mais estabilidade.
               </p>
-              {deviceId ? (
-                <p className="mt-2 text-xs text-slate-500">Protecao antifraude ativa para este checkout.</p>
-              ) : null}
+              <div className="mt-4 space-y-2 text-xs text-slate-400">
+                <p>1. Criamos o pedido pendente na Isidis.</p>
+                <p>2. Abrimos o checkout seguro do Mercado Pago em seguida.</p>
+                <p>3. Depois do pagamento, voce retorna ao pedido para acompanhar tudo no painel.</p>
+              </div>
               {cardFee ? (
-                <p className="mt-3 text-xs text-sky-200">
+                <p className="mt-4 text-xs text-sky-200">
                   Taxa operacional desta cobranca: {formatCurrency(cardFee)}.
                 </p>
               ) : null}
+              <p className="mt-3 text-xs text-slate-500">
+                Valor desta compra: {formatCurrency(amountTotal)}.
+              </p>
             </div>
 
-            {checkoutConfigError ? (
-              <div className="rounded-[1.5rem] border border-rose-500/20 bg-rose-500/5 p-4 text-sm text-rose-200">
-                {checkoutConfigError}
-              </div>
-            ) : checkoutConfig ? (
-              <div className="rounded-[1.5rem] border border-white/10 bg-white p-4 text-slate-950 shadow-[0_20px_60px_rgba(8,6,24,0.22)]">
-                <MercadoPagoCardBrick
-                  publicKey={checkoutConfig.public_key}
-                  locale={checkoutConfig.locale}
-                  initialization={brickInitialization}
-                  customization={brickCustomization}
-                  onReady={handleBrickReady}
-                  onSubmit={handleCardBrickSubmit}
-                  onError={handleBrickError}
-                />
-              </div>
-            ) : (
-              <div className="flex items-center justify-center rounded-[1.5rem] border border-white/10 bg-black/20 px-4 py-10 text-sm text-slate-400">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Carregando checkout do Mercado Pago...
-              </div>
-            )}
+            <Button
+              type="button"
+              onClick={handleCardCheckout}
+              disabled={cardSubmitting}
+              className="h-14 w-full rounded-2xl bg-sky-500 text-base font-semibold text-slate-950 hover:bg-sky-400"
+            >
+              {cardSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Abrindo checkout seguro
+                </>
+              ) : (
+                <>
+                  <ExternalLink className="mr-2 h-5 w-5" />
+                  Ir para o checkout seguro
+                </>
+              )}
+            </Button>
 
-            {isPollingCard ? (
-              <div className="rounded-[1.5rem] border border-amber-500/20 bg-amber-500/5 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-amber-200">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Cartao enviado. Estamos acompanhando a confirmacao em tempo real.
-                </div>
-                <p className="mt-2 text-xs text-slate-400">
-                  Assim que o gateway responder, voce sera levado automaticamente para o pedido {orderId?.slice(0, 8)}.
-                </p>
-              </div>
-            ) : null}
-
-            {cardSubmitting ? (
-              <div className="flex items-center justify-center gap-2 rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3 text-sm text-sky-200">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Enviando pagamento tokenizado ao Mercado Pago...
-              </div>
-            ) : null}
+            <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4 text-xs leading-6 text-slate-400">
+              O pagamento em cartao sera concluido fora da Isidis, no ambiente hospedado do Mercado Pago, com retorno automatico para o pedido apos a tentativa.
+            </div>
           </TabsContent>
         </div>
       </Tabs>

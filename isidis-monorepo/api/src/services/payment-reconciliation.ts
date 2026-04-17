@@ -22,18 +22,102 @@ async function getOrCreateWalletId(fastify: FastifyInstance, userId: string) {
   return wallet?.id ?? null
 }
 
+async function findOrderByMercadoPagoReference(
+  fastify: FastifyInstance,
+  paymentId: string,
+  externalReference?: string | null
+) {
+  const select =
+    'id, status, client_id, reader_id, amount_total, amount_service_total, amount_platform_fee, amount_reader_net, payment_method, asaas_payment_id, metadata, gigs(title, delivery_time_hours)'
+
+  const byPaymentId = await fastify.supabase
+    .from('orders')
+    .select(select)
+    .eq('asaas_payment_id', paymentId)
+    .maybeSingle()
+
+  if (byPaymentId.data) {
+    return byPaymentId.data
+  }
+
+  if (!externalReference) {
+    return null
+  }
+
+  const byExternalReference = await fastify.supabase
+    .from('orders')
+    .select(select)
+    .eq('id', externalReference)
+    .maybeSingle()
+
+  return byExternalReference.data ?? null
+}
+
 export async function processPaidMpOrder(
   fastify: FastifyInstance,
-  paymentId: string
+  paymentId: string,
+  options?: {
+    externalReference?: string | null
+    paymentMethodId?: string | null
+    paymentTypeId?: string | null
+  }
 ): Promise<{ orderId?: string; processed: boolean; found: boolean }> {
-  const { data: order } = await fastify.supabase
-    .from('orders')
-    .select('id, status, client_id, reader_id, amount_total, amount_reader_net, gigs(title, delivery_time_hours)')
-    .eq('asaas_payment_id', paymentId)
-    .single()
+  const order = await findOrderByMercadoPagoReference(
+    fastify,
+    paymentId,
+    options?.externalReference
+  )
 
   if (!order) {
     return { found: false, processed: false }
+  }
+
+  if ((order as any).asaas_payment_id !== paymentId) {
+    await fastify.supabase
+      .from('orders')
+      .update({
+        asaas_payment_id: paymentId,
+        metadata: {
+          ...((order as any).metadata ?? {}),
+          mercadopago: {
+            ...(((order as any).metadata as Record<string, any> | undefined)?.mercadopago ?? {}),
+            payment_method_id: options?.paymentMethodId ?? null,
+            payment_type_id: options?.paymentTypeId ?? null,
+          },
+        },
+      })
+      .eq('id', order.id)
+  }
+
+  if (
+    options?.paymentTypeId &&
+    options.paymentTypeId !== 'credit_card' &&
+    (order as any).payment_method === 'CARD'
+  ) {
+    const serviceAmount = (order as any).amount_service_total ?? order.amount_total
+    const platformFee = (order as any).amount_platform_fee ?? 0
+
+    await fastify.supabase
+      .from('orders')
+      .update({
+        amount_total: serviceAmount,
+        amount_reader_net: serviceAmount - platformFee,
+        amount_card_fee: null,
+        card_fee_responsibility: null,
+        metadata: {
+          ...((order as any).metadata ?? {}),
+          mercadopago: {
+            ...(((order as any).metadata as Record<string, any> | undefined)?.mercadopago ?? {}),
+            payment_method_id: options.paymentMethodId ?? null,
+            payment_type_id: options.paymentTypeId,
+            checkout_mode: 'checkout_pro',
+          },
+        },
+      })
+      .eq('id', order.id)
+
+    ;(order as any).amount_total = serviceAmount
+    ;(order as any).amount_reader_net = serviceAmount - platformFee
   }
 
   const { data: updated, error: updateError } = await fastify.supabase

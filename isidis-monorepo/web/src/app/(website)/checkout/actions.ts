@@ -1,6 +1,5 @@
 import apiClient from '@/lib/apiClient'
 import type {
-  CheckoutCardInput,
   CheckoutCardResponse,
   CheckoutConfigResponse,
   CheckoutCreatePayload,
@@ -60,7 +59,6 @@ export async function createCardPayment(
   gigId: string,
   selectedAddOnIds: string[] = [],
   requirementsAnswers: Record<string, string> = {},
-  card: CheckoutCardInput,
   existingOrderId?: string,
 ) {
   try {
@@ -70,19 +68,13 @@ export async function createCardPayment(
       add_on_ids: selectedAddOnIds,
       requirements_answers: requirementsAnswers,
       payment_method: 'CARD',
-      card_token: card.token,
-      payment_method_id: card.payment_method_id,
-      installments: card.installments,
-      issuer_id: card.issuer_id,
-      device_id: card.device_id,
-      card_holder_name: card.holder_name,
-      card_holder_postal_code: card.postal_code,
-      card_holder_address_number: card.address_number,
     }) as CheckoutCardResponse
 
     return {
       orderId: result.order_id,
       paymentId: result.payment_id ?? result.asaas_payment_id,
+      checkoutUrl: result.checkout_url,
+      preferenceId: result.preference_id,
       status: result.status,
       amountTotal: result.amount_total,
       amountCardFee: result.amount_card_fee,

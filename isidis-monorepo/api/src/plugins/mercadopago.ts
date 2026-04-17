@@ -1,6 +1,6 @@
 import fp from 'fastify-plugin'
 import { FastifyPluginAsync } from 'fastify'
-import { MercadoPagoConfig, Payment, PaymentRefund } from 'mercadopago'
+import { MercadoPagoConfig, Payment, PaymentRefund, Preference } from 'mercadopago'
 
 type MpRequestOptions = {
   idempotencyKey?: string
@@ -18,6 +18,11 @@ type MpRefundPaymentParams = {
   requestOptions?: MpRequestOptions
 }
 
+type MpCreatePreferenceParams = {
+  body: Record<string, unknown>
+  requestOptions?: MpRequestOptions
+}
+
 type MpError = Error & {
   statusCode?: number
   responseBody?: unknown
@@ -25,6 +30,7 @@ type MpError = Error & {
 
 type MpClient = {
   createPayment: (params: MpCreatePaymentParams) => Promise<any>
+  createPreference: (params: MpCreatePreferenceParams) => Promise<any>
   getPayment: (paymentId: string | number, requestOptions?: MpRequestOptions) => Promise<any>
   refundPayment: (params: MpRefundPaymentParams) => Promise<any>
 }
@@ -78,12 +84,21 @@ const mpPlugin: FastifyPluginAsync = async (fastify) => {
   })
 
   const payments = new Payment(client)
+  const preferences = new Preference(client)
   const refunds = new PaymentRefund(client)
 
   fastify.decorate('mp', {
     createPayment: ({ body, requestOptions }) =>
       runMercadoPagoCall(() =>
         payments.create({
+          body: body as any,
+          requestOptions: requestOptions as any,
+        })
+      ),
+
+    createPreference: ({ body, requestOptions }) =>
+      runMercadoPagoCall(() =>
+        preferences.create({
           body: body as any,
           requestOptions: requestOptions as any,
         })

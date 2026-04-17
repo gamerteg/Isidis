@@ -104,17 +104,6 @@ export interface Gig {
   readings_per_month?: number | null
 }
 
-export interface CheckoutCardInput {
-  holder_name: string
-  token: string
-  payment_method_id: string
-  installments: number
-  issuer_id?: string
-  postal_code: string
-  address_number: string
-  device_id?: string
-}
-
 export interface CheckoutConfigResponse {
   gateway: 'mercadopago'
   public_key: string
@@ -167,8 +156,10 @@ export interface CheckoutCardResponse {
   amount_service_total: number
   amount_card_fee: number | null
   card_fee_responsibility: 'READER' | null
-  asaas_payment_id: string
+  asaas_payment_id?: string
   payment_id?: string
+  preference_id?: string
+  checkout_url?: string
   status: 'CONFIRMED' | 'PENDING'
 }
 

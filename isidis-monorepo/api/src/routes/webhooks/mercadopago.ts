@@ -12,9 +12,38 @@ async function processMercadoPagoNotification(
 ) {
   const charge = await fastify.mp.getPayment(paymentId)
   const status = charge.status
+  const externalReference = typeof charge.external_reference === 'string' ? charge.external_reference : undefined
+
+  const findOrder = async () => {
+    const byPaymentId = await fastify.supabase
+      .from('orders')
+      .select('id, status, reader_id, client_id, amount_total, asaas_payment_id')
+      .eq('asaas_payment_id', paymentId)
+      .maybeSingle()
+
+    if (byPaymentId.data) {
+      return byPaymentId.data
+    }
+
+    if (!externalReference) {
+      return null
+    }
+
+    const byExternalReference = await fastify.supabase
+      .from('orders')
+      .select('id, status, reader_id, client_id, amount_total, asaas_payment_id')
+      .eq('id', externalReference)
+      .maybeSingle()
+
+    return byExternalReference.data ?? null
+  }
 
   if (['approved', 'authorized'].includes(status)) {
-    const result = await processPaidMpOrder(fastify, paymentId)
+    const result = await processPaidMpOrder(fastify, paymentId, {
+      externalReference,
+      paymentMethodId: charge.payment_method_id,
+      paymentTypeId: charge.payment_type_id,
+    })
 
     if (!result.found) {
       fastify.log.warn({ paymentId }, '[webhook:mp] Order nao encontrada')
@@ -31,16 +60,15 @@ async function processMercadoPagoNotification(
   }
 
   if (status === 'cancelled' || status === 'refunded') {
-    const { data: order } = await fastify.supabase
-      .from('orders')
-      .select('id, status, reader_id')
-      .eq('asaas_payment_id', paymentId)
-      .single()
+    const order = await findOrder()
 
     if (order && order.status !== 'CANCELED') {
       await fastify.supabase
         .from('orders')
-        .update({ status: 'CANCELED' })
+        .update({
+          status: 'CANCELED',
+          ...(order.asaas_payment_id ? {} : { asaas_payment_id: paymentId }),
+        })
         .eq('id', order.id)
 
       const { data: wallet } = await fastify.supabase
@@ -65,16 +93,20 @@ async function processMercadoPagoNotification(
 
   if (status === 'charged_back') {
     const disputedAt = new Date().toISOString()
-    const { data: order } = await fastify.supabase
-      .from('orders')
-      .update({ has_dispute: true, disputed_at: disputedAt })
-      .eq('asaas_payment_id', paymentId)
-      .select('id, reader_id, client_id, amount_total')
-      .single()
+    const order = await findOrder()
 
     if (!order) {
       return
     }
+
+    await fastify.supabase
+      .from('orders')
+      .update({
+        has_dispute: true,
+        disputed_at: disputedAt,
+        ...(order.asaas_payment_id ? {} : { asaas_payment_id: paymentId }),
+      })
+      .eq('id', order.id)
 
     try {
       await fastify.supabase.from('tickets').insert({

@@ -115,6 +115,53 @@ function getNotificationUrl(request: {
   return new URL('/webhooks/mercadopago?source_news=webhooks', derivedBaseUrl).toString()
 }
 
+function getAppBaseUrl(request: {
+  headers: Record<string, string | string[] | undefined>
+}) {
+  const normalizedEnvUrl = normalizePublicBaseUrl(process.env.APP_URL)
+  if (normalizedEnvUrl) {
+    return normalizedEnvUrl
+  }
+
+  const originHeader = request.headers.origin
+  const origin = Array.isArray(originHeader) ? originHeader[0] : originHeader
+  const normalizedOrigin = normalizePublicBaseUrl(origin)
+  if (normalizedOrigin) {
+    return normalizedOrigin
+  }
+
+  const refererHeader = request.headers.referer
+  const referer = Array.isArray(refererHeader) ? refererHeader[0] : refererHeader
+  if (!referer) {
+    return undefined
+  }
+
+  try {
+    const refererUrl = new URL(referer)
+    return normalizePublicBaseUrl(refererUrl.origin)
+  } catch {
+    return undefined
+  }
+}
+
+function getCheckoutProBackUrls(
+  request: {
+    headers: Record<string, string | string[] | undefined>
+  },
+  orderId: string
+) {
+  const appBaseUrl = getAppBaseUrl(request)
+  if (!appBaseUrl) {
+    return undefined
+  }
+
+  return {
+    success: new URL(`/checkout/success?order_id=${orderId}`, appBaseUrl).toString(),
+    pending: new URL(`/dashboard/pedido/${orderId}`, appBaseUrl).toString(),
+    failure: new URL(`/dashboard/pedido/${orderId}`, appBaseUrl).toString(),
+  }
+}
+
 function getCardRejectionMessage(statusDetail?: string) {
   const rejectionMap: Record<string, string> = {
     cc_rejected_insufficient_amount: 'Cartao sem limite suficiente.',
@@ -193,6 +240,43 @@ async function createPaymentWithNotificationFallback(params: {
     )
 
     return fastify.mp.createPayment({ body, requestOptions })
+  }
+}
+
+async function createPreferenceWithNotificationFallback(params: {
+  fastify: any
+  request: any
+  body: Record<string, unknown>
+  requestOptions?: Record<string, unknown>
+  notificationUrl?: string
+}) {
+  const { fastify, request, body, requestOptions, notificationUrl } = params
+
+  if (!notificationUrl) {
+    return fastify.mp.createPreference({ body, requestOptions })
+  }
+
+  try {
+    request.log.info({ notificationUrl }, '[checkout] MP CHECKOUT PRO notification URL resolvida')
+
+    return await fastify.mp.createPreference({
+      body: {
+        ...body,
+        notification_url: notificationUrl,
+      },
+      requestOptions,
+    })
+  } catch (error) {
+    if (!hasInvalidNotificationUrlError(error)) {
+      throw error
+    }
+
+    request.log.warn(
+      { notificationUrl },
+      '[checkout] MP CHECKOUT PRO recusou notification_url; reenviando preferencia sem notification_url'
+    )
+
+    return fastify.mp.createPreference({ body, requestOptions })
   }
 }
 
@@ -593,19 +677,10 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
           Boolean(sanitizedCardCvv) &&
           Boolean(sanitizedExpiryMonth) &&
           Boolean(sanitizedExpiryYear)
-
         const hasTokenizedCard = Boolean(card_token && payment_method_id && installments)
-
-        if (!hasTokenizedCard && !hasLegacyRawCard) {
-          await fastify.supabase
-            .from('orders')
-            .update({ status: 'CANCELED' })
-            .eq('id', order.id)
-
-          return reply.status(400).send({
-            error: 'Dados tokenizados do cartao sao obrigatorios para pagamento com cartao',
-          })
-        }
+        const { firstName, lastName } = buildPayerName(clientProfile.full_name)
+        const phone = buildPhone(clientProfile.cellphone)
+        const notificationUrl = getNotificationUrl(request)
 
         let finalCardToken = card_token
         let finalPaymentMethodId = payment_method_id
@@ -613,6 +688,105 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
         let finalInstallments = installments ?? 1
 
         try {
+          if (!hasTokenizedCard && !hasLegacyRawCard) {
+            const backUrls = getCheckoutProBackUrls(request, order.id)
+
+            if (!backUrls) {
+              throw Object.assign(
+                new Error('APP_URL nao configurada para redirecionar ao Checkout Pro do Mercado Pago'),
+                { statusCode: 500 }
+              )
+            }
+
+            const preference = await createPreferenceWithNotificationFallback({
+              fastify,
+              request,
+              notificationUrl,
+              requestOptions: {
+                idempotencyKey: randomUUID(),
+              },
+              body: {
+                items: [
+                  {
+                    id: gig_id,
+                    title: gig.title,
+                    description: gig.title,
+                    quantity: 1,
+                    currency_id: 'BRL',
+                    unit_price: toDecimal(totalAmount),
+                  },
+                ],
+                payer: {
+                  name: firstName,
+                  surname: lastName,
+                  email: clientEmail,
+                  identification: {
+                    type: 'CPF',
+                    number: clientProfile.tax_id.replace(/\D/g, ''),
+                  },
+                  ...(phone && { phone }),
+                },
+                back_urls: backUrls,
+                auto_return: 'approved',
+                payment_methods: {
+                  installments: 1,
+                  default_installments: 1,
+                  excluded_payment_types: [
+                    { id: 'ticket' },
+                    { id: 'bank_transfer' },
+                    { id: 'atm' },
+                    { id: 'debit_card' },
+                    { id: 'prepaid_card' },
+                  ],
+                },
+                external_reference: order.id,
+                statement_descriptor: 'ISIDIS',
+                additional_info: `Pedido ${order.id} - Cartao Checkout Pro`,
+              },
+            })
+
+            const checkoutUrl =
+              (process.env.NODE_ENV === 'production'
+                ? preference.init_point
+                : preference.sandbox_init_point ?? preference.init_point) ?? preference.init_point
+
+            if (!checkoutUrl || !preference.id) {
+              throw Object.assign(
+                new Error('Mercado Pago nao retornou a URL do Checkout Pro'),
+                { statusCode: 502 }
+              )
+            }
+
+            await fastify.supabase
+              .from('orders')
+              .update({
+                metadata: {
+                  ...orderMetadata,
+                  mercadopago: {
+                    checkout_mode: 'checkout_pro',
+                    preference_id: preference.id,
+                    back_urls: backUrls,
+                    payment_type: 'credit_card',
+                  },
+                },
+              })
+              .eq('id', order.id)
+
+            return reply.status(201).send({
+              data: {
+                order_id: order.id,
+                payment_method: 'CARD',
+                amount_total: totalAmount,
+                amount_service_total: serviceAmount,
+                amount_card_fee: cardFee,
+                card_fee_responsibility: 'READER',
+                preference_id: preference.id,
+                checkout_url: checkoutUrl,
+                status: 'PENDING',
+              },
+            })
+          }
+
           if (!hasTokenizedCard && hasLegacyRawCard) {
             if (!mpPublicKey || !mpAccessToken) {
               throw new Error('Configuracao do Mercado Pago incompleta para compatibilidade legada de cartao')
@@ -659,10 +833,7 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
             )
           }
 
-          const { firstName, lastName } = buildPayerName(clientProfile.full_name)
-          const phone = buildPhone(clientProfile.cellphone)
           const postalCode = card_holder_postal_code?.replace(/\D/g, '')
-          const notificationUrl = getNotificationUrl(request)
           const requestOptions = {
             ...(device_id && { meliSessionId: device_id }),
             idempotencyKey: randomUUID(),
