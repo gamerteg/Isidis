@@ -119,6 +119,13 @@ export interface CheckoutConfigResponse {
   gateway: 'mercadopago'
   public_key: string
   locale: 'pt-BR'
+  payer?: {
+    email?: string
+    identification?: {
+      type: 'CPF'
+      number: string
+    }
+  }
 }
 
 export interface CheckoutCreatePayload {

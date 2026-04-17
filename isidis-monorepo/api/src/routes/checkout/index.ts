@@ -316,12 +316,33 @@ async function resolveLegacyPaymentMethodId(params: {
 }
 
 const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get('/checkout/config', async (_request, reply) => {
+  fastify.get('/checkout/config', { preHandler: [(fastify as any).authenticate] }, async (request, reply) => {
+    const clientId = request.user.id
+
+    const { data: clientProfile } = await fastify.supabase
+      .from('profiles')
+      .select('tax_id')
+      .eq('id', clientId)
+      .single()
+
+    const { data: clientAuthData } = await fastify.supabase.auth.admin.getUserById(clientId)
+    const clientEmail = clientAuthData.user?.email ?? undefined
+    const taxId = clientProfile?.tax_id?.replace(/\D/g, '') || undefined
+
     return reply.send({
       data: {
         gateway: 'mercadopago',
         public_key: process.env.MERCADOPAGO_PUBLIC_KEY,
         locale: 'pt-BR',
+        payer: {
+          ...(clientEmail && { email: clientEmail }),
+          ...(taxId && {
+            identification: {
+              type: 'CPF',
+              number: taxId,
+            },
+          }),
+        },
       },
     })
   })

@@ -57,6 +57,13 @@ interface MercadoPagoBricksBuilder {
     settings: {
       initialization: {
         amount: number
+        payer?: {
+          email?: string
+          identification?: {
+            type: string
+            number: string
+          }
+        }
       }
       customization: {
         paymentMethods: {
@@ -89,6 +96,13 @@ interface MercadoPagoCardBrickProps {
   locale: string
   initialization: {
     amount: number
+    payer?: {
+      email?: string
+      identification?: {
+        type: string
+        number: string
+      }
+    }
   }
   customization: {
     paymentMethods: {
@@ -283,8 +297,18 @@ export function CheckoutForm({
     [selectedAddOns],
   )
   const brickInitialization = useMemo(
-    () => ({ amount: amountTotal }),
-    [amountTotal],
+    () => ({
+      amount: amountTotal,
+      ...(checkoutConfig?.payer && {
+        payer: {
+          ...(checkoutConfig.payer.email && { email: checkoutConfig.payer.email }),
+          ...(checkoutConfig.payer.identification && {
+            identification: checkoutConfig.payer.identification,
+          }),
+        },
+      }),
+    }),
+    [amountTotal, checkoutConfig],
   )
   const brickCustomization = useMemo(
     () => ({
