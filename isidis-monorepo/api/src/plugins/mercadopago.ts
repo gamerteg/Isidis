@@ -33,6 +33,7 @@ type MpClient = {
   createPreference: (params: MpCreatePreferenceParams) => Promise<any>
   getPayment: (paymentId: string | number, requestOptions?: MpRequestOptions) => Promise<any>
   refundPayment: (params: MpRefundPaymentParams) => Promise<any>
+  searchPayments: (options: { external_reference?: string; [key: string]: unknown }) => Promise<any>
 }
 
 function normalizeMpError(error: unknown): MpError {
@@ -119,6 +120,11 @@ const mpPlugin: FastifyPluginAsync = async (fastify) => {
           body: body as any,
           requestOptions: requestOptions as any,
         })
+      ),
+
+    searchPayments: (options) =>
+      runMercadoPagoCall(() =>
+        payments.search({ options: options as any })
       ),
   })
 }
