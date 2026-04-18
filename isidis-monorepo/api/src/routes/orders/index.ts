@@ -13,8 +13,7 @@ const orderDetailSelect = `
   selected_addons, delivery_content, reader_viewed_at,
   gigs(id, title, description, price, image_url, delivery_time_hours, delivery_method, requirements, add_ons),
   client:profiles!client_id(id, full_name, avatar_url, cellphone),
-  reader:profiles!reader_id(id, full_name, avatar_url, pix_key, pix_key_type),
-  subscriptions(id, status, readings_per_month, readings_done_this_period)
+  reader:profiles!reader_id(id, full_name, avatar_url, pix_key, pix_key_type)
 `
 
 const updateRequirementsSchema = z.object({
@@ -116,6 +115,37 @@ const ordersRoutes: FastifyPluginAsync = async (fastify) => {
           request.log.error(
             { orderId: id, err: reconcileErr?.message ?? reconcileErr },
             '[GET /orders/:id] Erro ao reconciliar pagamento pendente'
+          )
+        }
+      } else if (order.status === 'PENDING_PAYMENT' && (order as any).payment_method === 'CARD') {
+        // Checkout Pro card payments have no mercadopago_payment_id until webhook fires.
+        // Search by external_reference (order ID) to recover stuck orders.
+        try {
+          const searchResult = await fastify.mp.searchPayments({ external_reference: id })
+          const approvedPayment = ((searchResult?.results ?? []) as any[]).find((p) =>
+            ['approved', 'authorized'].includes(p.status)
+          )
+          if (approvedPayment) {
+            await processPaidMpOrder(fastify, String(approvedPayment.id), {
+              externalReference: id,
+              paymentMethodId: approvedPayment.payment_method_id,
+              paymentTypeId: approvedPayment.payment_type_id,
+            })
+
+            const refreshed = await fastify.supabase
+              .from('orders')
+              .select(orderDetailSelect)
+              .eq('id', id)
+              .single()
+
+            if (refreshed.data) {
+              order = refreshed.data as any
+            }
+          }
+        } catch (reconcileErr: any) {
+          request.log.error(
+            { orderId: id, err: reconcileErr?.message ?? reconcileErr },
+            '[GET /orders/:id] Erro ao reconciliar CARD sem payment_id'
           )
         }
       }
