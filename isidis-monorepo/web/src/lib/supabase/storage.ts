@@ -24,8 +24,8 @@ async function uploadReadingAsset(
     }
 
     const formData = new FormData()
-    formData.append('file', file)
     formData.append('type', type)
+    formData.append('file', file)
 
     const response = await fetch(
       `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/orders/${orderId}/delivery/upload`,
