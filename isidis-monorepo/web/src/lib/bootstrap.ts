@@ -41,5 +41,12 @@ export async function getPostAuthDestination(
     return getReaderDestination(userId)
   }
 
+  // user_metadata pode estar desatualizado; confirma pelo profiles como fonte de verdade
+  const supabase = createClient()
+  const { data } = await supabase.from('profiles').select('role').eq('id', userId).single()
+  if (data?.role === 'READER') {
+    return getReaderDestination(userId)
+  }
+
   return getClientDestination()
 }
