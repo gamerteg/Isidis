@@ -107,82 +107,87 @@ export default function WalletPage() {
             <CartomanteSidebar profile={profile} userId={user.id} />
 
             <main className="relative z-10 flex-1 h-screen overflow-y-auto scrollbar-hide pb-24 md:pb-8">
-                <MainHero
-                    className="pt-12 pb-12 px-4 md:px-8 mb-8"
-                    padding="none"
-                    maxWidth="full"
-                    title="Carteira e Saques"
-                    description="Gerencie seus ganhos e saques via PIX com transparência e segurança."
-                    withMockup={false}
-                >
-                    <div className="flex flex-col sm:flex-row items-center gap-3 mt-6">
-                        <div className="relative z-50">
-                            <NotificationsBell currentUserId={user.id} />
+                {/* Hero editorial */}
+                <section className="px-6 md:px-10 pt-10 pb-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div className="max-w-[1600px] mx-auto">
+                        <div className="flex items-start justify-between gap-6 flex-wrap">
+                            <div>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Bell className="w-4 h-4" style={{ color: '#f5c451' }} />
+                                    <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-muted-foreground">Tesouraria</span>
+                                </div>
+                                <h1 className="font-display text-[44px] md:text-[56px] leading-[0.95] tracking-[-0.02em] font-light">
+                                    Carteira e <em className="italic font-normal text-gradient-aurora">Saques</em>
+                                </h1>
+                                <p className="mt-3 text-muted-foreground">Gerencie seus ganhos e saques via PIX com transparência.</p>
+                            </div>
+                            <div className="flex items-center gap-3 pt-2">
+                                <NotificationsBell currentUserId={user.id} />
+                            </div>
                         </div>
                     </div>
-                </MainHero>
+                </section>
 
-                <PageContainer className="px-4 md:px-8 py-6 md:py-12">
+                <div className="px-6 md:px-10 py-6 max-w-[1600px] mx-auto w-full">
+                    {/* Balance cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-                        <div className="p-6 rounded-2xl border border-white/10 bg-card-item relative overflow-hidden group hover:border-indigo-500/20 transition-all">
-                            <div className="absolute -bottom-8 -right-8 w-28 h-28 rounded-full bg-indigo-500/5 group-hover:bg-indigo-500/10 transition-all" />
-                            <div className="flex items-center gap-2 mb-4">
-                                <div className="w-9 h-9 rounded-lg bg-slate-800 flex items-center justify-center">
-                                    <DollarSign className="w-4 h-4 text-slate-400" />
+                        {/* Aurora hero card */}
+                        <div className="aurora border-shine rounded-2xl p-6 relative overflow-hidden md:col-span-1 shadow-lg" style={{ boxShadow: '0 20px 60px -10px rgba(91,33,182,0.3)' }}>
+                            <div className="coin-orbit" />
+                            <div className="relative z-10">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center">
+                                        <ArrowDownToLine className="w-4 h-4 text-white" />
+                                    </div>
+                                    <span className="text-[10px] uppercase tracking-wider text-white/70 font-bold">Disponível</span>
                                 </div>
-                                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Total</span>
+                                <p className="text-xs text-white/60">Saldo para Saque</p>
+                                <p className="font-mono text-2xl font-semibold text-white mt-1">R$ {fmt(availableBalance)}</p>
+                                <WithdrawalModal
+                                    availableBalance={availableBalance}
+                                    pixKey={profile?.pix_key || null}
+                                    pixKeyType={profile?.pix_key_type || 'CPF'}
+                                >
+                                    <Button className="mt-4 bg-white/15 hover:bg-white/25 text-white font-bold text-xs rounded-xl gap-2 w-full h-9 backdrop-blur-sm border border-white/10">
+                                        <Sparkles className="w-3.5 h-3.5" />
+                                        Sacar via PIX
+                                    </Button>
+                                </WithdrawalModal>
                             </div>
-                            <p className="text-xs text-slate-500">Ganhos Totais</p>
-                            <p className="text-2xl font-black text-white mt-1">R$ {fmt(totalEarnings)}</p>
                         </div>
 
-                        <div className="p-6 rounded-2xl border border-amber-500/15 bg-card-item relative overflow-hidden group hover:border-amber-500/25 transition-all">
-                            <div className="absolute -bottom-8 -right-8 w-28 h-28 rounded-full bg-amber-500/5 group-hover:bg-amber-500/10 transition-all" />
+                        <div className="border-shine rounded-2xl p-6 relative overflow-hidden group transition-all" style={{ background: '#110d22' }}>
                             <div className="flex items-center gap-2 mb-4">
-                                <div className="w-9 h-9 rounded-lg bg-amber-900/30 flex items-center justify-center">
-                                    <Clock className="w-4 h-4 text-amber-400" />
+                                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'rgba(245,196,81,0.12)' }}>
+                                    <Clock className="w-4 h-4" style={{ color: '#f5c451' }} />
                                 </div>
-                                <span className="text-[10px] uppercase tracking-wider text-amber-500/70 font-bold">Processando</span>
+                                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Processando</span>
                             </div>
-                            <p className="text-xs text-slate-500">Saldo Pendente</p>
-                            <p className="text-2xl font-black text-white mt-1">R$ {fmt(pendingBalance)}</p>
+                            <p className="text-xs text-muted-foreground">Saldo Pendente</p>
+                            <p className="font-mono text-2xl font-semibold text-white mt-1">R$ {fmt(pendingBalance)}</p>
                             {pendingBalance > 0 && (
-                                <p className="text-[10px] text-slate-600 mt-2 flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-                                    Libera 48h após a entrega
-                                </p>
+                                <p className="text-[10px] text-muted-foreground mt-2">Libera 48h após a entrega</p>
                             )}
                         </div>
 
-                        <div className="p-6 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 relative overflow-hidden shadow-lg shadow-purple-900/20">
-                            <div className="absolute -bottom-8 -right-8 w-28 h-28 rounded-full bg-white/5" />
+                        <div className="border-shine rounded-2xl p-6 relative overflow-hidden group transition-all" style={{ background: '#110d22' }}>
                             <div className="flex items-center gap-2 mb-4">
-                                <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center">
-                                    <ArrowDownToLine className="w-4 h-4 text-white" />
+                                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: 'rgba(167,139,250,0.12)' }}>
+                                    <DollarSign className="w-4 h-4" style={{ color: 'var(--violet-bright)' }} />
                                 </div>
-                                <span className="text-[10px] uppercase tracking-wider text-indigo-200 font-bold">Saque</span>
+                                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Total</span>
                             </div>
-                            <p className="text-xs text-indigo-200">Disponível para Saque</p>
-                            <p className="text-2xl font-black text-white mt-1">R$ {fmt(availableBalance)}</p>
-                            <WithdrawalModal
-                                availableBalance={availableBalance}
-                                pixKey={profile?.pix_key || null}
-                                pixKeyType={profile?.pix_key_type || 'CPF'}
-                            >
-                                <Button className="mt-4 bg-white/15 hover:bg-white/25 text-white font-bold text-xs rounded-lg gap-2 w-full h-9 backdrop-blur-sm border border-white/10">
-                                    <Sparkles className="w-3.5 h-3.5" />
-                                    Sacar via PIX
-                                </Button>
-                            </WithdrawalModal>
+                            <p className="text-xs text-muted-foreground">Ganhos Totais (Vitalício)</p>
+                            <p className="font-mono text-2xl font-semibold text-gradient-violet mt-1">R$ {fmt(totalEarnings)}</p>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                         <div className="col-span-1 lg:col-span-3">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <FileText className="w-5 h-5 text-indigo-400" />
-                                    Extrato de Transações
+                                <h2 className="font-display text-2xl font-light flex items-center gap-2">
+                                    <FileText className="w-5 h-5" style={{ color: 'var(--violet-bright)' }} />
+                                    Extrato de <em className="italic font-normal text-gradient-aurora">Transações</em>
                                 </h2>
                                 <div className="flex items-center gap-1 bg-card-item border border-white/10 rounded-lg p-0.5 w-fit">
                                     <button className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md bg-indigo-500/15 text-indigo-300">Tudo</button>
@@ -191,7 +196,7 @@ export default function WalletPage() {
                                 </div>
                             </div>
 
-                            <div className="rounded-2xl border border-white/10 bg-card-item overflow-hidden">
+                            <div className="rounded-2xl border-shine overflow-hidden" style={{ background: '#110d22' }}>
                                 <div className="hidden sm:grid grid-cols-5 gap-4 px-6 py-3 border-b border-white/10 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                                     <span className="col-span-2">Data / Serviço / Cliente</span>
                                     <span>Bruto</span>
@@ -214,7 +219,7 @@ export default function WalletPage() {
                                             const net = detail?.amountNet || t.amount
 
                                             return (
-                                                <div key={t.id} className="grid grid-cols-1 sm:grid-cols-5 gap-2 sm:gap-4 px-4 sm:px-6 py-4 items-start sm:items-center hover:bg-white/5 transition-colors">
+                                                <div key={t.id} className="grid grid-cols-1 sm:grid-cols-5 gap-2 sm:gap-4 px-4 sm:px-6 py-4 items-start sm:items-center transition-colors shimmer-row card-row">
                                                     <div className="col-span-1 sm:col-span-2">
                                                         <div className="flex justify-between sm:block">
                                                             <p className="text-sm font-bold text-white truncate max-w-[200px] sm:max-w-none">
@@ -325,7 +330,7 @@ export default function WalletPage() {
                             </div>
                         </div>
                     </div>
-                </PageContainer>
+                </div>
             </main>
         </div>
     )

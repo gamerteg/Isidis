@@ -36,7 +36,7 @@ export default function AdminUsersPage() {
 
     return (
         <div className="space-y-6">
-            <h2 className="text-3xl font-bold tracking-tight">Gerenciar Usuários</h2>
+            <h2 className="font-display text-3xl font-semibold tracking-tight">Gerenciar Usuários</h2>
 
             <div className="rounded-md border bg-card">
                 <Table>

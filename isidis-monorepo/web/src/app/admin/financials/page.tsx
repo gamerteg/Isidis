@@ -83,7 +83,7 @@ export default function AdminFinancialsPage() {
     return (
         <div className="space-y-8 animate-fade-in-up">
             <div>
-                <h2 className="text-3xl font-bold tracking-tight">Financeiro</h2>
+                <h2 className="font-display text-3xl font-semibold tracking-tight">Financeiro</h2>
                 <p className="text-muted-foreground">VisÃ£o geral das receitas, taxas e repasses da plataforma.</p>
             </div>
 
@@ -96,7 +96,7 @@ export default function AdminFinancialsPage() {
                         <ShoppingCart className="h-4 w-4 text-violet-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-violet-400">{formatCurrency(data.totalRevenue)}</div>
+                        <div className="font-mono text-2xl font-bold text-violet-400">{formatCurrency(data.totalRevenue)}</div>
                         <p className="text-xs text-muted-foreground mt-1">
                             {data.recentOrders.length} pedido{data.recentOrders.length !== 1 ? 's' : ''} recentes considerados
                         </p>
@@ -110,7 +110,7 @@ export default function AdminFinancialsPage() {
                         <TrendingUp className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-green-400">{formatCurrency(data.platformFee)}</div>
+                        <div className="font-mono text-2xl font-bold text-green-400">{formatCurrency(data.platformFee)}</div>
                         <p className="text-xs text-muted-foreground mt-1">
                             {platformPercent}% da receita bruta â€” lucro da empresa
                         </p>
@@ -124,7 +124,7 @@ export default function AdminFinancialsPage() {
                         <Users className="h-4 w-4 text-amber-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-amber-400">{formatCurrency(data.totalRepasse)}</div>
+                        <div className="font-mono text-2xl font-bold text-amber-400">{formatCurrency(data.totalRepasse)}</div>
                         <p className="text-xs text-muted-foreground mt-1">
                             {repassePercent}% da receita bruta â€” total devido
                         </p>
@@ -141,7 +141,7 @@ export default function AdminFinancialsPage() {
                         <ArrowUpRight className="h-4 w-4 text-red-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-red-400">{formatCurrency(data.totalWithdrawn)}</div>
+                        <div className="font-mono text-2xl font-bold text-red-400">{formatCurrency(data.totalWithdrawn)}</div>
                         <p className="text-xs text-muted-foreground mt-1">Repassado via PIX para cartomantes</p>
                     </CardContent>
                 </Card>
@@ -153,7 +153,7 @@ export default function AdminFinancialsPage() {
                         <Clock className="h-4 w-4 text-blue-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-blue-400">{formatCurrency(data.pendingRepasse)}</div>
+                        <div className="font-mono text-2xl font-bold text-blue-400">{formatCurrency(data.pendingRepasse)}</div>
                         <p className="text-xs text-muted-foreground mt-1">Saldo disponÃ­vel nÃ£o sacado pelos cartomantes</p>
                     </CardContent>
                 </Card>

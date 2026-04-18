@@ -165,7 +165,7 @@ export function DashboardClient({
                     {/* Header */}
                     <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 relative z-50">
                         <div>
-                            <h1 className="text-2xl md:text-3xl font-bold text-white mb-1">Minhas Leituras Sagradas</h1>
+                            <h1 className="font-display text-[32px] md:text-[40px] leading-[0.95] tracking-[-0.02em] font-light mb-1">Minhas <em className="italic font-normal text-gradient-aurora">Leituras</em></h1>
                             <p className="text-xs md:text-sm text-slate-500">Acompanhe sua jornada espiritual e insights.</p>
                         </div>
                         <div className="flex items-center gap-3 bg-card/50 backdrop-blur-md p-1.5 pl-3 rounded-xl border border-white/5 shadow-lg w-full sm:w-auto justify-between sm:justify-start">
@@ -205,7 +205,7 @@ export function DashboardClient({
                     {filteredOrders.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-24 text-center">
                             <ShoppingBag className="h-16 w-16 text-slate-700 mb-6" />
-                            <h2 className="text-2xl font-bold text-white mb-2">
+                            <h2 className="font-display text-2xl font-light mb-2">
                                 {activeFilter === 'all' ? 'Nenhuma leitura ainda' : 'Nenhuma leitura nesta categoria'}
                             </h2>
                             <p className="text-slate-500 mb-6 max-w-md">

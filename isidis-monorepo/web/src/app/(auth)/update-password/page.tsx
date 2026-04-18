@@ -22,11 +22,11 @@ export default function UpdatePasswordPage() {
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 mb-4 animate-float">
                         <Sparkles className="w-8 h-8 text-primary" />
                     </div>
-                    <h1 className="text-3xl font-bold mb-2">Definir Nova Senha</h1>
+                    <h1 className="font-display text-3xl font-light mb-2">Definir Nova <em className="italic font-normal text-gradient-aurora">Senha</em></h1>
                     <p className="text-muted-foreground">Digite sua nova senha abaixo.</p>
                 </div>
 
-                <div className="glass-strong rounded-2xl p-8">
+                <div className="border-shine bg-card/40 backdrop-blur-xl rounded-2xl p-8">
                     <form action={formAction} className="space-y-5">
                         <div className="space-y-2">
                             <Label htmlFor="password" className="text-sm font-medium">Nova Senha</Label>
@@ -76,7 +76,7 @@ export default function UpdatePasswordPage() {
                             </div>
                         )}
 
-                        <Button type="submit" className="w-full py-6 text-base font-bold animate-glow-pulse">
+                        <Button type="submit" className="aurora border-shine w-full py-6 text-base font-bold text-white hover:opacity-90">
                             <Lock className="mr-2 w-4 h-4" />
                             Redefinir Senha
                         </Button>

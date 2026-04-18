@@ -69,39 +69,34 @@ export default function DashboardHome() {
             <RealtimeRefresher userId={user.id} />
 
             <main className="relative z-10 flex-1 h-screen overflow-y-auto scrollbar-hide pb-24 md:pb-8">
-                {/* 1. Header Hero (Full Width) */}
-                <PageSection padding="xl" withShootingStars={true} className="mb-0 border-b border-white/5">
-                    <PageContainer>
-                        <PageHeader
-                            title={
-                                <>
-                                    Olá, {firstName}. <br />
-                                    <span className="italic font-serif text-slate-300 text-2xl md:text-3xl lg:text-4xl">
-                                        O que as cartas<br className="hidden sm:block" /> têm para você hoje?
-                                    </span>
-                                </>
-                            }
-                            titleClassName="text-3xl md:text-5xl lg:text-6xl leading-[1.1]"
-                            description="Sintonize sua energia e escolha o caminho para a sua próxima descoberta emocional."
-                            className="pt-4 md:pt-8"
-                            align="center"
-                        />
-                    </PageContainer>
-                </PageSection>
+                {/* Hero editorial */}
+                <section className="px-6 md:px-10 pt-10 pb-8" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div className="max-w-[1600px] mx-auto text-center">
+                        <div className="flex justify-center mb-3">
+                            <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-muted-foreground">Portal Espiritual</span>
+                        </div>
+                        <h1 className="font-display text-[44px] md:text-[60px] leading-[0.95] tracking-[-0.02em] font-light">
+                            Olá, {firstName}. <em className="italic font-normal text-gradient-aurora">O que as cartas têm para você hoje?</em>
+                        </h1>
+                        <p className="mt-4 text-muted-foreground max-w-xl mx-auto">Sintonize sua energia e escolha o caminho para a sua próxima descoberta.</p>
+                    </div>
+                </section>
 
-                <PageContainer className="px-3 md:px-8 py-6 md:py-12">
+                <div className="px-4 md:px-10 py-6 md:py-10 max-w-[1600px] mx-auto w-full">
 
                     {/* 2. Necessidade Imediata */}
-                    <PageSection padding="none" className="mb-16">
+                    <div className="mb-16">
                         <PageHeader
                             badge="Direcionamento"
-                            title="Necessidade Imediata"
+                            badgeIcon={<span>✦</span>}
+                            title="Necessidade"
+                            subtitle="Imediata"
                             className="mb-8"
                         />
 
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
                             {categoryCounts.map((item, i) => (
-                                <Link to={`/cartomantes?category=${encodeURIComponent(item.slug)}`} key={i} className="group relative h-[280px] md:h-[380px] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden border border-white/5 bg-card-deep hover:border-purple-500/30 transition-all hover:-translate-y-1">
+                                <Link to={`/cartomantes?category=${encodeURIComponent(item.slug)}`} key={i} className="group relative h-[280px] md:h-[380px] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden border-shine bg-card-deep transition-all hover:-translate-y-1">
                                     <img
                                         src={item.image}
                                         alt={item.category}
@@ -109,41 +104,45 @@ export default function DashboardHome() {
                                     />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
                                     <div className="absolute bottom-0 left-0 p-4 md:p-8">
-                                        <h3 className="text-lg md:text-2xl font-serif text-white leading-tight mb-1">{item.category}</h3>
+                                        <h3 className="text-lg md:text-2xl font-display text-white leading-tight mb-1">{item.category}</h3>
                                         <p className="text-[9px] md:text-[11px] text-purple-300 font-bold tracking-wider uppercase">{item.count} Profissionais</p>
                                     </div>
                                 </Link>
                             ))}
                         </div>
-                    </PageSection>
+                    </div>
 
                     {/* 3. Cartomantes Online */}
-                    <PageSection padding="none" className="mb-16">
+                    <div className="mb-16">
                         <div className="flex items-end justify-between mb-8">
                             <PageHeader
                                 badge="Live"
-                                title="Online Agora"
+                                badgeIcon={<span style={{ color: '#4ade80' }}>●</span>}
+                                title="Online"
+                                subtitle="Agora"
                                 className="mb-0"
                             />
-                            <Link to="/cartomantes" className="text-purple-400 text-xs md:text-sm font-bold flex items-center hover:text-purple-300">
+                            <Link to="/cartomantes" className="text-sm font-bold flex items-center hover:underline" style={{ color: 'var(--violet-bright)' }}>
                                 Ver todas <ArrowRight className="ml-1 w-4 h-4" />
                             </Link>
                         </div>
 
                         <OnlineReaders />
-                    </PageSection>
+                    </div>
 
                     {/* 5. Recomendados */}
-                    <PageSection padding="none" className="mb-16">
+                    <div className="mb-16">
                         <PageHeader
                             badge="Curadoria"
-                            title="Recomendados"
+                            badgeIcon={<span>✦</span>}
+                            title="Serviços"
+                            subtitle="Recomendados"
                             className="mb-8"
                         />
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                             {recommendedGigs && recommendedGigs.map((gig, i) => (
-                                <Link to={`/servico/${gig.id}`} key={gig.id} className="bg-card-item border border-white/5 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden group hover:border-purple-500/30 transition-all flex flex-col">
+                                <Link to={`/servico/${gig.id}`} key={gig.id} className="border-shine rounded-[1.5rem] md:rounded-[2rem] overflow-hidden group transition-all flex flex-col hover:-translate-y-1" style={{ background: '#110d22' }}>
                                     <div className="h-40 md:h-48 relative overflow-hidden">
                                         <img
                                             src={gig.image_url || 'https://images.unsplash.com/photo-1630325458098-4fc173335e21?q=80&w=800'}
@@ -157,7 +156,7 @@ export default function DashboardHome() {
                                         </div>
                                     </div>
                                     <div className="p-5 md:p-6 flex flex-col flex-1">
-                                        <h3 className="text-lg md:text-xl font-serif text-white mb-2 leading-tight group-hover:text-purple-400 transition-colors">{gig.title}</h3>
+                                        <h3 className="text-lg md:text-xl font-display text-white mb-2 leading-tight group-hover:text-purple-400 transition-colors">{gig.title}</h3>
                                         <p className="text-xs md:text-sm text-slate-400 line-clamp-2 mb-6 flex-1">{gig.description || 'Uma leitura profunda para iluminar seus caminhos.'}</p>
 
                                         <div className="flex items-center justify-between pt-4 border-t border-white/5">
@@ -171,14 +170,14 @@ export default function DashboardHome() {
                                                 </div>
                                                 <span className="text-[10px] md:text-xs text-slate-300">{gig.owner?.full_name}</span>
                                             </div>
-                                            <span className="text-base md:text-lg font-serif text-white">R$ {gig.price / 100}</span>
+                                            <span className="text-base md:text-lg font-display text-white">R$ {gig.price / 100}</span>
                                         </div>
                                     </div>
                                 </Link>
                             ))}
                         </div>
-                    </PageSection>
-                </PageContainer>
+                    </div>
+                </div>
 
                 {/* Footer Space for Scroll */}
                 <div className="h-24 md:h-12" />

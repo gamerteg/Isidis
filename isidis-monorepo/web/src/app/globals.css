@@ -76,6 +76,13 @@
     --shadow-glow: 0 0 40px -10px hsl(262 83% 65% / 0.35);
     --shadow-glow-gold: 0 0 40px -10px hsl(43 96% 56% / 0.3);
     --shadow-glow-sm: 0 0 20px -8px hsl(262 83% 65% / 0.25);
+
+    /* Brand tokens (literal hex for use outside Tailwind) */
+    --violet-bright: #a78bfa;
+    --gold-bright: #f5c451;
+    --text-1: #f4f1ff;
+    --text-2: #c8c0e0;
+    --text-3: #8b83a8;
   }
 }
 
@@ -621,4 +628,139 @@
     perspective: none !important;
     transform: none !important;
   }
+}
+/* ========================================
+   DESIGN SYSTEM v2 — UTILITIES
+   ======================================== */
+
+/* Border Shine — gradient border via pseudo-element */
+.border-shine {
+  position: relative;
+  background-clip: padding-box;
+  border: 1px solid transparent;
+}
+.border-shine::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(167,139,250,0.3), rgba(255,255,255,0.04) 40%, rgba(245,196,81,0.2));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Aurora — deep gradient card background */
+.aurora {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(167,139,250,0.35), transparent 50%),
+    radial-gradient(circle at 80% 100%, rgba(245,196,81,0.25), transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(244,114,182,0.15), transparent 60%),
+    linear-gradient(135deg, #2a1b5e 0%, #1a0e3d 100%);
+}
+
+/* Gradient text variants */
+.text-gradient-violet {
+  background: linear-gradient(135deg, #a78bfa 0%, #f5c451 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.text-gradient-aurora {
+  background: linear-gradient(120deg, #a78bfa 0%, #f472b6 45%, #f5c451 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Tab active — gradient underline */
+.tab-active {
+  position: relative;
+}
+.tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #a78bfa, #f5c451);
+  border-radius: 2px;
+}
+
+/* Shimmer row — sweep animation */
+.shimmer-row {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer-row::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.06) 50%, transparent 60%);
+  animation: shimmer-sweep 3s linear infinite;
+  pointer-events: none;
+}
+@keyframes shimmer-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Coin orbit — decorative spinning ring */
+.coin-orbit {
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  top: -50%;
+  left: -50%;
+  border-radius: 50%;
+  border: 1px dashed rgba(245,196,81,0.2);
+  animation: coin-spin 40s linear infinite;
+  pointer-events: none;
+}
+@keyframes coin-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Card Tarot Mini — deep purple gradient thumbnail */
+.card-tarot-mini {
+  background: linear-gradient(135deg, #1a0e3d 0%, #2a1b5e 100%);
+  box-shadow: inset 0 0 20px rgba(167,139,250,0.15), 0 4px 12px rgba(0,0,0,0.4);
+  position: relative;
+  overflow: hidden;
+}
+.card-tarot-mini::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: inherit;
+  border: 1px solid rgba(245,196,81,0.2);
+  pointer-events: none;
+}
+
+/* Card row — subtle hover slide */
+.card-row {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.card-row:hover {
+  background: rgba(255,255,255,0.025);
+  transform: translateX(2px);
+}
+
+/* Urgent bar — red left border for urgent orders */
+.urgent-bar {
+  background: linear-gradient(90deg, rgba(248,113,113,0.12), transparent 80%);
+  border-left: 2px solid #f87171;
+}
+
+/* Sparkle animation utility */
+.sparkle-anim {
+  animation: sparkle-pulse 3s ease-in-out infinite;
+}
+@keyframes sparkle-pulse {
+  0%, 100% { opacity: 0; transform: scale(0.5) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(180deg); }
 }

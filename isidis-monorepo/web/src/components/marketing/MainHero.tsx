@@ -64,7 +64,7 @@ export function MainHero({
                         {(primaryButton || secondaryButton || children) && (
                             <div className="flex flex-col sm:flex-row gap-4 mb-10">
                                 {primaryButton && (
-                                    <Button size="lg" className="h-14 px-8 text-base font-bold rounded-2xl animate-glow-pulse" asChild>
+                                    <Button size="lg" className="aurora border-shine h-14 px-8 text-base font-bold rounded-2xl text-white hover:opacity-90" asChild>
                                         <Link to={primaryButton.href}>{primaryButton.text}</Link>
                                     </Button>
                                 )}

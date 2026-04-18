@@ -8,7 +8,7 @@ export default function LoadingDashboardFallback() {
             <PageSection padding="xl" className="w-full h-full flex flex-col items-center justify-center">
                 <PageContainer className="flex flex-col items-center justify-center space-y-4">
                     <Loader2 className="w-12 h-12 animate-spin text-purple-500" />
-                    <h2 className="text-xl font-serif text-white/80 animate-pulse">
+                    <h2 className="text-xl font-display text-white/80 animate-pulse">
                         Carregando...
                     </h2>
                 </PageContainer>

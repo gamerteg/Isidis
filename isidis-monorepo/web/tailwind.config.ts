@@ -20,8 +20,9 @@ const config = {
         extend: {
             fontFamily: {
                 sans: ["Manrope", "sans-serif"],
-                serif: ["Playfair Display", "serif"],
-                display: ["Playfair Display", "serif"],
+                serif: ["Fraunces", "serif"],
+                display: ["Fraunces", "serif"],
+                mono: ["JetBrains Mono", "monospace"],
             },
             colors: {
                 border: "hsl(var(--border))",
@@ -109,6 +110,18 @@ const config = {
                     "50%": { backgroundPosition: "100% 50%" },
                     "100%": { backgroundPosition: "0% 50%" },
                 },
+                "sparkle": {
+                    "0%, 100%": { opacity: "0", transform: "scale(0.5) rotate(0deg)" },
+                    "50%": { opacity: "1", transform: "scale(1) rotate(180deg)" },
+                },
+                "spin-slow": {
+                    from: { transform: "rotate(0deg)" },
+                    to: { transform: "rotate(360deg)" },
+                },
+                "shimmer-move": {
+                    "0%": { transform: "translateX(-100%)" },
+                    "100%": { transform: "translateX(100%)" },
+                },
             },
             animation: {
                 "accordion-down": "accordion-down 0.2s ease-out",
@@ -120,6 +133,9 @@ const config = {
                 "float-slow": "float 8s ease-in-out infinite",
                 "glow-pulse": "glow-pulse 2s ease-in-out infinite",
                 "gradient-shift": "gradient-shift 4s ease infinite",
+                "sparkle": "sparkle 3s ease-in-out infinite",
+                "spin-slow": "spin-slow 40s linear infinite",
+                "shimmer-move": "shimmer-move 3s linear infinite",
             },
         },
     },

@@ -30,7 +30,7 @@ export default function PerfilPage() {
 
             <div className="max-w-5xl mx-auto relative z-10">
                 <div className="mb-10 animate-fade-in text-center sm:text-left">
-                    <h1 className="text-3xl sm:text-4xl font-black mb-3 tracking-tight">Meu Perfil</h1>
+                    <h1 className="font-display text-[40px] leading-[0.95] tracking-[-0.02em] font-light mb-3">Meu <em className="italic font-normal text-gradient-aurora">Perfil</em></h1>
                     <p className="text-muted-foreground max-w-2xl text-sm sm:text-base leading-relaxed">
                         Gerencie suas informações pessoais e aparência pública no Isidis.
                     </p>

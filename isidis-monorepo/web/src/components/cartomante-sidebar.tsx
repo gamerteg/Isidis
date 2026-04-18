@@ -40,12 +40,12 @@ export function CartomanteSidebar({ profile, userId }: CartomanteSidebarProps) {
     const currentUserId = userId || profile?.id
 
     return (
-        <aside className="hidden md:flex w-56 shrink-0 border-r border-border/40 bg-card/30 backdrop-blur-xl flex-col h-screen sticky top-0">
+        <aside className="hidden md:flex w-56 shrink-0 flex-col h-screen sticky top-0" style={{ background: 'rgba(10,8,22,0.92)', backdropFilter: 'blur(20px)', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
             {/* Logo */}
-            <div className="px-5 py-5 border-b border-white/5">
-                <Link to="/" className="flex items-center gap-2">
-                    <img src="/logo.png" alt="Isidis Logo" width={32} height={32} className="w-8 h-8 object-contain" />
-                    <span className="font-bold text-primary">Isidis</span>
+            <div className="px-5 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <Link to="/" className="flex items-center gap-2.5 group">
+                    <img src="/logo.png" alt="Isidis Logo" width={32} height={32} className="w-8 h-8 object-contain transition-transform duration-300 group-hover:scale-110" />
+                    <span className="font-display font-light text-lg text-gradient-violet">Isidis</span>
                 </Link>
             </div>
 
@@ -58,9 +58,10 @@ export function CartomanteSidebar({ profile, userId }: CartomanteSidebarProps) {
                             key={item.label}
                             to={item.href}
                             className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
-                                ? 'bg-primary/15 text-primary border border-primary/20 shadow-lg shadow-primary/5'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                                ? 'border-shine bg-[#1a1433] shadow-lg'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent'
                                 }`}
+                            style={isActive ? { color: 'var(--violet-bright)' } : {}}
                         >
                             <item.icon className={`w-4 h-4 ${isActive ? 'text-primary' : ''}`} />
                             {item.label}
@@ -76,10 +77,9 @@ export function CartomanteSidebar({ profile, userId }: CartomanteSidebarProps) {
             <div className="p-3 border-t border-white/5">
                 <div className="flex items-center gap-3 px-3 py-2.5">
                     {profile?.avatar_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={profile.avatar_url} alt="" width={36} height={36} className="w-9 h-9 rounded-full object-cover border border-primary/20" />
+                        <img src={profile.avatar_url} alt="" width={36} height={36} className="w-9 h-9 rounded-full object-cover" style={{ border: '1px solid var(--violet-bright)', boxShadow: '0 0 12px rgba(167,139,250,0.25)' }} />
                     ) : (
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-purple-900 flex items-center justify-center text-white font-bold text-xs border border-primary/20">
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs" style={{ background: 'linear-gradient(135deg, #a78bfa, #5b21b6)', border: '1px solid rgba(167,139,250,0.4)', boxShadow: '0 0 12px rgba(167,139,250,0.25)' }}>
                             {firstName.substring(0, 2).toUpperCase()}
                         </div>
                     )}

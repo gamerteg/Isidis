@@ -42,7 +42,7 @@ export default function Home() {
         badgeIcon={<img src="/logo.png" alt="" width={16} height={16} className="w-4 h-4 object-contain" />}
         title={
           <>
-            Encontre clareza para sua <span className="text-gradient-primary">jornada espiritual</span>
+            Encontre clareza para sua <em className="italic font-normal text-gradient-aurora">jornada espiritual</em>
           </>
         }
         description="Conecte-se com as melhores cartomantes do país em uma experiência única. Receba leituras profundas com áudio, vídeo e fotos das cartas, tudo em um só lugar."
@@ -66,7 +66,7 @@ export default function Home() {
               <div key={stat.label} className="group cursor-default">
                 <div className="flex items-center gap-3 mb-1 justify-center">
                   {stat.icon && <stat.icon className={cn("w-6 h-6 text-primary", stat.fill && "fill-primary")} />}
-                  <p className="text-3xl md:text-4xl font-black text-gradient-primary tracking-tighter">
+                  <p className="text-3xl md:text-4xl font-mono font-bold text-gradient-aurora tracking-tighter">
                     {stat.value}
                   </p>
                 </div>
@@ -294,14 +294,14 @@ export default function Home() {
               align="center"
               title={
                 <>
-                  Pronto para ver o que as <span className="text-gradient-primary">cartas revelam?</span>
+                  Pronto para ver o que as <em className="italic font-normal text-gradient-aurora">cartas revelam?</em>
                 </>
               }
               description="Junte-se a milhares de pessoas que usam o Isidis para guiar suas decisões e encontrar paz interior."
             />
 
             <div className="flex flex-col sm:flex-row gap-6 justify-center mt-10">
-              <Button size="lg" className="h-16 px-12 text-lg font-bold animate-glow-pulse rounded-2xl shadow-2xl shadow-primary/40" asChild>
+              <Button size="lg" className="aurora border-shine h-16 px-12 text-lg font-bold rounded-2xl text-white hover:opacity-90" asChild>
                 <Link to="/register">
                   Começar minha Jornada
                 </Link>

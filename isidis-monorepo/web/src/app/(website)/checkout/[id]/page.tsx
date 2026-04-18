@@ -122,7 +122,7 @@ export default function CheckoutPage() {
         </section>
 
         <aside className="order-2 lg:sticky lg:top-8">
-          <div className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-white/5 p-5 shadow-[0_30px_100px_rgba(8,6,24,0.28)] backdrop-blur-xl md:p-6">
+          <div className="border-shine overflow-hidden rounded-[1.75rem] bg-[#110d22]/80 p-5 shadow-[0_30px_100px_rgba(8,6,24,0.28)] backdrop-blur-xl md:p-6">
             <div className="flex items-start gap-4">
               {gig.image_url ? (
                 <img
@@ -199,7 +199,7 @@ export default function CheckoutPage() {
 
                 <div className="flex items-center justify-between border-t border-white/10 pt-3 text-base font-semibold text-white">
                   <span>Total</span>
-                  <span>{formatCurrencyFromReais(orderTotal)}</span>
+                  <span className="font-mono text-gradient-violet">{formatCurrencyFromReais(orderTotal)}</span>
                 </div>
               </div>
             </div>

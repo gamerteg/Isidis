@@ -142,39 +142,33 @@ export default function CartomanteDashboard() {
             <RealtimeRefresher userId={user.id} />
 
             <main className="relative z-10 flex-1 h-screen overflow-y-auto scrollbar-hide pb-24 md:pb-8">
-                <PageSection padding="xl" withShootingStars={true} className="mb-0 border-b border-white/5">
-                    <PageContainer>
-                        <div className="flex flex-col items-center text-center">
-                            <PageHeader
-                                title={
-                                    <>
-                                        Bem-vinda de volta, <br />
-                                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-amber-400">
-                                            {firstName}
-                                        </span>
-                                    </>
-                                }
-                                description={`Você tem ${paidOrders.length} pedido${paidOrders.length !== 1 ? 's' : ''} aguardando sua intuição.`}
-                                className="mb-4"
-                                align="center"
-                            />
-
-                            <div className="mb-8 relative z-50">
-                                <CopyLinkButton url={`/cartomante/${user.id}`} text="Copiar Link do Perfil" variant="outline" className="border-indigo-500/30 hover:border-indigo-500/50 hover:bg-indigo-500/10 text-indigo-300 rounded-full bg-white/5 backdrop-blur-md" />
-                            </div>
-
-                            <div className="flex items-center gap-3 relative z-50">
-                                <NotificationsBell currentUserId={user.id} />
-                                <div className="px-4 py-2 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md shadow-lg flex flex-col items-center min-w-[100px]">
-                                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Pedidos Totais</span>
-                                    <span className="text-xl font-bold text-white">{allOrders.length}</span>
+                {/* Hero editorial */}
+                <section className="px-6 md:px-10 pt-10 pb-8 relative" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div className="max-w-[1600px] mx-auto">
+                        <div className="flex items-start justify-between gap-6 flex-wrap">
+                            <div>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Sparkles className="w-4 h-4" style={{ color: 'var(--violet-bright)' }} />
+                                    <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-muted-foreground">Portal Profissional</span>
                                 </div>
+                                <h1 className="font-display text-[44px] md:text-[56px] leading-[0.95] tracking-[-0.02em] font-light">
+                                    Bem-vinda, <em className="italic font-normal text-gradient-aurora">{firstName}</em>
+                                </h1>
+                                <p className="mt-3 text-muted-foreground">
+                                    {paidOrders.length > 0
+                                        ? `${paidOrders.length} pedido${paidOrders.length !== 1 ? 's' : ''} aguardando sua intuição.`
+                                        : 'Tudo em ordem por agora.'}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-3 pt-2">
+                                <NotificationsBell currentUserId={user.id} />
+                                <CopyLinkButton url={`/cartomante/${user.id}`} text="Copiar Link" variant="outline" className="border-white/10 hover:border-white/20 hover:bg-white/5 text-muted-foreground rounded-xl bg-white/5 text-sm" />
                             </div>
                         </div>
-                    </PageContainer>
-                </PageSection>
+                    </div>
+                </section>
 
-                <PageContainer className="px-4 md:px-8 py-6 md:py-12">
+                <div className="px-6 md:px-10 py-6 md:py-10 max-w-[1600px] mx-auto w-full">
                     {(profile?.verification_status !== 'APPROVED' || !activeGigsCount) && (
                         <div className="mb-8 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 flex items-start gap-4 backdrop-blur-sm">
                             <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
@@ -192,66 +186,67 @@ export default function CartomanteDashboard() {
                         </div>
                     )}
 
-                    <PageSection padding="none" className="mb-12">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                            <div className="p-6 rounded-[2rem] border border-white/5 bg-card-deep/50 backdrop-blur-md relative overflow-hidden group hover:bg-card-deep/80 transition-colors">
-                                <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-indigo-500/10 group-hover:bg-indigo-500/20 transition-colors" />
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center">
-                                        <Clock className="w-5 h-5 text-indigo-400" />
+                    {/* Stats row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+                        {/* Aurora wallet card */}
+                        <div className="aurora border-shine rounded-[2rem] p-6 relative overflow-hidden lg:col-span-2 shadow-lg" style={{ boxShadow: '0 20px 60px -10px rgba(91,33,182,0.3)' }}>
+                            <div className="coin-orbit" />
+                            <div className="relative z-10">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur-sm">
+                                        <Wallet className="w-5 h-5 text-white" />
                                     </div>
-                                    <span className="text-xs uppercase tracking-wider text-slate-400 font-bold">A liberar</span>
+                                    <span className="text-xs uppercase tracking-wider text-white/70 font-bold">Disponível para Saque</span>
                                 </div>
-                                <p className="text-xs text-slate-500 mb-1">Saldo Pendente</p>
-                                <p className="text-2xl font-black text-white">R$ {(pendingBalance / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                            </div>
-
-                            <div className="p-6 rounded-[2rem] bg-gradient-to-br from-indigo-600 to-purple-800 relative overflow-hidden group shadow-lg shadow-indigo-900/20">
-                                <div className="absolute -bottom-6 -right-6 w-32 h-32 rounded-full bg-white/10 blur-2xl" />
-                                <div className="relative z-10">
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                                            <Wallet className="w-5 h-5 text-white" />
-                                        </div>
-                                        <span className="text-xs uppercase tracking-wider text-indigo-100 font-bold">Disponível</span>
-                                    </div>
-                                    <p className="text-xs text-indigo-200/80 mb-1">Saldo para Saque</p>
-                                    <p className="text-2xl font-black text-white mb-4">R$ {(availableBalance / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                                    <WithdrawalModal
-                                        availableBalance={availableBalance}
-                                        pixKey={profile?.pix_key || null}
-                                        pixKeyType={profile?.pix_key_type || 'CPF'}
-                                    >
-                                        <Button className="w-full bg-white/20 hover:bg-white/30 text-white font-bold text-xs rounded-xl h-10 backdrop-blur-md shadow-none border border-white/10">
-                                            <Sparkles className="w-4 h-4 mr-2" />
-                                            Sacar via PIX
-                                        </Button>
-                                    </WithdrawalModal>
-                                </div>
-                            </div>
-
-                            <div className="p-6 rounded-[2rem] border border-white/5 bg-card-deep/50 backdrop-blur-md flex flex-col items-center justify-center text-center hover:bg-card-deep/80 transition-colors relative overflow-hidden">
-                                <Star className="w-8 h-8 text-amber-400 fill-amber-400 mb-2 drop-shadow-lg" />
-                                <p className="text-3xl font-black text-white">{avgRating}</p>
-                                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mt-1">Avaliação Média</p>
-                            </div>
-
-                            <div className="p-6 rounded-[2rem] border border-white/5 bg-card-deep/50 backdrop-blur-md flex flex-col items-center justify-center text-center hover:bg-card-deep/80 transition-colors relative overflow-hidden">
-                                <CheckCircle2 className="w-8 h-8 text-green-400 mb-2 drop-shadow-lg" />
-                                <p className="text-3xl font-black text-white">{deliveryRate}%</p>
-                                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mt-1">Taxa de Entrega</p>
+                                <p className="font-mono text-3xl font-semibold text-white mb-1">
+                                    R$ {(availableBalance / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </p>
+                                <p className="text-xs text-white/50 mb-4">A liberar: <span className="font-mono text-white/70">R$ {(pendingBalance / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
+                                <WithdrawalModal
+                                    availableBalance={availableBalance}
+                                    pixKey={profile?.pix_key || null}
+                                    pixKeyType={profile?.pix_key_type || 'CPF'}
+                                >
+                                    <Button className="bg-white/20 hover:bg-white/30 text-white font-bold text-xs rounded-xl h-9 px-5 backdrop-blur-md shadow-none border border-white/10">
+                                        <Sparkles className="w-3.5 h-3.5 mr-2" />
+                                        Sacar via PIX
+                                    </Button>
+                                </WithdrawalModal>
                             </div>
                         </div>
-                    </PageSection>
 
-                    <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 mb-12">
+                        {/* Total earnings */}
+                        <div className="border-shine rounded-[2rem] p-6 relative overflow-hidden hover:bg-white/3 transition-colors" style={{ background: '#110d22' }}>
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(245,196,81,0.15)' }}>
+                                    <Star className="w-5 h-5 fill-amber-400" style={{ color: '#f5c451' }} />
+                                </div>
+                                <span className="text-xs uppercase tracking-wider text-muted-foreground font-bold">Avaliação</span>
+                            </div>
+                            <p className="font-mono text-3xl font-semibold text-white">{avgRating}</p>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mt-1">Média geral</p>
+                        </div>
+
+                        <div className="border-shine rounded-[2rem] p-6 relative overflow-hidden hover:bg-white/3 transition-colors" style={{ background: '#110d22' }}>
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(74,222,128,0.12)' }}>
+                                    <CheckCircle2 className="w-5 h-5 text-green-400" />
+                                </div>
+                                <span className="text-xs uppercase tracking-wider text-muted-foreground font-bold">Entregas</span>
+                            </div>
+                            <p className="font-mono text-3xl font-semibold text-white">{deliveryRate}%</p>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mt-1">Taxa de entrega</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 mb-12 w-full">
                         <div className="xl:col-span-3 space-y-6">
                             <div className="flex items-center justify-between">
-                                <h2 className="text-xl font-serif text-white flex items-center gap-2">
-                                    <Package className="w-5 h-5 text-indigo-400" />
-                                    Pedidos para Entregar
+                                <h2 className="font-display text-2xl font-light flex items-center gap-2">
+                                    <Package className="w-5 h-5" style={{ color: 'var(--violet-bright)' }} />
+                                    Pedidos para <em className="italic font-normal text-gradient-aurora ml-1">Entregar</em>
                                 </h2>
-                                <Link to="/dashboard/cartomante/pedidos" className="text-sm text-indigo-400 hover:text-indigo-300 font-bold hover:underline">
+                                <Link to="/dashboard/cartomante/pedidos" className="text-sm font-bold hover:underline" style={{ color: 'var(--violet-bright)' }}>
                                     Ver todos
                                 </Link>
                             </div>
@@ -273,15 +268,13 @@ export default function CartomanteDashboard() {
                                         const isUrgent = hoursAgo >= 20
 
                                         return (
-                                            <div key={order.id} className="p-5 rounded-[1.5rem] border border-white/5 bg-card-item hover:border-indigo-500/30 transition-all shadow-lg hover:shadow-indigo-500/10 group">
+                                            <div key={order.id} className={`p-5 rounded-[1.5rem] border-shine transition-all shadow-lg group card-row ${isUrgent ? 'urgent-bar' : ''}`} style={{ background: '#110d22' }}>
                                                 <div className="flex flex-col sm:flex-row items-start gap-5">
-                                                    <div className="w-full sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-black/40 shrink-0 border border-white/5 relative aspect-video sm:aspect-square">
+                                                    <div className="w-full sm:w-20 sm:h-20 rounded-2xl overflow-hidden card-tarot-mini shrink-0 relative aspect-video sm:aspect-square flex items-center justify-center">
                                                         {gig?.image_url ? (
-                                                            <img src={gig.image_url} alt="" className="w-full h-full object-cover" />
+                                                            <img src={gig.image_url} alt="" className="w-full h-full object-cover relative z-10" />
                                                         ) : (
-                                                            <div className="w-full h-full flex items-center justify-center">
-                                                                <Mic className="w-6 h-6 text-indigo-400/50" />
-                                                            </div>
+                                                            <Mic className="w-6 h-6 relative z-10" style={{ color: 'var(--violet-bright)', opacity: 0.6 }} />
                                                         )}
                                                     </div>
 
@@ -323,12 +316,12 @@ export default function CartomanteDashboard() {
                         </div>
 
                         <div className="xl:col-span-2 space-y-6">
-                            <h2 className="text-xl font-serif text-white flex items-center gap-2">
-                                <Sparkles className="w-5 h-5 text-amber-400" />
-                                Atividade Recente
+                            <h2 className="font-display text-2xl font-light flex items-center gap-2">
+                                <Sparkles className="w-5 h-5" style={{ color: '#f5c451' }} />
+                                Atividade <em className="italic font-normal text-gradient-aurora">Recente</em>
                             </h2>
 
-                            <div className="rounded-[2rem] border border-white/5 bg-card-deep/40 backdrop-blur-md divide-y divide-white/5 overflow-hidden">
+                            <div className="rounded-[2rem] border-shine divide-y divide-white/5 overflow-hidden" style={{ background: '#110d22' }}>
                                 {recentActivity.length === 0 ? (
                                     <div className="p-8 text-center">
                                         <p className="text-sm text-slate-500">Nenhuma atividade recente.</p>
@@ -356,17 +349,17 @@ export default function CartomanteDashboard() {
                                 </div>
                             </div>
 
-                            <div className="p-6 rounded-[2rem] border border-white/5 bg-gradient-to-br from-card-deep to-[#0f0518] text-center relative overflow-hidden group">
-                                <p className="text-xs text-slate-500 uppercase tracking-wider font-bold mb-2">Total Recebido (Vitalício)</p>
-                                <p className="text-3xl font-black bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                            <div className="p-6 rounded-[2rem] border-shine text-center relative overflow-hidden" style={{ background: '#110d22' }}>
+                                <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold mb-2">Total Recebido (Vitalício)</p>
+                                <p className="font-mono text-3xl font-semibold text-gradient-violet">
                                     R$ {(totalEarnings / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                 </p>
                             </div>
 
-                            <div className="p-6 rounded-[2rem] bg-gradient-to-br from-purple-900/60 to-indigo-900/60 relative overflow-hidden shadow-xl border border-white/5">
+                            <div className="p-6 rounded-[2rem] aurora border-shine relative overflow-hidden shadow-xl">
                                 <div className="absolute -bottom-10 -right-10 w-40 h-40 rounded-full bg-white/5 blur-3xl" />
                                 <div className="flex items-center justify-between mb-2 relative z-10 gap-2">
-                                    <h3 className="font-serif text-lg font-bold text-white/80 leading-tight">Aumente seu alcance</h3>
+                                    <h3 className="font-display text-lg font-bold text-white/80 leading-tight">Aumente seu alcance</h3>
                                     <span className="bg-indigo-500/20 text-indigo-300 text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider backdrop-blur-md border border-indigo-500/20 shrink-0">
                                         Em breve
                                     </span>
@@ -380,7 +373,7 @@ export default function CartomanteDashboard() {
                             </div>
                         </div>
                     </div>
-                </PageContainer>
+                </div>
             </main>
         </div>
     )

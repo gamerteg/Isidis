@@ -253,14 +253,14 @@ export default function RegisterPage() {
                     </div>
                 )}
 
-                <form action={formAction} onSubmit={handleFormSubmit} className="bg-card/30 backdrop-blur-md border border-white/10 rounded-3xl p-8 shadow-2xl">
+                <form action={formAction} onSubmit={handleFormSubmit} className="border-shine bg-card/30 backdrop-blur-md rounded-3xl p-8 shadow-2xl">
                     <input type="hidden" name="role" value={selectedRole || 'CLIENT'} />
                     <input type="hidden" name="specialties" value={JSON.stringify(specialties)} />
 
                     {/* Step 1: Role Selection */}
                     <div className={step === 1 ? "animate-fade-in-up" : "hidden"}>
                         <div className="text-center mb-10">
-                            <h1 className="text-3xl font-bold mb-3">Bem-vinda ao Isidis</h1>
+                            <h1 className="font-display text-3xl font-light mb-3">Bem-vinda ao <em className="italic font-normal text-gradient-aurora">Isidis</em></h1>
                             <p className="text-muted-foreground">Escolha como você deseja participar.</p>
                         </div>
 

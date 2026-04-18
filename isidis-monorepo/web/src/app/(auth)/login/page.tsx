@@ -22,11 +22,11 @@ export default function LoginPage() {
                     <div className="inline-flex items-center justify-center w-24 h-24 rounded-2xl bg-primary/5 border border-primary/10 mb-6 animate-float">
                         <img src="/logo.png" alt="Isidis Logo" className="w-16 h-16 object-contain" />
                     </div>
-                    <h1 className="text-3xl font-bold mb-2">Bem-vindo de volta</h1>
+                    <h1 className="font-display text-3xl font-light mb-2">Bem-vindo de <em className="italic font-normal text-gradient-aurora">volta</em></h1>
                     <p className="text-muted-foreground">Entre para acessar sua jornada espiritual.</p>
                 </div>
 
-                <div className="glass-strong rounded-2xl p-8">
+                <div className="border-shine rounded-2xl bg-card/40 backdrop-blur-xl p-8">
                     <form action={formAction} className="space-y-5">
                         {next ? <input type="hidden" name="next" value={next} /> : null}
                         <div className="space-y-2">
@@ -73,7 +73,7 @@ export default function LoginPage() {
                             </div>
                         )}
 
-                        <Button type="submit" className="w-full py-6 text-base font-bold animate-glow-pulse">
+                        <Button type="submit" className="aurora border-shine w-full py-6 text-base font-bold text-white hover:opacity-90">
                             <LogIn className="mr-2 w-4 h-4" />
                             Entrar
                         </Button>

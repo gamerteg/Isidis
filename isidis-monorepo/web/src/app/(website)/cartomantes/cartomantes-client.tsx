@@ -11,7 +11,6 @@ import { cn } from '@/lib/utils'
 import { AnalyticsTracker } from '@/components/analytics-tracker'
 import { UserSidebar } from '@/components/user-sidebar'
 import { DashboardBottomNav } from '@/components/layout/dashboard-bottom-nav'
-import { MainHero } from '@/components/marketing/MainHero'
 import { usePresence } from '@/components/providers/presence-provider'
 import type { MarketplaceReaderData } from '@/lib/readers'
 import type { PaginationMeta } from '@/types'
@@ -145,31 +144,19 @@ export function CartomantesClient({ readers, pagination, initialFilters, userId 
             {userId && <UserSidebar className="hidden md:flex h-[calc(100vh-4rem)] sticky top-16" />}
 
             <div className="flex-1 flex flex-col min-w-0">
-                {/* Hero Header */}
-                <MainHero
-                    badge={
-                        <div className="flex items-center gap-2">
-                            <Link to="/" className="hover:text-indigo-400">Marketplace</Link>
-                            <span>/</span>
-                            <span className="text-indigo-400">
-                                {activeCategory !== 'all'
-                                    ? categories.find(c => c.key === activeCategory)?.label || 'Buscar'
-                                    : 'Buscar'}
-                            </span>
-                        </div>
-                    }
-                    title={
-                        <>
-                            Resultados para{' '}
-                            <span className="text-gradient-primary">
-                                &quot;{searchQuery || (activeCategory !== 'all' ? (categories.find(c => c.key === activeCategory)?.label) : 'Tarot')}&quot;
-                            </span>
-                        </>
-                    }
-                    description={`${totalReaders} profissionais ${totalReaders === 1 ? 'encontrada' : 'encontradas'} para sua jornada.`}
-                    withMockup={false}
-                    className="pt-20 pb-20"
-                >
+                {/* Hero editorial */}
+                <section className="px-6 md:px-10 pt-10 pb-8" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div className="flex items-center gap-2 mb-3 text-muted-foreground text-sm">
+                        <Link to="/" className="hover:text-foreground">Marketplace</Link>
+                        <span>/</span>
+                        <span style={{ color: 'var(--violet-bright)' }}>
+                            {activeCategory !== 'all' ? categories.find(c => c.key === activeCategory)?.label || 'Buscar' : 'Cartomantes'}
+                        </span>
+                    </div>
+                    <h1 className="font-display text-[44px] md:text-[56px] leading-[0.95] tracking-[-0.02em] font-light">
+                        Encontre sua <em className="italic font-normal text-gradient-aurora">Cartomante</em>
+                    </h1>
+                    <p className="mt-3 text-muted-foreground">{totalReaders} profissional{totalReaders !== 1 ? 'is' : ''} disponível{totalReaders !== 1 ? 'is' : ''} para sua jornada.</p>
                     <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto mt-6">
                         {/* Search Bar */}
                         <div className="relative flex-1 md:w-80">
@@ -179,21 +166,21 @@ export function CartomantesClient({ readers, pagination, initialFilters, userId 
                                 value={searchQuery}
                                 onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1) }}
                                 placeholder="Buscar por nome..."
-                                className="w-full pl-11 pr-4 py-3 rounded-xl border border-indigo-500/20 bg-[#12122a] text-slate-100 placeholder:text-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 text-sm glass"
+                                className="w-full pl-11 pr-4 py-3 rounded-xl border border-border/20 bg-card/60 text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30 text-sm"
                             />
                         </div>
 
                         {/* Mobile Filter Toggle */}
                         <Button
                             variant="outline"
-                            className="md:hidden border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/10 gap-2 h-[48px] rounded-xl glass"
+                            className="md:hidden border-border/20 text-primary hover:bg-primary/10 gap-2 h-[48px] rounded-xl"
                             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                         >
                             <Sparkles className="w-4 h-4" />
                             {isSidebarOpen ? 'Fechar Filtros' : 'Filtros'}
                         </Button>
                     </div>
-                </MainHero>
+                </section>
 
                 <div className={cn("w-full flex flex-col md:flex-row", userId ? "max-w-screen-2xl" : "max-w-7xl mx-auto")}>
                     {/* ──── Sidebar Filters ──── */}
@@ -451,7 +438,7 @@ function ReaderCard({ reader }: { reader: MarketplaceReaderData }) {
     const isOnline = onlineUsers.has(reader.id) || reader.isOnline
 
     return (
-        <div className="rounded-2xl border border-indigo-500/10 bg-[#12122a] hover:border-indigo-500/30 transition-all group overflow-hidden relative">
+        <div className="border-shine rounded-2xl bg-[#110d22] hover:-translate-y-1 transition-all duration-300 group overflow-hidden relative">
             {reader.gigId && (
                 <AnalyticsTracker
                     gigId={reader.gigId}
@@ -532,14 +519,14 @@ function ReaderCard({ reader }: { reader: MarketplaceReaderData }) {
                 <div className="flex items-center justify-between pt-3 border-t border-indigo-500/10">
                     <div>
                         <span className="text-[10px] text-slate-500 uppercase tracking-wider block">A partir de</span>
-                        <span className="text-xl font-extrabold bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
+                        <span className="text-xl font-mono text-gradient-violet">
                             R$ {reader.price}
                         </span>
                     </div>
                     <Button
                         asChild
                         size="sm"
-                        className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold gap-1.5 rounded-full h-9 px-5"
+                        className="aurora border-shine text-white font-semibold gap-1.5 rounded-full h-9 px-5 hover:opacity-90"
                     >
                         <Link to={`/cartomante/${reader.id}`}>
                             Agendar

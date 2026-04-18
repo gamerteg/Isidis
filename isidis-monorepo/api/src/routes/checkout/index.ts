@@ -814,187 +814,55 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       if (payment_method === 'CARD') {
-        const mpPublicKey = process.env.MERCADOPAGO_PUBLIC_KEY
-        const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN
-        const holderName = card_holder_name?.trim() || clientProfile.full_name
-        const sanitizedCardNumber = card_number?.replace(/\D/g, '')
-        const sanitizedCardCvv = card_cvv?.replace(/\D/g, '')
-        const sanitizedExpiryMonth = card_expiry_month?.replace(/\D/g, '')
-        const sanitizedExpiryYear = card_expiry_year?.replace(/\D/g, '')
-        const hasLegacyRawCard =
-          Boolean(sanitizedCardNumber) &&
-          Boolean(sanitizedCardCvv) &&
-          Boolean(sanitizedExpiryMonth) &&
-          Boolean(sanitizedExpiryYear)
-        const hasTokenizedCard = Boolean(card_token && payment_method_id)
-        const resolvedPayer = resolveMercadoPagoPayer({
-          clientEmail,
-          clientFullName: clientProfile.full_name,
-          clientTaxId: clientProfile.tax_id,
-          clientCellphone: clientProfile.cellphone,
-          payer,
-          holderName,
-          legacyPostalCode: card_holder_postal_code,
-          legacyAddressNumber: card_holder_address_number,
-        })
-        const notificationUrl = getNotificationUrl(request)
-
-        let finalCardToken = card_token
-        let finalPaymentMethodId = payment_method_id
-        let finalIssuerId = issuer_id
-        let finalInstallments = installments ?? 1
-
         try {
-          if (!hasTokenizedCard && !hasLegacyRawCard) {
-            throw Object.assign(
-              new Error('O Checkout Bricks nao retornou os dados do cartao. Recarregue a pagina e tente novamente.'),
-              { statusCode: 400 }
-            )
-          }
+          const notificationUrl = getNotificationUrl(request)
+          const backUrls = getCheckoutProBackUrls(request, order.id)
+          const requestOptions = { idempotencyKey: randomUUID() }
 
-          if (!hasTokenizedCard && hasLegacyRawCard) {
-            if (!mpPublicKey || !mpAccessToken) {
-              throw new Error('Configuracao do Mercado Pago incompleta para compatibilidade legada de cartao')
-            }
-
-            request.log.warn(
-              { orderId: order.id },
-              '[checkout] Fluxo legado de cartao acionado; o web deve usar tokenizacao no cliente'
-            )
-
-            finalCardToken = await tokenizeLegacyCard({
-              accessToken: mpAccessToken,
-              publicKey: mpPublicKey,
-              cardNumber: sanitizedCardNumber!,
-              expiryMonth: sanitizedExpiryMonth!,
-              expiryYear: sanitizedExpiryYear!,
-              cvv: sanitizedCardCvv!,
-              holderName,
-              taxId: clientProfile.tax_id,
-            })
-
-            const legacyMethod = await resolveLegacyPaymentMethodId({
-              accessToken: mpAccessToken,
-              publicKey: mpPublicKey,
-              cardNumber: sanitizedCardNumber!,
-            })
-
-            finalPaymentMethodId = legacyMethod.paymentMethodId
-            finalIssuerId = legacyMethod.issuerId
-            finalInstallments = 1
-          }
-
-          if (!finalCardToken || !finalPaymentMethodId) {
-            throw Object.assign(
-              new Error('payment_method_id e card_token sao obrigatorios para pagamentos tokenizados'),
-              { statusCode: 400 }
-            )
-          }
-
-          if (finalInstallments !== 1) {
-            throw Object.assign(
-              new Error('No momento, pagamentos com cartao estao disponiveis somente em 1 parcela'),
-              { statusCode: 400 }
-            )
-          }
-
-          const requestOptions = {
-            ...(device_id && { meliSessionId: device_id }),
-            idempotencyKey: randomUUID(),
-          }
-
-          const charge = await createPaymentWithNotificationFallback({
+          const preference = await createPreferenceWithNotificationFallback({
             fastify,
             request,
             notificationUrl,
-            context: 'CARD',
             body: {
-              transaction_amount: toDecimal(totalAmount),
-              token: finalCardToken,
-              description: sanitizePixDescription(order.id, gig.title),
-              installments: finalInstallments,
-              capture: true,
-              payment_method_id: finalPaymentMethodId,
-              issuer_id: finalIssuerId,
-              statement_descriptor: 'ISIDIS',
-              payer: {
-                email: resolvedPayer.email,
-                first_name: resolvedPayer.firstName,
-                last_name: resolvedPayer.lastName,
-                entity_type: 'individual',
-                identification: resolvedPayer.identification,
-                ...(resolvedPayer.phone && { phone: resolvedPayer.phone }),
-                ...(resolvedPayer.postalCode && {
-                  address: {
-                    zip_code: resolvedPayer.postalCode,
-                    ...(resolvedPayer.streetNumber && { street_number: resolvedPayer.streetNumber }),
-                  },
-                }),
-              },
-              additional_info: {
-                ip_address: clientIp,
-                items: [
-                  {
-                    id: gig_id,
-                    title: gig.title,
-                    description: gig.title,
-                    quantity: 1,
-                    unit_price: toDecimal(totalAmount),
-                  },
-                ],
-                payer: {
-                  first_name: resolvedPayer.firstName,
-                  last_name: resolvedPayer.lastName,
-                  ...(resolvedPayer.phone && { phone: resolvedPayer.phone }),
-                  ...(resolvedPayer.postalCode && {
-                    address: {
-                      zip_code: resolvedPayer.postalCode,
-                      ...(resolvedPayer.streetNumber && { street_number: resolvedPayer.streetNumber }),
-                    },
-                  }),
+              items: [
+                {
+                  id: gig_id,
+                  title: gig.title,
+                  description: gig.title,
+                  quantity: 1,
+                  currency_id: 'BRL',
+                  unit_price: toDecimal(totalAmount),
                 },
+              ],
+              payer: {
+                email: clientEmail,
+                name: clientProfile.full_name,
               },
               external_reference: order.id,
+              statement_descriptor: 'ISIDIS',
+              payment_methods: {
+                excluded_payment_types: [{ id: 'ticket' }, { id: 'bank_transfer' }, { id: 'digital_currency' }],
+                installments: 1,
+                default_installments: 1,
+              },
+              ...(backUrls && { back_urls: backUrls, auto_return: 'approved' }),
             },
             requestOptions,
           })
 
           request.log.info(
-            { chargeId: charge.id, chargeStatus: charge.status, statusDetail: charge.status_detail },
-            '[checkout] MP CARD charge criado'
+            { preferenceId: preference.id, initPoint: preference.init_point },
+            '[checkout] MP CARD CHECKOUT PRO preference criada'
           )
-
-          if (charge.status === 'rejected') {
-            throw Object.assign(
-              new Error(getCardRejectionMessage(charge.status_detail)),
-              {
-                statusCode: 422,
-                responseBody: {
-                  status: charge.status,
-                  status_detail: charge.status_detail,
-                },
-              }
-            )
-          }
 
           await fastify.supabase
             .from('orders')
             .update({
-              mercadopago_payment_id: charge.id?.toString(),
               metadata: {
                 ...orderMetadata,
                 mercadopago: {
-                  checkout_mode: 'checkout_bricks',
-                  payment_method_id: finalPaymentMethodId,
-                  payment_type_id:
-                    brick_additional_data?.paymentTypeId ??
-                    brick_payment_type ??
-                    brick_selected_payment_method ??
-                    null,
-                  issuer_id: finalIssuerId ?? null,
-                  installments: finalInstallments,
-                  bin: brick_additional_data?.bin ?? null,
-                  last_four_digits: charge.card?.last_four_digits ?? null,
+                  checkout_mode: 'checkout_pro',
+                  preference_id: preference.id ?? null,
                 },
               },
             })
@@ -1008,9 +876,9 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
               amount_service_total: serviceAmount,
               amount_card_fee: cardFee,
               card_fee_responsibility: 'READER',
-              mercadopago_payment_id: charge.id?.toString(),
-              payment_id: charge.id?.toString(),
-              status: ['approved', 'authorized'].includes(charge.status ?? '') ? 'CONFIRMED' : 'PENDING',
+              preference_id: preference.id,
+              checkout_url: preference.init_point,
+              status: 'PENDING_PAYMENT',
             },
           })
         } catch (mpErr: any) {
@@ -1020,20 +888,14 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
             .eq('id', order.id)
 
           request.log.error(
-            {
-              err: mpErr.message,
-              statusCode: mpErr.statusCode,
-              responseBody: mpErr.responseBody,
-            },
-            '[checkout] Erro no MP CARD'
+            { err: mpErr.message, statusCode: mpErr.statusCode, responseBody: mpErr.responseBody },
+            '[checkout] Erro no MP CARD CHECKOUT PRO'
           )
 
           const statusCode = typeof mpErr?.statusCode === 'number' ? mpErr.statusCode : 502
-          const errorMessage = mpErr.message ?? 'Erro ao processar cartao. Tente novamente.'
-
           return reply
             .status(statusCode >= 400 && statusCode < 500 ? statusCode : 502)
-            .send({ error: errorMessage })
+            .send({ error: mpErr.message ?? 'Erro ao criar preferencia de pagamento. Tente novamente.' })
         }
       }
 

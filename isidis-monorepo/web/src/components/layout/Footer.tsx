@@ -16,14 +16,14 @@ export function Footer() {
     }, [])
 
     return (
-        <footer className="border-t border-border/50 bg-card/30 mt-auto">
+        <footer className="mt-auto" style={{ background: 'linear-gradient(to bottom, transparent, rgba(10,8,22,0.8))', borderTop: '1px solid rgba(167,139,250,0.12)' }}>
             <div className="container mx-auto px-4 py-12">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                     {/* Brand */}
                     <div className="md:col-span-1">
                         <Link to="/" className="flex items-center gap-2 mb-4">
                             <img src="/logo.png" alt="Isidis Logo" width={32} height={32} className="w-8 h-8 object-contain" />
-                            <span className="text-lg font-bold text-gradient-primary">Isidis</span>
+                            <span className="text-lg font-display font-light text-gradient-violet">Isidis</span>
                         </Link>
                         <p className="text-sm text-muted-foreground leading-relaxed">
                             Conectando você ao universo através de leituras espirituais personalizadas.
@@ -36,7 +36,7 @@ export function Footer() {
                     </div>
 
                     <div>
-                        <h4 className="text-sm font-bold uppercase tracking-wider mb-4 text-foreground">Plataforma</h4>
+                        <h4 className="text-sm font-display font-light uppercase tracking-wider mb-4 text-foreground">Plataforma</h4>
                         <ul className="space-y-2.5">
                             {user ? (
                                 <>
@@ -71,7 +71,7 @@ export function Footer() {
                     </div>
                 </div>
 
-                <div className="border-t border-border/50 mt-10 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="mt-10 pt-6 flex flex-col md:flex-row items-center justify-between gap-4" style={{ borderTop: '1px solid rgba(167,139,250,0.1)' }}>
                     <p className="text-xs text-muted-foreground">
                         © {new Date().getFullYear()} Isidis. Todos os direitos reservados.
                     </p>

@@ -76,7 +76,7 @@ export function OnlineReaders() {
                         <div className="absolute bottom-0 right-0 w-4 h-4 md:w-5 md:h-5 bg-green-500 border-4 border-card-item rounded-full" />
                     </div>
 
-                    <h3 className="text-base md:text-lg font-serif text-white">{reader.full_name || 'Cartomante'}</h3>
+                    <h3 className="text-base md:text-lg font-display text-white">{reader.full_name || 'Cartomante'}</h3>
                     <p className="text-[10px] md:text-xs text-slate-400 mb-3">{reader.specialties?.[0] || 'Tarot & Videncia'}</p>
 
                     <div className="flex items-center gap-1 text-amber-400 text-[10px] md:text-xs font-bold mb-4">

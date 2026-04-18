@@ -96,68 +96,79 @@ export default function GigsPage() {
             <CartomanteSidebar profile={profile} userId={user.id} />
 
             <main className="relative z-10 flex-1 h-screen overflow-y-auto scrollbar-hide pb-24 md:pb-8">
-                <MainHero
-                    className="pt-12 pb-12 px-4 md:px-8 mb-8"
-                    padding="none"
-                    maxWidth="full"
-                    title="Meus Gigs"
-                    description="Gerencie seus serviços místicos e aumente seu alcance no marketplace."
-                    withMockup={false}
-                >
-                    <div className="flex flex-col sm:flex-row items-center gap-3 mt-6">
-                        <div className="relative w-full sm:w-auto">
-                            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                            <input
-                                type="text"
-                                placeholder="Buscar serviços..."
-                                className="pl-10 pr-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-slate-300 placeholder:text-slate-600 w-full focus:outline-none focus:border-indigo-500/30 backdrop-blur-sm glass"
-                            />
+                {/* Hero editorial */}
+                <section className="px-6 md:px-10 pt-10 pb-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div className="max-w-[1600px] mx-auto">
+                        <div className="flex items-start justify-between gap-6 flex-wrap">
+                            <div>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Tag className="w-4 h-4" style={{ color: 'var(--violet-bright)' }} />
+                                    <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-muted-foreground">Catálogo Místico</span>
+                                </div>
+                                <h1 className="font-display text-[44px] md:text-[56px] leading-[0.95] tracking-[-0.02em] font-light">
+                                    Meus <em className="italic font-normal text-gradient-aurora">Arcanos</em>
+                                </h1>
+                                <p className="mt-3 text-muted-foreground">{activeGigs.length} serviço(s) ativo(s) no marketplace.</p>
+                            </div>
+                            <div className="flex items-center gap-3 pt-2">
+                                <Link to="/dashboard/cartomante/gigs/novo">
+                                    <Button className="aurora border-shine text-white font-bold text-sm rounded-xl gap-2 h-10 px-5 hover:opacity-90">
+                                        <Plus className="w-4 h-4" />
+                                        Criar Gig
+                                    </Button>
+                                </Link>
+                            </div>
                         </div>
-                        <Link to="/dashboard/cartomante/gigs/novo" className="w-full sm:w-auto">
-                            <Button className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm rounded-xl gap-2 h-10 px-5 shadow-lg shadow-purple-900/20">
-                                <Sparkles className="w-4 h-4" />
-                                Criar Novo Gig
-                            </Button>
-                        </Link>
                     </div>
-                </MainHero>
+                </section>
 
-                <PageContainer className="px-4 md:px-8 py-6 md:py-12">
-                    <div className="flex items-center gap-6 border-b border-indigo-500/10 mb-8 overflow-x-auto scrollbar-hide">
-                        <button className="text-sm font-bold text-purple-400 pb-3 border-b-2 border-purple-500 whitespace-nowrap">
-                            Gigs Ativos ({activeGigs.length})
+                <div className="px-6 md:px-10 py-6 max-w-[1600px] mx-auto w-full">
+                    <div className="flex items-center gap-6 mb-8 overflow-x-auto scrollbar-hide pb-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                        <button className="text-sm font-bold pb-3 whitespace-nowrap tab-active text-white relative">
+                            Ativos ({activeGigs.length})
                         </button>
-                        <button className="text-sm font-medium text-slate-500 pb-3 border-b-2 border-transparent hover:text-slate-300 whitespace-nowrap">
+                        <button className="text-sm font-medium pb-3 text-muted-foreground hover:text-foreground whitespace-nowrap">
                             Rascunhos (0)
                         </button>
-                        <button className="text-sm font-medium text-slate-500 pb-3 border-b-2 border-transparent hover:text-slate-300 whitespace-nowrap">
+                        <button className="text-sm font-medium pb-3 text-muted-foreground hover:text-foreground whitespace-nowrap">
                             Inativos ({inactiveGigs.length})
                         </button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-12">
-                        {gigs.map((gig) => {
+                        {gigs.map((gig, index) => {
                             const sales = salesCounts[gig.id] || 0
                             const review = reviewStats[gig.id]
+                            const romanNumerals = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII']
+                            const arcaneNum = romanNumerals[index] || String(index + 1)
 
                             return (
                                 <div
                                     key={gig.id}
-                                    className="rounded-2xl border border-white/5 bg-card-item overflow-hidden hover:border-indigo-500/25 transition-all group"
+                                    className="rounded-2xl border-shine overflow-hidden transition-all duration-400 group hover:-translate-y-1"
+                                    style={{ background: '#110d22', transition: 'transform 0.4s cubic-bezier(.16,1,.3,1), box-shadow 0.4s' }}
+                                    onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 20px 50px -10px rgba(139,92,246,0.25)')}
+                                    onMouseLeave={e => (e.currentTarget.style.boxShadow = '')}
                                 >
-                                    <div className="relative aspect-[16/10] bg-black/40 overflow-hidden">
+                                    <div className="relative aspect-[16/10] overflow-hidden card-tarot-mini">
                                         {gig.image_url ? (
                                             <img
                                                 src={gig.image_url}
                                                 alt={gig.title}
-                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-500 relative z-10"
                                             />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center">
-                                                <Tag className="w-12 h-12 text-indigo-700" />
+                                            <div className="w-full h-full flex items-center justify-center relative z-10">
+                                                <Tag className="w-12 h-12" style={{ color: 'var(--violet-bright)', opacity: 0.4 }} />
                                             </div>
                                         )}
-                                        <div className="absolute top-3 right-3 flex flex-col gap-2 items-end">
+                                        {/* Arcane roman numeral */}
+                                        <div className="absolute top-3 left-3 z-20">
+                                            <span className="font-mono text-xs font-semibold px-2 py-1 rounded-md" style={{ color: '#f5c451', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)' }}>
+                                                {arcaneNum}
+                                            </span>
+                                        </div>
+                                        <div className="absolute top-3 right-3 flex flex-col gap-2 items-end z-20">
                                             {gig.status === 'APPROVED' ? (
                                                 <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider backdrop-blur-md ${gig.is_active
                                                     ? 'bg-green-500/90 text-white'
@@ -198,7 +209,7 @@ export default function GigsPage() {
                                         <div className="flex items-end justify-between">
                                             <div>
                                                 <p className="text-[10px] uppercase tracking-wider text-slate-600 font-bold">A partir de</p>
-                                                <p className="text-xl font-black text-green-400">
+                                                <p className="font-mono text-xl font-semibold text-green-400">
                                                     R$ {fmt(gig.price)}
                                                 </p>
                                             </div>
@@ -234,7 +245,10 @@ export default function GigsPage() {
                         })}
 
                         <Link to="/dashboard/cartomante/gigs/novo"
-                            className="rounded-2xl border-2 border-dashed border-white/10 bg-white/5 flex flex-col items-center justify-center py-16 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all group cursor-pointer min-h-[320px]"
+                            className="rounded-2xl flex flex-col items-center justify-center py-16 transition-all group cursor-pointer min-h-[320px]"
+                            style={{ border: '2px dashed rgba(167,139,250,0.2)', background: 'rgba(167,139,250,0.03)' }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(167,139,250,0.4)'; (e.currentTarget as HTMLElement).style.background = 'rgba(167,139,250,0.06)' }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(167,139,250,0.2)'; (e.currentTarget as HTMLElement).style.background = 'rgba(167,139,250,0.03)' }}
                         >
                             <div className="w-14 h-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-4 group-hover:bg-purple-500/15 group-hover:border-purple-500/25 transition-all">
                                 <Plus className="w-6 h-6 text-slate-500 group-hover:text-purple-400 transition-colors" />
@@ -247,44 +261,44 @@ export default function GigsPage() {
                     </div>
 
                     <div>
-                        <h2 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
-                            <Sparkles className="w-5 h-5 text-purple-400" />
-                            Insights de Desempenho
+                        <h2 className="font-display text-2xl font-light flex items-center gap-2 mb-6">
+                            <Sparkles className="w-5 h-5" style={{ color: '#f5c451' }} />
+                            Insights de <em className="italic font-normal text-gradient-aurora">Desempenho</em>
                         </h2>
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="p-5 rounded-2xl border border-white/10 bg-card-item">
-                                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-2">Total de Pedidos</p>
-                                <p className="text-2xl font-black text-white">{totalSales}</p>
-                                <p className="text-[10px] text-slate-500 mt-1">Em todos os gigs</p>
+                            <div className="p-5 rounded-2xl border-shine" style={{ background: '#110d22' }}>
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Total de Pedidos</p>
+                                <p className="font-mono text-2xl font-semibold text-white">{totalSales}</p>
+                                <p className="text-[10px] text-muted-foreground mt-1">Em todos os gigs</p>
                             </div>
-                            <div className="p-5 rounded-2xl border border-white/10 bg-card-item">
-                                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-2">Gigs Ativos</p>
-                                <p className="text-2xl font-black text-white">{activeGigs.length}</p>
-                                <p className="text-[10px] text-slate-500 mt-1">de {gigs.length} no total</p>
+                            <div className="p-5 rounded-2xl border-shine" style={{ background: '#110d22' }}>
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Gigs Ativos</p>
+                                <p className="font-mono text-2xl font-semibold text-white">{activeGigs.length}</p>
+                                <p className="text-[10px] text-muted-foreground mt-1">de {gigs.length} no total</p>
                             </div>
-                            <div className="p-5 rounded-2xl border border-white/10 bg-card-item">
-                                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-2">Avaliação Média</p>
-                                <p className="text-2xl font-black text-white">
+                            <div className="p-5 rounded-2xl border-shine" style={{ background: '#110d22' }}>
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Avaliação Média</p>
+                                <p className="font-mono text-2xl font-semibold text-white">
                                     {Object.values(reviewStats).length > 0
                                         ? (Object.values(reviewStats).reduce((sum, r) => sum + r.avg, 0) / Object.values(reviewStats).length).toFixed(1)
                                         : '—'}
                                 </p>
-                                <p className="text-[10px] text-slate-500 mt-1">
+                                <p className="text-[10px] text-muted-foreground mt-1">
                                     {Object.values(reviewStats).reduce((sum, r) => sum + r.count, 0)} avaliações
                                 </p>
                             </div>
-                            <div className="p-5 rounded-2xl border border-white/10 bg-card-item">
-                                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-2">Receita Média / Gig</p>
-                                <p className="text-2xl font-black text-white">
+                            <div className="p-5 rounded-2xl border-shine" style={{ background: '#110d22' }}>
+                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">Receita Média / Gig</p>
+                                <p className="font-mono text-2xl font-semibold text-white">
                                     {gigs.length > 0
                                         ? `R$ ${fmt(Math.round(gigs.reduce((sum, g) => sum + ((salesCounts[g.id] || 0) * g.price), 0) / gigs.length))}`
                                         : 'R$ 0,00'}
                                 </p>
-                                <p className="text-[10px] text-slate-500 mt-1">Ganhos líquidos</p>
+                                <p className="text-[10px] text-muted-foreground mt-1">Ganhos líquidos</p>
                             </div>
                         </div>
                     </div>
-                </PageContainer>
+                </div>
             </main>
         </div>
     )

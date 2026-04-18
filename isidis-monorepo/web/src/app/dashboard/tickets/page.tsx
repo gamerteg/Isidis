@@ -43,8 +43,10 @@ export default function TicketsPage() {
         <div className="max-w-6xl mx-auto space-y-6 p-4 md:p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold">Suporte</h1>
-                    <p className="text-muted-foreground">O que podemos ajudar hoje?</p>
+                    <h1 className="font-display text-[36px] leading-[0.95] tracking-[-0.02em] font-light">
+                        Central de <em className="italic font-normal text-gradient-aurora">Suporte</em>
+                    </h1>
+                    <p className="text-muted-foreground mt-2">O que podemos ajudar hoje?</p>
                 </div>
                 <CreateTicketDialog />
             </div>

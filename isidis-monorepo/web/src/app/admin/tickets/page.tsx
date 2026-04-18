@@ -68,7 +68,7 @@ export default function AdminTicketsPage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Tickets de Suporte</h2>
+                    <h2 className="font-display text-3xl font-semibold tracking-tight">Tickets de Suporte</h2>
                     <p className="text-muted-foreground">
                         Gerencie as solicitações de suporte dos usuários e cartomantes.
                     </p>

@@ -200,7 +200,9 @@ export interface CheckoutPaymentResponse {
   card_fee_responsibility?: 'READER' | null
   mercadopago_payment_id?: string
   payment_id?: string
-  status?: 'CONFIRMED' | 'PENDING'
+  preference_id?: string
+  checkout_url?: string
+  status?: 'CONFIRMED' | 'PENDING' | 'PENDING_PAYMENT'
   pix_qr_code_id?: string
   pix?: {
     qr_code_base64: string | null

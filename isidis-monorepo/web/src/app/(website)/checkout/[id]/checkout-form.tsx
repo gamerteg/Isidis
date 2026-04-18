@@ -221,6 +221,37 @@ export function CheckoutForm({
     }
   }, [method])
 
+  const handleCardProSubmit = useCallback(async () => {
+    const requirementsError = validateRequirements(requirementsAnswers)
+    if (requirementsError) {
+      setError(requirementsError)
+      return
+    }
+
+    setSubmitting(true)
+    setError('')
+
+    try {
+      const result = await submitCheckoutPayment({
+        order_id: orderId ?? existingOrderId,
+        gig_id: gigId,
+        add_on_ids: selectedAddOnIds,
+        requirements_answers: requirementsAnswers,
+        payment_method: 'CARD',
+      })
+
+      if (result.checkout_url) {
+        window.location.href = result.checkout_url
+      } else {
+        setError('Nao foi possivel obter o link de pagamento. Tente novamente.')
+        setSubmitting(false)
+      }
+    } catch (err: any) {
+      setError(err?.message ?? 'Nao foi possivel processar o pagamento.')
+      setSubmitting(false)
+    }
+  }, [existingOrderId, gigId, orderId, requirementsAnswers, selectedAddOnIds, validateRequirements])
+
   const handleBrickSubmit = useCallback(async (paymentData: BrickFormData, additionalData?: BrickAdditionalData | null) => {
     const requirementsError = validateRequirements(requirementsAnswers)
     if (requirementsError) {
@@ -383,6 +414,7 @@ export function CheckoutForm({
               copied={copied}
               paymentBrickCustomization={paymentBrickCustomization}
               handleBrickSubmit={handleBrickSubmit}
+              onCardProSubmit={handleCardProSubmit}
               method={method}
               checkoutConfig={checkoutConfig}
             />
@@ -404,6 +436,7 @@ export function CheckoutForm({
           copied={copied}
           paymentBrickCustomization={paymentBrickCustomization}
           handleBrickSubmit={handleBrickSubmit}
+          onCardProSubmit={handleCardProSubmit}
           method={method}
           checkoutConfig={checkoutConfig}
         />
@@ -427,6 +460,7 @@ interface CheckoutBrickCardProps {
   copied: boolean
   paymentBrickCustomization: ComponentProps<typeof Payment>['customization']
   handleBrickSubmit: (paymentData: BrickFormData, additionalData?: BrickAdditionalData | null) => Promise<void>
+  onCardProSubmit?: () => Promise<void>
   method: CheckoutMethod
   checkoutConfig: CheckoutConfigResponse | null
 }
@@ -446,6 +480,7 @@ function CheckoutBrickCard({
   copied,
   paymentBrickCustomization,
   handleBrickSubmit,
+  onCardProSubmit,
   method,
   checkoutConfig,
 }: CheckoutBrickCardProps) {
@@ -462,12 +497,12 @@ function CheckoutBrickCard({
           </div>
           <div>
             <p className="text-sm font-semibold text-white">
-              Checkout Bricks oficial do Mercado Pago
+              {method === 'CARD' ? 'Checkout Pro oficial do Mercado Pago' : 'Checkout Bricks oficial do Mercado Pago'}
             </p>
             <p className="text-xs text-slate-400">
               {method === 'PIX'
                 ? 'O PIX e iniciado pelo Brick e a confirmacao segue monitorada pela Isidis.'
-                : 'Cartoes de credito e debito sao enviados pelo Brick oficial do Mercado Pago.'}
+                : 'Voce sera redirecionado para o ambiente seguro do Mercado Pago para inserir os dados do cartao.'}
             </p>
           </div>
         </div>
@@ -617,26 +652,47 @@ function CheckoutBrickCard({
             />
           </div>
         </div>
+      ) : method === 'CARD' ? (
+        <div className="space-y-4">
+          <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
+            <p className="text-sm font-semibold text-white">Pagamento com Cartao via Checkout Pro</p>
+            <ul className="mt-3 space-y-2 text-sm text-slate-400">
+              <li>Voce sera redirecionado ao ambiente seguro do Mercado Pago.</li>
+              <li>Credito e debito disponiveis, 1 parcela sem juros pela Isidis.</li>
+              <li>Apos o pagamento, voce voltara automaticamente para acompanhar o pedido.</li>
+            </ul>
+            <p className="mt-4 text-xs text-slate-500">
+              Valor desta compra: {formatCurrencyFromReais(amountTotal)}.
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            onClick={() => void onCardProSubmit?.()}
+            disabled={submitting}
+            className="w-full rounded-2xl bg-sky-600 py-6 text-base font-semibold text-white hover:bg-sky-500 disabled:opacity-60"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Preparando pagamento...
+              </>
+            ) : (
+              <>
+                <CreditCard className="h-5 w-5" />
+                Pagar com Cartao
+              </>
+            )}
+          </Button>
+        </div>
       ) : (
         <div className="space-y-4">
           <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-            <p className="text-sm font-semibold text-white">
-              {method === 'PIX' ? 'PIX com Checkout Bricks' : 'Cartoes com Checkout Bricks'}
-            </p>
+            <p className="text-sm font-semibold text-white">PIX com Checkout Bricks</p>
             <ul className="mt-3 space-y-2 text-sm text-slate-400">
-              {method === 'PIX' ? (
-                <>
-                  <li>O Mercado Pago monta o formulario do PIX direto no Brick.</li>
-                  <li>Depois da confirmacao, mantemos o QR Code e o acompanhamento aqui na Isidis.</li>
-                  <li>O pedido nasce no backend com os requisitos preenchidos e o valor validado no servidor.</li>
-                </>
-              ) : (
-                <>
-                  <li>O Brick oficial coleta com seguranca os dados do cartao.</li>
-                  <li>Credito e debito ficam disponiveis no mesmo fluxo.</li>
-                  <li>No momento, mantemos 1 parcela para reduzir risco operacional na migracao.</li>
-                </>
-              )}
+              <li>O Mercado Pago monta o formulario do PIX direto no Brick.</li>
+              <li>Depois da confirmacao, mantemos o QR Code e o acompanhamento aqui na Isidis.</li>
+              <li>O pedido nasce no backend com os requisitos preenchidos e o valor validado no servidor.</li>
             </ul>
             <p className="mt-4 text-xs text-slate-500">
               Valor desta compra: {formatCurrencyFromReais(amountTotal)}.
@@ -651,7 +707,7 @@ function CheckoutBrickCard({
               </div>
             ) : sdkReady ? (
               <Payment
-                key={`${method}-${checkoutResult?.paymentId ?? 'new'}`}
+                key={`pix-${checkoutResult?.paymentId ?? 'new'}`}
                 initialization={{
                   amount: amountTotal,
                   payer: checkoutConfig?.payer,

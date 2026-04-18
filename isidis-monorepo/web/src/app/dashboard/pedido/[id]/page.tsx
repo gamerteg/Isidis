@@ -183,7 +183,7 @@ export default function ClientOrderDetailPage() {
                 Voltar para minhas tiragens
               </Link>
             </Button>
-            <h1 className="text-3xl font-semibold text-white">Pedido #{order.id.slice(0, 8)}</h1>
+            <h1 className="font-display text-[36px] leading-[0.95] tracking-[-0.02em] font-light">Pedido <em className="italic font-normal text-gradient-aurora">#{order.id.slice(0, 8)}</em></h1>
             <p className="mt-2 text-sm text-slate-400">
               Um unico lugar para acompanhar pagamento, preparo e entrega da sua leitura.
             </p>

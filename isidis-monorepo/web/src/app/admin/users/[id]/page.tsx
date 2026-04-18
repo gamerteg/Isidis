@@ -57,7 +57,7 @@ export default function AdminUserEditPage() {
                     <Link to="/admin/users"><ArrowLeft className="h-4 w-4" /></Link>
                 </Button>
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Editar Usuário</h2>
+                    <h2 className="font-display text-3xl font-semibold tracking-tight">Editar Usuário</h2>
                     <p className="text-muted-foreground">ID: <span className="font-mono text-xs">{id}</span></p>
                 </div>
             </div>

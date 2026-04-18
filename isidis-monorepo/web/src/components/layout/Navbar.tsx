@@ -37,12 +37,14 @@ export function Navbar() {
     }
 
     return (
-        <nav className="border-b border-border/50 glass-strong sticky top-0 z-50">
+        <nav className="border-b border-white/5 sticky top-0 z-50 bg-[#0a0816]/80 backdrop-blur-xl">
             <div className="container mx-auto px-4 h-16 flex items-center justify-between">
                 {/* Logo */}
-                <Link to="/" className="flex items-center gap-2 group">
-                    <img src="/logo.png" alt="Isidis Logo" width={40} height={40} className="w-10 h-10 object-contain transition-transform duration-300 group-hover:scale-110" />
-                    <span className="text-xl font-bold text-gradient-primary tracking-tight">Isidis</span>
+                <Link to="/" className="flex items-center gap-2.5 group">
+                    <div className="relative">
+                        <img src="/logo.png" alt="Isidis Logo" width={40} height={40} className="w-9 h-9 object-contain transition-transform duration-300 group-hover:scale-110" />
+                    </div>
+                    <span className="text-xl font-display font-light text-gradient-violet tracking-tight">Isidis</span>
                 </Link>
 
                 {/* Nav Links */}
@@ -177,7 +179,7 @@ export function Navbar() {
                             <Button variant="ghost" size="sm" asChild className="hidden md:flex font-medium text-muted-foreground hover:text-foreground">
                                 <Link to="/login">Entrar</Link>
                             </Button>
-                            <Button size="sm" asChild className="hidden md:flex font-bold rounded-xl px-5">
+                            <Button size="sm" asChild className="hidden md:flex font-bold rounded-xl px-5 aurora border-shine text-white hover:opacity-90">
                                 <Link to="/register">Criar Conta</Link>
                             </Button>
                         </div>

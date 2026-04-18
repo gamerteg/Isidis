@@ -54,7 +54,7 @@ export default function ApprovalDetailsPage() {
                     <Link to="/admin/approvals"><ArrowLeft className="w-5 h-5" /></Link>
                 </Button>
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Análise de Cadastro</h1>
+                    <h1 className="font-display text-2xl font-semibold tracking-tight">Análise de Cadastro</h1>
                     <div className="flex items-center gap-2 text-muted-foreground text-sm">
                         <span>{reader.full_name}</span>
                         <span>•</span>

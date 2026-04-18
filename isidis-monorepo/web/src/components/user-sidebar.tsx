@@ -32,7 +32,7 @@ export function UserSidebar({ className, activeFilter, onFilterChange }: UserSid
     ]
 
     return (
-        <aside className={cn("w-64 border-r border-border/40 bg-card/30 backdrop-blur-xl flex flex-col shrink-0 sticky top-0 h-screen hidden md:flex", className)}>
+        <aside className={cn("w-64 flex flex-col shrink-0 sticky top-0 h-screen hidden md:flex", className)} style={{ background: 'rgba(10,8,22,0.92)', backdropFilter: 'blur(20px)', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
             <div className="p-4 flex-1">
                 <nav className="space-y-1">
                     {sidebarLinks.map(link => {
@@ -48,10 +48,11 @@ export function UserSidebar({ className, activeFilter, onFilterChange }: UserSid
                                         link.onClick()
                                     }
                                 }}
-                                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${isActive
-                                    ? 'bg-primary/15 text-primary font-medium'
-                                    : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
+                                    ? 'border-shine bg-[#1a1433] shadow-lg'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-white/5 border border-transparent'
                                     }`}
+                                style={isActive ? { color: 'var(--violet-bright)' } : {}}
                             >
                                 <link.icon className="w-4 h-4" />
                                 {link.label}
@@ -60,7 +61,7 @@ export function UserSidebar({ className, activeFilter, onFilterChange }: UserSid
                     })}
                 </nav>
             </div>
-            <div className="p-4 border-t border-indigo-500/10">
+            <div className="p-4" style={{ borderTop: '1px solid rgba(167,139,250,0.08)' }}>
                 <button
                     type="button"
                     onClick={async () => {

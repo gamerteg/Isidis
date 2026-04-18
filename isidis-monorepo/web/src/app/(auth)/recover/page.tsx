@@ -46,11 +46,11 @@ export default function RecoverPage() {
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 mb-4 animate-float">
                         <Sparkles className="w-8 h-8 text-primary" />
                     </div>
-                    <h1 className="text-3xl font-bold mb-2">Recuperar Senha</h1>
+                    <h1 className="font-display text-3xl font-light mb-2">Recuperar <em className="italic font-normal text-gradient-aurora">Senha</em></h1>
                     <p className="text-muted-foreground">Digite seu email para receber um link de recuperação.</p>
                 </div>
 
-                <div className="glass-strong rounded-2xl p-8">
+                <div className="border-shine bg-card/40 backdrop-blur-xl rounded-2xl p-8">
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <div className="space-y-2">
                             <Label htmlFor="email" className="text-sm font-medium">Email</Label>
@@ -78,7 +78,7 @@ export default function RecoverPage() {
                             </div>
                         )}
 
-                        <Button type="submit" className="w-full py-6 text-base font-bold animate-glow-pulse" disabled={loading}>
+                        <Button type="submit" className="aurora border-shine w-full py-6 text-base font-bold text-white hover:opacity-90" disabled={loading}>
                             {loading ? <Loader2 className="mr-2 w-4 h-4 animate-spin" /> : <Mail className="mr-2 w-4 h-4" />}
                             Enviar Link
                         </Button>

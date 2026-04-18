@@ -83,14 +83,14 @@ export default function TopicosPage() {
                                     <Badge className="bg-indigo-500 hover:bg-indigo-600 text-white border-none mb-4">
                                         {gig.category || 'Geral'}
                                     </Badge>
-                                    <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 shadow-sm">
+                                    <h1 className="font-display text-3xl md:text-4xl font-light leading-[0.95] tracking-[-0.02em] text-white mb-2">
                                         {gig.title}
                                     </h1>
                                 </div>
                             </div>
                         )}
 
-                        <div className="bg-[#12121a] rounded-3xl p-8 border border-white/5 space-y-6">
+                        <div className="border-shine rounded-3xl bg-[#110d22] p-8 space-y-6">
                             <h2 className="text-2xl font-bold text-white">Sobre este serviço</h2>
                             <div className="prose prose-invert max-w-none text-slate-300 whitespace-pre-line">
                                 {gig.description}
@@ -120,7 +120,7 @@ export default function TopicosPage() {
                             </div>
                         </div>
 
-                        <Link to={`/cartomante/${profile.id}`} className="block bg-[#12121a] rounded-3xl p-8 border border-white/5 hover:border-indigo-500/50 transition-colors group">
+                        <Link to={`/cartomante/${profile.id}`} className="block border-shine rounded-3xl bg-[#110d22] p-8 hover:opacity-90 transition-opacity group">
                             <div className="flex items-center gap-6">
                                 <div className="w-20 h-20 rounded-full border-2 border-indigo-500/30 overflow-hidden relative shrink-0">
                                     <img

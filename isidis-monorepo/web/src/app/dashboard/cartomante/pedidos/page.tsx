@@ -167,45 +167,46 @@ export default function OrdersPage() {
             <CartomanteSidebar profile={profile} userId={user.id} />
 
             <main className="relative z-10 flex-1 h-screen overflow-y-auto scrollbar-hide pb-24 md:pb-8">
-                <MainHero
-                    className="pt-12 pb-12 px-4 md:px-8 mb-8"
-                    padding="none"
-                    maxWidth="full"
-                    title="Pedidos Profissionais"
-                    description="Gerencie suas consultas místicas e entregas com agilidade."
-                    withMockup={false}
-                >
-                    <div className="flex flex-col sm:flex-row items-center gap-3 mt-6">
-                        <SearchInput placeholder="Buscar por cliente ou ID..." />
-                        <button className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-slate-300 hover:text-indigo-300 hover:border-indigo-500/30 transition-all w-full sm:w-auto backdrop-blur-sm glass">
-                            <Calendar className="w-4 h-4" />
-                            Período
-                        </button>
-                        <span className="hidden sm:inline-flex text-[10px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/20 px-4 py-2 rounded-full whitespace-nowrap">
-                            {activeOrders.length} Ativos
-                        </span>
+                {/* Hero editorial */}
+                <section className="px-6 md:px-10 pt-10 pb-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div className="max-w-[1600px] mx-auto">
+                        <div className="flex items-start justify-between gap-6 flex-wrap">
+                            <div>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Package className="w-4 h-4" style={{ color: 'var(--violet-bright)' }} />
+                                    <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-muted-foreground">Gestão de Pedidos</span>
+                                </div>
+                                <h1 className="font-display text-[44px] md:text-[56px] leading-[0.95] tracking-[-0.02em] font-light">
+                                    Meus <em className="italic font-normal text-gradient-aurora">Pedidos</em>
+                                </h1>
+                                <p className="mt-3 text-muted-foreground">{activeOrders.length} pedido(s) ativo(s) aguardando entrega.</p>
+                            </div>
+                            <div className="flex items-center gap-3 pt-2">
+                                <SearchInput placeholder="Buscar por cliente ou ID..." />
+                            </div>
+                        </div>
                     </div>
-                </MainHero>
+                </section>
 
-                <PageContainer className="px-4 md:px-8 py-6 md:py-12">
-                    <div className="flex items-center gap-6 border-b border-white/10 mb-8 overflow-x-auto scrollbar-hide">
+                <div className="px-6 md:px-10 py-6 max-w-[1600px] mx-auto w-full">
+                    <div className="flex items-center gap-6 mb-8 overflow-x-auto scrollbar-hide pb-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                         <Link to="/dashboard/cartomante/pedidos?tab=active"
-                            className={`text-sm font-bold pb-3 border-b-2 whitespace-nowrap transition-colors ${currentTab === 'active' ? 'text-indigo-400 border-indigo-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}
+                            className={`text-sm font-bold pb-3 whitespace-nowrap transition-colors relative ${currentTab === 'active' ? 'tab-active text-white' : 'text-muted-foreground hover:text-foreground'}`}
                         >
                             Ativos ({activeOrders.length})
                         </Link>
                         <Link to="/dashboard/cartomante/pedidos?tab=pending"
-                            className={`text-sm font-medium pb-3 border-b-2 whitespace-nowrap transition-colors ${currentTab === 'pending' ? 'text-indigo-400 border-indigo-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}
+                            className={`text-sm font-medium pb-3 whitespace-nowrap transition-colors relative ${currentTab === 'pending' ? 'tab-active text-white' : 'text-muted-foreground hover:text-foreground'}`}
                         >
                             Pendentes ({pendingOrders.length})
                         </Link>
                         <Link to="/dashboard/cartomante/pedidos?tab=completed"
-                            className={`text-sm font-medium pb-3 border-b-2 whitespace-nowrap transition-colors ${currentTab === 'completed' ? 'text-indigo-400 border-indigo-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}
+                            className={`text-sm font-medium pb-3 whitespace-nowrap transition-colors relative ${currentTab === 'completed' ? 'tab-active text-white' : 'text-muted-foreground hover:text-foreground'}`}
                         >
                             Concluídos ({completedOrders.length})
                         </Link>
                         <Link to="/dashboard/cartomante/pedidos?tab=canceled"
-                            className={`text-sm font-medium pb-3 border-b-2 whitespace-nowrap transition-colors ${currentTab === 'canceled' ? 'text-indigo-400 border-indigo-500' : 'text-slate-500 border-transparent hover:text-slate-300'}`}
+                            className={`text-sm font-medium pb-3 whitespace-nowrap transition-colors relative ${currentTab === 'canceled' ? 'tab-active text-white' : 'text-muted-foreground hover:text-foreground'}`}
                         >
                             Cancelados
                         </Link>
@@ -236,15 +237,14 @@ export default function OrdersPage() {
                                 return (
                                     <div
                                         key={order.id}
-                                        className="rounded-[1.5rem] border border-white/5 bg-card-item hover:border-indigo-500/20 hover:bg-white/5 transition-all p-5 flex flex-col md:flex-row items-start md:items-center gap-5 group"
+                                        className={`rounded-[1.5rem] border-shine p-5 flex flex-col md:flex-row items-start md:items-center gap-5 group card-row ${due.urgent && order.status === 'PAID' ? 'urgent-bar' : ''}`}
+                                        style={{ background: '#110d22' }}
                                     >
-                                        <div className="w-full md:w-16 h-32 md:h-16 rounded-2xl overflow-hidden bg-black/40 shrink-0 relative">
+                                        <div className="w-full md:w-16 h-32 md:h-16 rounded-2xl overflow-hidden card-tarot-mini shrink-0 relative flex items-center justify-center">
                                             {gig?.image_url ? (
-                                                <img src={gig.image_url} alt={gig.title} className="w-full h-full object-cover" />
+                                                <img src={gig.image_url} alt={gig.title} className="w-full h-full object-cover relative z-10" />
                                             ) : (
-                                                <div className="w-full h-full flex items-center justify-center">
-                                                    <Tag className="w-6 h-6 text-indigo-700" />
-                                                </div>
+                                                <Tag className="w-6 h-6 relative z-10" style={{ color: 'var(--violet-bright)', opacity: 0.6 }} />
                                             )}
                                             <div className="absolute top-2 right-2 md:hidden">
                                                 <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border backdrop-blur-md ${badge.color}`}>
@@ -264,7 +264,7 @@ export default function OrdersPage() {
                                                     </span>
                                                 </div>
                                                 <span className="md:hidden flex items-center gap-1 text-slate-500 text-xs font-bold">
-                                                    R$ {fmt(order.amount_reader_net)}
+                                                    R$ <span className="font-mono">{fmt(order.amount_reader_net)}</span>
                                                 </span>
                                             </div>
 
@@ -300,7 +300,7 @@ export default function OrdersPage() {
 
                                                 <span className="hidden md:flex items-center gap-1.5 text-slate-500 font-medium ml-auto">
                                                     <CreditCard className="w-3.5 h-3.5" />
-                                                    R$ {fmt(order.amount_reader_net)}
+                                                    R$ <span className="font-mono">{fmt(order.amount_reader_net)}</span>
                                                 </span>
                                             </div>
                                         </div>
@@ -381,7 +381,7 @@ export default function OrdersPage() {
                             </div>
                         </div>
                     )}
-                </PageContainer>
+                </div>
             </main>
 
             <Dialog open={cancelDialog.open} onOpenChange={(open) => !cancelDialog.submitting && setCancelDialog(prev => ({ ...prev, open }))}>

@@ -94,7 +94,7 @@ export default function AdminGigsPage() {
 
     return (
         <div className="space-y-6">
-            <h2 className="text-3xl font-bold tracking-tight">Moderação de Gigs</h2>
+            <h2 className="font-display text-3xl font-semibold tracking-tight">Moderação de Gigs</h2>
 
             <Tabs defaultValue="pending" className="w-full">
                 <TabsList>
