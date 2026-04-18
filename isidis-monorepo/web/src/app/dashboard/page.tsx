@@ -12,6 +12,7 @@ import { RealtimeRefresher } from '@/components/realtime-refresher'
 import { OnlineReaders } from '@/components/online-readers'
 import { useAuth } from '@/hooks/useAuth'
 import apiClient from '@/lib/apiClient'
+import { createClient } from '@/lib/supabase/client'
 
 export default function DashboardHome() {
     const { user, loading: authLoading } = useAuth()
@@ -34,11 +35,18 @@ export default function DashboardHome() {
         if (!user) { navigate('/login'); return }
         if (user.user_metadata?.role === 'READER') { navigate('/dashboard/cartomante'); return }
 
+        const supabase = createClient()
+
         Promise.all([
+            supabase.from('profiles').select('role').eq('id', user.id).single(),
             apiClient.get<{ data: { completed: boolean } }>('/me/quiz').catch(() => null),
             getCategoryCounts(),
             getBestSellingGigs(4),
-        ]).then(([quizResponse, categories, gigs]) => {
+        ]).then(([{ data: profileData }, quizResponse, categories, gigs]) => {
+            if (profileData?.role === 'READER') {
+                navigate('/dashboard/cartomante')
+                return
+            }
             if (quizResponse && !quizResponse.data.data.completed) {
                 navigate('/quiz-onboarding', { replace: true })
                 return
