@@ -1,6 +1,6 @@
 
 import React from 'react'
-import { logAnalyticsEvent } from '@/app/actions/analytics'
+import { logAnalyticsEvent } from '@/lib/actions/analytics'
 
 interface ClickTrackerProps {
     gigId: string

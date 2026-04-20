@@ -7,7 +7,7 @@ import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Send, User, ShieldCheck, MessageSquare, LifeBuoy } from 'lucide-react'
-import { addTicketMessage } from '@/app/actions/tickets'
+import { addTicketMessage } from '@/lib/actions/tickets'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 

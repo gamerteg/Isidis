@@ -18,6 +18,12 @@ const config = {
             },
         },
         extend: {
+            spacing: {
+                'safe-b': 'env(safe-area-inset-bottom)',
+                'safe-t': 'env(safe-area-inset-top)',
+                'safe-l': 'env(safe-area-inset-left)',
+                'safe-r': 'env(safe-area-inset-right)',
+            },
             fontFamily: {
                 sans: ["Manrope", "sans-serif"],
                 serif: ["Fraunces", "serif"],

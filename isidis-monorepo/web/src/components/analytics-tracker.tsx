@@ -1,6 +1,6 @@
 
 import { useEffect, useRef } from 'react'
-import { logAnalyticsEvent } from '@/app/actions/analytics'
+import { logAnalyticsEvent } from '@/lib/actions/analytics'
 
 interface AnalyticsTrackerProps {
     gigId: string

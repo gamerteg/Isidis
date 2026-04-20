@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { getUnreadMessageCount } from '@/app/actions/chat'
+import { getUnreadMessageCount } from '@/lib/actions/chat'
 
 interface SidebarMessageBadgeProps {
     userId: string

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Loader2, Star } from 'lucide-react'
 
-import { submitReview } from '@/app/actions/reviews'
+import { submitReview } from '@/lib/actions/reviews'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,

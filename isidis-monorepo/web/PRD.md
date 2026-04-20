@@ -1,7 +1,7 @@
-# Product Requirements Document (PRD) - Magicplace
+# Product Requirements Document (PRD) - Isidis
 
 ## 1. Visão Geral do Produto
-O **Magicplace** é um marketplace de nicho focado em serviços de Tarô e Esoterismo. O objetivo é conectar tarólogas qualificadas a clientes que buscam orientação, oferecendo uma experiência de entrega superior (visual e auditiva) e um sistema de pagamento simplificado via PIX.
+O **Isidis** é um marketplace de nicho focado em serviços de Tarô e Esoterismo. O objetivo é conectar tarólogas qualificadas a clientes que buscam orientação, oferecendo uma experiência de entrega superior (visual e auditiva) e um sistema de pagamento simplificado via PIX.
 
 ### 1.1 Diferenciais Chave
 - **Entrega Rica:** Diferente de chats simples, a entrega é um "Produto Digital" visual (Cartas virando + Áudio explicativo + Texto).

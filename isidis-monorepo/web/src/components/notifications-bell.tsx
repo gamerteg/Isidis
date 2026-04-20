@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import useSWR from 'swr'
 import { Bell, Check, ExternalLink, MessageCircle, Sparkles, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getNotifications, markNotificationRead, markAllNotificationsRead } from '@/app/actions/notifications'
+import { getNotifications, markNotificationRead, markAllNotificationsRead } from '@/lib/actions/notifications'
 import {  useNavigate  } from 'react-router-dom'
 
 interface Notification {

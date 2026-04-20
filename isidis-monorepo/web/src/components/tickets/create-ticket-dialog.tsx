@@ -32,7 +32,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { PlusCircle } from 'lucide-react'
-import { createTicket, TicketCategory, TicketPriority } from '@/app/actions/tickets'
+import { createTicket, TicketCategory, TicketPriority } from '@/lib/actions/tickets'
 import { toast } from 'sonner'
 
 const formSchema = z.object({

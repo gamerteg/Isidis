@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, ArrowDownToLine, AlertCircle, CheckCircle2 } from 'lucide-react'
-import { requestWithdrawal } from '@/app/actions/finance'
+import { requestWithdrawal } from '@/lib/actions/finance'
 import {  useNavigate  } from 'react-router-dom'
 
 interface WithdrawalModalProps {

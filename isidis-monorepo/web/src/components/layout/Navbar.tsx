@@ -52,7 +52,62 @@ export function Navbar() {
 
                     {!loading && user ? (
                         <div className="flex items-center gap-2">
-                            {/* Show relevant dashboard link based on role */}
+                            {/* Mobile hamburger — authenticated users */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="md:hidden h-11 w-11 p-2">
+                                        <Menu className="w-5 h-5" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56 glass-strong border-border/50">
+                                    {role === 'READER' ? (
+                                        <>
+                                            <DropdownMenuItem asChild>
+                                                <Link to="/dashboard/cartomante" className="cursor-pointer">
+                                                    <LayoutDashboard className="mr-2 h-4 w-4" /> Meu Painel
+                                                </Link>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem asChild>
+                                                <Link to="/dashboard/cartomante/mensagens" className="cursor-pointer">
+                                                    <Moon className="mr-2 h-4 w-4" /> Mensagens
+                                                </Link>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem asChild>
+                                                <Link to="/dashboard/cartomante/perfil" className="cursor-pointer">
+                                                    <User className="mr-2 h-4 w-4" /> Perfil
+                                                </Link>
+                                            </DropdownMenuItem>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <DropdownMenuItem asChild>
+                                                <Link to="/dashboard/minhas-tiragens" className="cursor-pointer">
+                                                    <LayoutDashboard className="mr-2 h-4 w-4" /> Minhas Leituras
+                                                </Link>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem asChild>
+                                                <Link to="/dashboard/mensagens" className="cursor-pointer">
+                                                    <Moon className="mr-2 h-4 w-4" /> Mensagens
+                                                </Link>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem asChild>
+                                                <Link to="/dashboard/perfil" className="cursor-pointer">
+                                                    <User className="mr-2 h-4 w-4" /> Perfil
+                                                </Link>
+                                            </DropdownMenuItem>
+                                        </>
+                                    )}
+                                    <DropdownMenuSeparator className="bg-border/50" />
+                                    <DropdownMenuItem
+                                        className="text-red-400 focus:text-red-400 cursor-pointer focus:bg-red-500/10"
+                                        onClick={handleSignOut}
+                                    >
+                                        <LogOut className="mr-2 h-4 w-4" /> Sair
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            {/* Desktop nav link */}
                             {role === 'READER' ? (
                                 <Button variant="ghost" size="sm" asChild className="hidden md:flex text-muted-foreground hover:text-foreground">
                                     <Link to="/dashboard/cartomante" className="nav-link">Meu Painel</Link>
@@ -63,9 +118,10 @@ export function Navbar() {
                                 </Button>
                             )}
 
+                            {/* Desktop avatar dropdown */}
                             <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Avatar className="cursor-pointer h-9 w-9 border-2 border-transparent hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/20">
+                                <DropdownMenuTrigger asChild className="hidden md:flex">
+                                    <Avatar className="cursor-pointer h-11 w-11 border-2 border-transparent hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/20">
                                         <AvatarImage src={user.user_metadata?.avatar_url} />
                                         <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
                                             {user.email?.substring(0, 2).toUpperCase()}

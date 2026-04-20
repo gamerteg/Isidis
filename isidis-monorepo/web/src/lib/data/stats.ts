@@ -93,18 +93,18 @@ const _getCategoryCounts = async (): Promise<CategoryCount[]> => {
     // Ensure minimums for visual appeal if data is empty
     if (Object.values(counts).every(c => c === 0)) {
         return [
-            { category: 'Amor & Relacionamentos', count: 0, slug: 'Amor & Relacionamentos', image: 'https://images.unsplash.com/photo-1518136247453-74e7b5265980?auto=format&fit=crop&q=80&w=800' },
-            { category: 'Carreira & Financas', count: 0, slug: 'Carreira & Financas', image: 'https://images.unsplash.com/photo-1579621970588-a35d0e7ab9b6?auto=format&fit=crop&q=80&w=800' },
-            { category: 'Espiritualidade', count: 0, slug: 'Espiritualidade', image: 'https://images.unsplash.com/photo-1528715471579-d1bcf0ba5e83?auto=format&fit=crop&q=80&w=800' },
-            { category: 'Saude & Bem-estar', count: 0, slug: 'Saude & Bem-estar', image: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&q=80&w=800' }
+            { category: 'Amor & Relacionamentos', count: 0, slug: 'Amor & Relacionamentos', image: '/img/Relacionamento.png' },
+            { category: 'Carreira & Financas', count: 0, slug: 'Carreira & Financas', image: '/img/Financeiro.png' },
+            { category: 'Espiritualidade', count: 0, slug: 'Espiritualidade', image: '/img/Espiritualidade.png' },
+            { category: 'Saude & Bem-estar', count: 0, slug: 'Saude & Bem-estar', image: '/img/Bem-estar.png' }
         ]
     }
 
     return [
-        { category: 'Amor & Relacionamentos', count: counts['Amor & Relacionamentos'], slug: 'Amor & Relacionamentos', image: 'https://images.unsplash.com/photo-1518136247453-74e7b5265980?auto=format&fit=crop&q=80&w=800' },
-        { category: 'Carreira & Financas', count: counts['Carreira & Financas'], slug: 'Carreira & Financas', image: 'https://images.unsplash.com/photo-1579621970588-a35d0e7ab9b6?auto=format&fit=crop&q=80&w=800' },
-        { category: 'Espiritualidade', count: counts['Espiritualidade'], slug: 'Espiritualidade', image: 'https://images.unsplash.com/photo-1528715471579-d1bcf0ba5e83?auto=format&fit=crop&q=80&w=800' },
-        { category: 'Saude & Bem-estar', count: counts['Saude & Bem-estar'], slug: 'Saude & Bem-estar', image: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&q=80&w=800' }
+        { category: 'Amor & Relacionamentos', count: counts['Amor & Relacionamentos'], slug: 'Amor & Relacionamentos', image: '/img/Relacionamento.png' },
+        { category: 'Carreira & Financas', count: counts['Carreira & Financas'], slug: 'Carreira & Financas', image: '/img/Financeiro.png' },
+        { category: 'Espiritualidade', count: counts['Espiritualidade'], slug: 'Espiritualidade', image: '/img/Espiritualidade.png' },
+        { category: 'Saude & Bem-estar', count: counts['Saude & Bem-estar'], slug: 'Saude & Bem-estar', image: '/img/Bem-estar.png' }
     ]
 }
 

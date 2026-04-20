@@ -1,0 +1,207 @@
+{
+  "main": {
+    "id": "584f560d70728aa5",
+    "type": "split",
+    "children": [
+      {
+        "id": "bc337e7d9cc438da",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "7af29b2aee223953",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "patches/PATCH-2026-04-20-migracao-nextjs-vite.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "PATCH-2026-04-20-migracao-nextjs-vite"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "933267f5fcc962ca",
+    "type": "split",
+    "children": [
+      {
+        "id": "4a511ce5f5142531",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "7c0cb38659628127",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorador de arquivos"
+            }
+          },
+          {
+            "id": "01295be9e8746624",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Procurar"
+            }
+          },
+          {
+            "id": "c68aa523f61e7da7",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Marcadores"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "92e472f58785c24f",
+    "type": "split",
+    "children": [
+      {
+        "id": "65ea8ea2b72c609d",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "3e94f0559c54e522",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "patches/PATCH-2026-04-20-migracao-nextjs-vite.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Links inversos para PATCH-2026-04-20-migracao-nextjs-vite"
+            }
+          },
+          {
+            "id": "b58f8deed6afa63f",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "patches/PATCH-2026-04-20-migracao-nextjs-vite.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Links de saída para PATCH-2026-04-20-migracao-nextjs-vite"
+            }
+          },
+          {
+            "id": "6ec3ec82ec2c5b14",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etiquetas"
+            }
+          },
+          {
+            "id": "188e73c2428b6bd1",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Todas as propriedades"
+            }
+          },
+          {
+            "id": "fd37b7bdb25ebade",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "patches/PATCH-2026-04-20-migracao-nextjs-vite.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Sumário de PATCH-2026-04-20-migracao-nextjs-vite"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Abrir a troca rápida": false,
+      "graph:Abrir visualização em gráfico": false,
+      "canvas:Criar novo canvas": false,
+      "daily-notes:Abrir a nota de hoje": false,
+      "templates:Inserir modelo": false,
+      "command-palette:Abrir paleta de comandos": false,
+      "bases:Criar nova base": false
+    }
+  },
+  "active": "7af29b2aee223953",
+  "lastOpenFiles": [
+    "patches/PATCH-2026-04-20-admin-removal-mobile-first.md",
+    "07-Telas-Dashboards.md",
+    "patches/PATCH-2026-04-20-migracao-nextjs-vite.md",
+    "patches",
+    "15-Deployment-e-Ambientes.md",
+    "14-Estrategia-de-Testes.md",
+    "13-Monitoramento-e-Erros.md",
+    "12-Estrategia-de-Tipagem.md",
+    "11-Modelo-de-Dados.md",
+    "06-Telas-Auth-Onboarding.md",
+    "02-Plano-Definitivo-Frontend.md",
+    "09-Func-Pagamentos-Financeiro.md",
+    "08-Func-Mensagens-Presenca.md",
+    "05-Telas-Publicas.md",
+    "04-Melhorias-API.md",
+    "00-Index.md",
+    "10-Func-Ciclo-Leitura.md",
+    "01-Erros-Identificados.md"
+  ]
+}
