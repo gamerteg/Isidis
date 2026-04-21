@@ -8,12 +8,13 @@ import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   getUserDetail, updateUser, suspendUser, activateUser, changeRole,
-  getUserOrders, getUserWalletStats, type AdminUser, type UserOrder, type WalletStats,
+  getUserOrders, getUserWalletStats, creditBalance, type AdminUser, type UserOrder, type WalletStats,
 } from '@/services/users'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, pixKeyTypeLabel } from '@/lib/utils'
 
 export function UserDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -27,6 +28,17 @@ export function UserDetailPage() {
   // Editable fields
   const [fullName, setFullName] = useState('')
   const [bio, setBio] = useState('')
+  const [socialName, setSocialName] = useState('')
+  const [cellphone, setCellphone] = useState('')
+  const [taxId, setTaxId] = useState('')
+  const [pixKeyType, setPixKeyType] = useState('')
+  const [pixKey, setPixKey] = useState('')
+
+  // Credit balance dialog
+  const [creditDialog, setCreditDialog] = useState(false)
+  const [creditAmount, setCreditAmount] = useState('')
+  const [creditDescription, setCreditDescription] = useState('')
+  const [crediting, setCrediting] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -38,6 +50,11 @@ export function UserDetailPage() {
       setOrders(o)
       setFullName(u?.full_name ?? '')
       setBio(u?.bio ?? '')
+      setSocialName(u?.social_name ?? '')
+      setCellphone(u?.cellphone ?? '')
+      setTaxId(u?.tax_id ?? '')
+      setPixKeyType(u?.pix_key_type ?? '')
+      setPixKey(u?.pix_key ?? '')
 
       if (u?.role === 'READER') {
         getUserWalletStats(id).then(setWallet)
@@ -49,13 +66,41 @@ export function UserDetailPage() {
     if (!user || !id) return
     setSaving(true)
     try {
-      await updateUser(id, { full_name: fullName, bio })
+      const updates = {
+        full_name: fullName,
+        bio,
+        social_name: socialName,
+        cellphone,
+        tax_id: taxId,
+        pix_key_type: pixKeyType,
+        pix_key: pixKey,
+      }
+      await updateUser(id, updates)
       toast.success('Perfil atualizado.')
-      setUser(u => u ? { ...u, full_name: fullName, bio } : u)
+      setUser(u => u ? { ...u, ...updates } : u)
     } catch {
       toast.error('Erro ao salvar.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleCreditBalance = async () => {
+    if (!id || !creditAmount || !creditDescription) return
+    setCrediting(true)
+    try {
+      const amountCents = Math.round(parseFloat(creditAmount.replace(',', '.')) * 100)
+      await creditBalance(id, amountCents, creditDescription)
+      toast.success('Saldo creditado com sucesso.')
+      setCreditDialog(false)
+      setCreditAmount('')
+      setCreditDescription('')
+      // Refresh wallet
+      getUserWalletStats(id).then(setWallet)
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao creditar saldo.')
+    } finally {
+      setCrediting(false)
     }
   }
 
@@ -189,10 +234,50 @@ export function UserDetailPage() {
             <TabsContent value="profile">
               <Card>
                 <CardContent className="pt-6 space-y-4">
-                  <div className="space-y-2">
-                    <Label>Nome Completo</Label>
-                    <Input value={fullName} onChange={e => setFullName(e.target.value)} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Nome Completo</Label>
+                      <Input value={fullName} onChange={e => setFullName(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Nome Social (opcional)</Label>
+                      <Input value={socialName} onChange={e => setSocialName(e.target.value)} />
+                    </div>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>CPF / CNPJ</Label>
+                      <Input value={taxId} onChange={e => setTaxId(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>WhatsApp / Celular</Label>
+                      <Input value={cellphone} onChange={e => setCellphone(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Tipo de Chave PIX</Label>
+                      <Select value={pixKeyType} onValueChange={setPixKeyType}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="CPF">CPF</SelectItem>
+                          <SelectItem value="CNPJ">CNPJ</SelectItem>
+                          <SelectItem value="EMAIL">E-mail</SelectItem>
+                          <SelectItem value="PHONE">Telefone</SelectItem>
+                          <SelectItem value="RANDOM">Aleatória</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Chave PIX</Label>
+                      <Input value={pixKey} onChange={e => setPixKey(e.target.value)} />
+                    </div>
+                  </div>
+
                   {isReader && (
                     <div className="space-y-2">
                       <Label>Biografia</Label>
@@ -262,23 +347,40 @@ export function UserDetailPage() {
 
             {isReader && (
               <TabsContent value="wallet">
-                <div className="grid gap-4 md:grid-cols-3">
-                  <Card>
-                    <CardHeader><CardTitle className="text-sm text-muted-foreground">Disponível</CardTitle></CardHeader>
+                <div className="space-y-6">
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <Card>
+                      <CardHeader><CardTitle className="text-sm text-muted-foreground">Disponível</CardTitle></CardHeader>
+                      <CardContent>
+                        <p className="text-2xl font-bold text-green-400">{formatCurrency(wallet?.available ?? 0)}</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader><CardTitle className="text-sm text-muted-foreground">Em Hold (48h)</CardTitle></CardHeader>
+                      <CardContent>
+                        <p className="text-2xl font-bold text-amber-400">{formatCurrency(wallet?.pending ?? 0)}</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader><CardTitle className="text-sm text-muted-foreground">Total Sacado</CardTitle></CardHeader>
+                      <CardContent>
+                        <p className="text-2xl font-bold text-blue-400">{formatCurrency(wallet?.total_withdrawn ?? 0)}</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card className="border-primary/20 bg-primary/5">
+                    <CardHeader>
+                      <CardTitle className="text-sm">Ação Manual de Saldo</CardTitle>
+                    </CardHeader>
                     <CardContent>
-                      <p className="text-2xl font-bold text-green-400">{formatCurrency(wallet?.available ?? 0)}</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader><CardTitle className="text-sm text-muted-foreground">Em Hold (48h)</CardTitle></CardHeader>
-                    <CardContent>
-                      <p className="text-2xl font-bold text-amber-400">{formatCurrency(wallet?.pending ?? 0)}</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader><CardTitle className="text-sm text-muted-foreground">Total Sacado</CardTitle></CardHeader>
-                    <CardContent>
-                      <p className="text-2xl font-bold text-blue-400">{formatCurrency(wallet?.total_withdrawn ?? 0)}</p>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Use esta ferramenta para creditar valores manualmente na carteira da cartomante (ex: reembolsos, bônus, correções).
+                      </p>
+                      <Button onClick={() => setCreditDialog(true)}>
+                        <Wallet className="w-4 h-4 mr-2" />
+                        Liberar Saldo Manualmente
+                      </Button>
                     </CardContent>
                   </Card>
                 </div>
@@ -287,6 +389,39 @@ export function UserDetailPage() {
           </Tabs>
         </div>
       </div>
+
+      {/* Credit Balance Dialog */}
+      <Dialog open={creditDialog} onOpenChange={setCreditDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Liberar Saldo Manual</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Valor (R$)</Label>
+              <Input
+                placeholder="0,00"
+                value={creditAmount}
+                onChange={e => setCreditAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Motivo / Descrição</Label>
+              <Input
+                placeholder="Ex: Correção de repasse pedido #123"
+                value={creditDescription}
+                onChange={e => setCreditDescription(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreditDialog(false)}>Cancelar</Button>
+            <Button onClick={handleCreditBalance} disabled={crediting || !creditAmount || !creditDescription}>
+              {crediting ? 'Creditando...' : 'Confirmar Crédito'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirm Dialog */}
       <Dialog open={!!confirmDialog} onOpenChange={() => setConfirmDialog(null)}>

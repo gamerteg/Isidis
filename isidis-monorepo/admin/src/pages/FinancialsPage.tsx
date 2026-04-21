@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { DollarSign, TrendingUp, ArrowUpRight, Clock, AlertCircle, Check, X } from 'lucide-react'
+import { DollarSign, TrendingUp, ArrowUpRight, Clock, AlertCircle, Check, X, FileText, Printer } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -13,6 +13,7 @@ import {
   getFinancialOverview,
   listPendingWithdrawals,
   updateWithdrawalStatus,
+  getWithdrawalReceipt,
   type PendingWithdrawal,
 } from '@/services/financials'
 import { formatCurrency, formatDate, pixKeyTypeLabel } from '@/lib/utils'
@@ -34,6 +35,8 @@ export function FinancialsPage() {
   const [processing, setProcessing] = useState<string | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [confirmDialog, setConfirmDialog] = useState<{ id: string; action: 'COMPLETED' | 'FAILED' } | null>(null)
+  const [receiptDialog, setReceiptDialog] = useState<any | null>(null)
+  const [loadingReceipt, setLoadingReceipt] = useState(false)
 
   const load = async (background = false) => {
     if (background) {
@@ -86,11 +89,25 @@ export function FinancialsPage() {
       await updateWithdrawalStatus(id, action)
       toast.success(action === 'COMPLETED' ? 'Saque marcado como concluido.' : 'Saque marcado como falhou.')
       await load(true)
-    } catch {
-      toast.error('Erro ao atualizar status do saque.')
     } finally {
       setProcessing(null)
     }
+  }
+
+  const handleViewReceipt = async (id: string) => {
+    setLoadingReceipt(true)
+    try {
+      const data = await getWithdrawalReceipt(id)
+      setReceiptDialog(data)
+    } catch {
+      toast.error('Erro ao carregar recibo.')
+    } finally {
+      setLoadingReceipt(false)
+    }
+  }
+
+  const handlePrint = () => {
+    window.print()
   }
 
   if (loading && !overview) {
@@ -232,6 +249,16 @@ export function FinancialsPage() {
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex gap-2 justify-center">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-blue-400 border-blue-500/30"
+                          onClick={() => handleViewReceipt(withdrawal.id)}
+                          disabled={loadingReceipt}
+                          title="Ver Nota"
+                        >
+                          <FileText className="w-4 h-4" />
+                        </Button>
                         <Button
                           size="sm"
                           variant="success"
@@ -376,6 +403,107 @@ export function FinancialsPage() {
               Confirmar
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdrawal Receipt Modal */}
+      <Dialog open={!!receiptDialog} onOpenChange={() => setReceiptDialog(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="print:hidden">
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              Nota de Repasse da Plataforma
+            </DialogTitle>
+          </DialogHeader>
+
+          {receiptDialog && (
+            <div className="space-y-6 pt-4 print:pt-0">
+              {/* Header Print */}
+              <div className="hidden print:block text-center border-b pb-4 mb-6">
+                <h1 className="text-2xl font-bold">ISIDIS</h1>
+                <p className="text-sm text-muted-foreground">Comprovante de Repasse de Serviços</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8 text-sm">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-bold uppercase text-[10px] text-muted-foreground mb-1">Dados do Recebedor</h3>
+                    <p className="font-semibold text-base">{receiptDialog.reader.name}</p>
+                    {receiptDialog.reader.tax_id && <p>CPF/CNPJ: {receiptDialog.reader.tax_id}</p>}
+                    {receiptDialog.reader.social_name && <p>Nome Social: {receiptDialog.reader.social_name}</p>}
+                    <p>WhatsApp: {receiptDialog.reader.cellphone || '—'}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-bold uppercase text-[10px] text-muted-foreground mb-1">Dados de Pagamento</h3>
+                    <p>Chave PIX: {receiptDialog.withdrawal.pix_key}</p>
+                    <p>Tipo: {pixKeyTypeLabel(receiptDialog.withdrawal.pix_key_type)}</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-bold uppercase text-[10px] text-muted-foreground mb-1">Informações do Saque</h3>
+                    <p>ID: <code className="text-xs">{receiptDialog.withdrawal.id}</code></p>
+                    <p>Data Pedido: {formatDate(receiptDialog.withdrawal.created_at)}</p>
+                    <p>Status: <Badge variant={receiptDialog.withdrawal.status === 'COMPLETED' ? 'success' : 'warning'}>{receiptDialog.withdrawal.status}</Badge></p>
+                  </div>
+                  <div className="bg-primary/5 p-3 rounded-lg border border-primary/10">
+                    <h3 className="font-bold uppercase text-[10px] text-primary mb-1">Valor do Repasse</h3>
+                    <p className="text-2xl font-bold text-primary">{formatCurrency(receiptDialog.withdrawal.amount)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-bold uppercase text-[10px] text-muted-foreground mb-2">Detalhamento dos Atendimentos</h3>
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-muted/50">
+                      <TableRow>
+                        <TableHead className="text-[10px]">DATA</TableHead>
+                        <TableHead className="text-[10px]">CLIENTE</TableHead>
+                        <TableHead className="text-[10px]">SERVIÇO</TableHead>
+                        <TableHead className="text-right text-[10px]">VALOR LÍQUIDO</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {receiptDialog.service_orders.length > 0 ? (
+                        receiptDialog.service_orders.map((o: any) => (
+                          <TableRow key={o.id} className="text-xs">
+                            <TableCell>{formatDate(o.created_at).split(' ')[0]}</TableCell>
+                            <TableCell>{o.client_name}</TableCell>
+                            <TableCell className="truncate max-w-[150px]">{o.gig_title}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(o.amount_reader_net)}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-4 text-muted-foreground italic">
+                            Pedidos conciliados no fechamento anterior.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              <div className="text-[10px] text-muted-foreground pt-4 border-t flex justify-between items-center">
+                <p>Gerado em {new Date(receiptDialog.generated_at).toLocaleString('pt-BR')}</p>
+                <p>Isidis Admin - Plataforma de Consultas</p>
+              </div>
+
+              <div className="flex justify-end gap-3 print:hidden">
+                <Button variant="outline" onClick={() => setReceiptDialog(null)}>Fechar</Button>
+                <Button onClick={handlePrint} className="gap-2">
+                  <Printer className="w-4 h-4" />
+                  Imprimir / PDF
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

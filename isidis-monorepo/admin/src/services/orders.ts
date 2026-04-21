@@ -96,6 +96,20 @@ export async function resolveDispute(orderId: string): Promise<void> {
   }
 }
 
+export async function refundOrder(orderId: string): Promise<{ success: boolean; note: string }> {
+  const response = await apiPost<{ data: { success: boolean; note: string } }>(`/admin/orders/${orderId}/refund`)
+  return response.data
+}
+
+export async function forcePaidOrder(orderId: string): Promise<void> {
+  await apiPost(`/admin/orders/${orderId}/force-paid`)
+}
+
+export async function forceOrderStatus(orderId: string, status: string): Promise<void> {
+  await apiPost(`/admin/orders/${orderId}/force-status`, { status })
+}
+
+
 export const ORDER_STATUS_MAP: Record<
   string,
   { label: string; variant: 'success' | 'info' | 'warning' | 'outline' | 'destructive' }

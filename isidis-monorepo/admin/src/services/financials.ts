@@ -84,3 +84,9 @@ export async function listRecentOrders(limit = 50): Promise<OrderFinancialRow[]>
     return legacyListRecentOrders(limit)
   }
 }
+
+export async function getWithdrawalReceipt(id: string): Promise<any> {
+  const response = await apiGet<{ data: any }>(`/admin/withdrawals/${id}/receipt`)
+  return response.data
+}
+

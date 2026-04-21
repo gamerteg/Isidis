@@ -1031,26 +1031,53 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Prioridade: order_id do query param (sempre disponível desde checkout direto)
       if (orderIdParam) {
-        const { data } = await fastify.supabase
+        const { data, error: queryError } = await fastify.supabase
           .from('orders')
           .select('id, status, client_id, mercadopago_payment_id')
           .eq('id', orderIdParam)
           .maybeSingle()
+
+        if (queryError) {
+          request.log.error(
+            { orderIdParam, err: queryError.message, code: queryError.code },
+            '[checkout] Erro DB ao buscar pedido por order_id no status check'
+          )
+        }
+
         if (data) order = data
       }
 
       // Fallback: buscar por mercadopago_payment_id
       if (!order) {
-        const { data } = await fastify.supabase
+        const { data, error: queryError } = await fastify.supabase
           .from('orders')
           .select('id, status, client_id, mercadopago_payment_id')
           .eq('mercadopago_payment_id', paymentId)
           .maybeSingle()
+
+        if (queryError) {
+          request.log.error(
+            { paymentId, err: queryError.message, code: queryError.code },
+            '[checkout] Erro DB ao buscar pedido por mercadopago_payment_id no status check'
+          )
+        }
+
         if (data) order = data
       }
 
-      if (!order || order.client_id !== request.user.id) {
-        request.log.warn({ paymentId, orderIdParam }, '[checkout] Pedido nao encontrado no status check')
+      if (!order) {
+        request.log.warn(
+          { paymentId, orderIdParam, userId: request.user.id },
+          '[checkout] Pedido nao encontrado por nenhum criterio no status check'
+        )
+        return reply.status(404).send({ error: 'Pedido nao encontrado' })
+      }
+
+      if (order.client_id !== request.user.id) {
+        request.log.warn(
+          { paymentId, orderIdParam, orderClientId: order.client_id, requestUserId: request.user.id },
+          '[checkout] client_id do pedido nao corresponde ao usuario autenticado'
+        )
         return reply.status(404).send({ error: 'Pedido nao encontrado' })
       }
 

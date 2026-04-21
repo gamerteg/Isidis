@@ -54,6 +54,15 @@ const signedUrlQuerySchema = z.object({
   path: z.string().trim().min(1),
 })
 
+const forceOrderStatusSchema = z.object({
+  status: z.enum(['PAID', 'DELIVERED', 'COMPLETED']),
+})
+
+const creditBalanceSchema = z.object({
+  amount: z.number().int().min(1),
+  description: z.string().trim().min(1).max(500),
+})
+
 type FastifyWithSupabase = any
 
 type RawOrderRow = {
@@ -861,6 +870,209 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
     }
   )
 
+  // ─── Estornar pedido via Mercado Pago ───
+  fastify.post(
+    '/admin/orders/:id/refund',
+    { preHandler: [(fastify as any).requireAdmin] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string }
+
+      const { data: order, error: fetchErr } = await fastify.supabase
+        .from('orders')
+        .select('id, status, client_id, reader_id, mercadopago_payment_id, amount_total, gig_id')
+        .eq('id', id)
+        .single()
+
+      if (fetchErr || !order) {
+        return reply.status(404).send({ error: 'Pedido não encontrado' })
+      }
+
+      if (order.status === 'CANCELED') {
+        return reply.status(400).send({ error: 'Pedido já está cancelado' })
+      }
+
+      let refundSuccess = false
+      let refundNote = ''
+
+      if (order.mercadopago_payment_id) {
+        try {
+          await fastify.mp.refundPayment({ paymentId: order.mercadopago_payment_id })
+          refundSuccess = true
+          refundNote = 'Reembolso processado via Mercado Pago.'
+        } catch (mpErr: any) {
+          request.log.error({ mpErr: mpErr?.message }, '[admin/refund] Erro MP refund')
+          refundNote = 'Erro ao estornar no Mercado Pago. Estorno manual pode ser necessário.'
+        }
+      } else {
+        refundNote = 'Pedido sem payment_id do Mercado Pago. Estorno manual necessário.'
+      }
+
+      // Cancelar pedido e transações
+      await fastify.supabase.from('orders').update({ status: 'CANCELED' }).eq('id', id)
+      await fastify.supabase.from('transactions').update({ status: 'FAILED' }).eq('order_id', id)
+
+      // Notificar partes
+      const [gigMap] = await Promise.all([
+        getGigsMap(fastify, [order.gig_id]),
+      ])
+
+      await Promise.all([
+        notifyUser(fastify, order.client_id, {
+          type: 'ORDER_UPDATE',
+          title: 'Pedido estornado',
+          message: `Seu pedido de "${gigMap.get(order.gig_id)?.title ?? 'serviço'}" foi estornado pelo suporte. ${refundSuccess ? 'O reembolso será processado em até 5 dias úteis.' : ''}`,
+          link: '/dashboard/pedidos',
+        }),
+        notifyUser(fastify, order.reader_id, {
+          type: 'ORDER_UPDATE',
+          title: 'Pedido estornado',
+          message: `O pedido de "${gigMap.get(order.gig_id)?.title ?? 'serviço'}" foi estornado pelo suporte.`,
+          link: '/dashboard/cartomante/pedidos',
+        }),
+      ])
+
+      return reply.send({ data: { success: true, refund_success: refundSuccess, note: refundNote } })
+    }
+  )
+
+  // ─── Forçar pedido como pago (quando webhook falhou) ───
+  fastify.post(
+    '/admin/orders/:id/force-paid',
+    { preHandler: [(fastify as any).requireAdmin] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string }
+
+      const { data: order, error: fetchErr } = await fastify.supabase
+        .from('orders')
+        .select('id, status, client_id, reader_id, amount_reader_net, gig_id, mercadopago_payment_id')
+        .eq('id', id)
+        .single()
+
+      if (fetchErr || !order) {
+        return reply.status(404).send({ error: 'Pedido não encontrado' })
+      }
+
+      if (order.status !== 'PENDING_PAYMENT') {
+        return reply.status(400).send({ error: `Pedido não está em PENDING_PAYMENT (status atual: ${order.status})` })
+      }
+
+      // Atualizar status para PAID
+      const { error: updateErr } = await fastify.supabase
+        .from('orders')
+        .update({ status: 'PAID' })
+        .eq('id', id)
+
+      if (updateErr) {
+        return reply.status(500).send({ error: updateErr.message })
+      }
+
+      // Criar ou buscar wallet da cartomante e adicionar SALE_CREDIT
+      let { data: wallet } = await fastify.supabase
+        .from('wallets')
+        .select('id')
+        .eq('user_id', order.reader_id)
+        .single()
+
+      if (!wallet) {
+        const { data: newWallet } = await fastify.supabase
+          .from('wallets')
+          .insert({ user_id: order.reader_id })
+          .select('id')
+          .single()
+        wallet = newWallet
+      }
+
+      if (wallet) {
+        await fastify.supabase.from('transactions').insert({
+          wallet_id: wallet.id,
+          amount: order.amount_reader_net,
+          type: 'SALE_CREDIT',
+          status: 'PENDING',
+          order_id: order.id,
+          external_id: order.mercadopago_payment_id ?? `admin-force-${Date.now()}`,
+        })
+      }
+
+      // Notificar
+      const gigMap = await getGigsMap(fastify, [order.gig_id])
+
+      await notifyUser(fastify, order.reader_id, {
+        type: 'ORDER_NEW',
+        title: 'Novo pedido recebido! 🎉',
+        message: `Pagamento confirmado para "${gigMap.get(order.gig_id)?.title ?? 'serviço'}". Você já pode iniciar o atendimento.`,
+        link: `/orders/${order.id}`,
+      })
+
+      return reply.send({ data: { success: true } })
+    }
+  )
+
+  // ─── Forçar mudança de status de pedido ───
+  fastify.post(
+    '/admin/orders/:id/force-status',
+    { preHandler: [(fastify as any).requireAdmin] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string }
+      const body = forceOrderStatusSchema.safeParse(request.body)
+
+      if (!body.success) {
+        return reply.status(400).send({ error: body.error.flatten() })
+      }
+
+      const { data: order, error: fetchErr } = await fastify.supabase
+        .from('orders')
+        .select('id, status, client_id, reader_id')
+        .eq('id', id)
+        .single()
+
+      if (fetchErr || !order) {
+        return reply.status(404).send({ error: 'Pedido não encontrado' })
+      }
+
+      const updates: Record<string, any> = { status: body.data.status }
+
+      if (body.data.status === 'DELIVERED' && !order.delivered_at) {
+        updates.delivered_at = new Date().toISOString()
+      }
+
+      const { error: updateErr } = await fastify.supabase
+        .from('orders')
+        .update(updates)
+        .eq('id', id)
+
+      if (updateErr) {
+        return reply.status(500).send({ error: updateErr.message })
+      }
+
+      // Se mudou para COMPLETED, liberar as transações SALE_CREDIT pendentes desse pedido
+      if (body.data.status === 'COMPLETED') {
+        await fastify.supabase
+          .from('transactions')
+          .update({ status: 'COMPLETED' })
+          .eq('order_id', id)
+          .eq('type', 'SALE_CREDIT')
+          .eq('status', 'PENDING')
+      }
+
+      await Promise.all([
+        notifyUser(fastify, order.client_id, {
+          type: 'ORDER_UPDATE',
+          title: 'Atualização do pedido',
+          message: `Seu pedido foi atualizado para ${body.data.status} pelo suporte.`,
+          link: '/dashboard/pedidos',
+        }),
+        notifyUser(fastify, order.reader_id, {
+          type: 'ORDER_UPDATE',
+          title: 'Atualização do pedido',
+          message: `O pedido foi atualizado para ${body.data.status} pelo suporte.`,
+          link: '/dashboard/cartomante/pedidos',
+        }),
+      ])
+
+      return reply.send({ data: { success: true } })
+    }
+  )
+
   fastify.get('/admin/financials', { preHandler: [(fastify as any).requireAdmin] }, async (_, reply) => {
     const [stats, recentOrders, health] = await Promise.all([
       getFinancialStats(fastify),
@@ -912,6 +1124,107 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       return reply.send({ data: { success: true } })
+    }
+  )
+
+  // ─── Nota/Comprovante de Saque ───
+  fastify.get(
+    '/admin/withdrawals/:id/receipt',
+    { preHandler: [(fastify as any).requireAdmin] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string }
+
+      // Buscar a transação de saque
+      const { data: withdrawal, error: wError } = await fastify.supabase
+        .from('transactions')
+        .select('id, created_at, amount, status, metadata, wallets!inner(user_id)')
+        .eq('id', id)
+        .eq('type', 'WITHDRAWAL')
+        .single()
+
+      if (wError || !withdrawal) {
+        return reply.status(404).send({ error: 'Saque não encontrado' })
+      }
+
+      const userId = (withdrawal as any).wallets.user_id
+      const metadata = (withdrawal.metadata as Record<string, string> | null) ?? {}
+
+      // Dados do perfil da cartomante
+      const { data: profile } = await fastify.supabase
+        .from('profiles')
+        .select('full_name, social_name, tax_id, cellphone, pix_key, pix_key_type')
+        .eq('id', userId)
+        .single()
+
+      // Buscar wallet
+      const { data: wallet } = await fastify.supabase
+        .from('wallets')
+        .select('id')
+        .eq('user_id', userId)
+        .single()
+
+      // Buscar todas as transações SALE_CREDIT COMPLETED da wallet para listar os atendimentos
+      let serviceOrders: any[] = []
+      if (wallet) {
+        const { data: saleTxns } = await fastify.supabase
+          .from('transactions')
+          .select('amount, created_at, order_id, orders(id, created_at, amount_total, amount_platform_fee, amount_reader_net, gig_id, client_id, payment_method)')
+          .eq('wallet_id', wallet.id)
+          .eq('type', 'SALE_CREDIT')
+          .eq('status', 'COMPLETED')
+          .order('created_at', { ascending: false })
+          .limit(100)
+
+        if (saleTxns) {
+          const ordersData = saleTxns
+            .filter((tx: any) => tx.orders)
+            .map((tx: any) => tx.orders)
+
+          // Enriquecer com nomes
+          const clientIds = ordersData.map((o: any) => o.client_id).filter(Boolean)
+          const gigIds = ordersData.map((o: any) => o.gig_id).filter(Boolean)
+
+          const [profileMap, gigMap] = await Promise.all([
+            getProfilesMap(fastify, clientIds, 'id, full_name'),
+            getGigsMap(fastify, gigIds),
+          ])
+
+          serviceOrders = ordersData.map((o: any) => ({
+            id: o.id,
+            created_at: o.created_at,
+            amount_total: o.amount_total,
+            amount_platform_fee: o.amount_platform_fee,
+            amount_reader_net: o.amount_reader_net,
+            payment_method: o.payment_method,
+            client_name: profileMap.get(o.client_id)?.full_name ?? 'Cliente',
+            gig_title: gigMap.get(o.gig_id)?.title ?? 'Serviço',
+          }))
+        }
+      }
+
+      return reply.send({
+        data: {
+          withdrawal: {
+            id: withdrawal.id,
+            created_at: withdrawal.created_at,
+            amount: Math.abs(withdrawal.amount),
+            status: withdrawal.status,
+            pix_key: metadata.pix_key ?? '—',
+            pix_key_type: metadata.pix_key_type ?? '—',
+            notes: metadata.notes ?? null,
+          },
+          reader: {
+            name: profile?.full_name ?? 'Desconhecido',
+            social_name: profile?.social_name ?? null,
+            tax_id: profile?.tax_id ?? null,
+            cellphone: profile?.cellphone ?? null,
+            pix_key: profile?.pix_key ?? null,
+            pix_key_type: profile?.pix_key_type ?? null,
+          },
+          service_orders: serviceOrders,
+          generated_at: new Date().toISOString(),
+        },
+      })
     }
   )
 
@@ -968,6 +1281,83 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
       const { id } = request.params as { id: string }
       const wallet = await getUserWalletStatsInternal(fastify, id)
       return reply.send({ data: wallet })
+    }
+  )
+
+  // ─── Liberar saldo manualmente na carteira da cartomante ───
+  fastify.post(
+    '/admin/users/:id/credit-balance',
+    { preHandler: [(fastify as any).requireAdmin] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string }
+      const body = creditBalanceSchema.safeParse(request.body)
+
+      if (!body.success) {
+        return reply.status(400).send({ error: body.error.flatten() })
+      }
+
+      // Verificar se o usuário existe
+      const { data: profile } = await fastify.supabase
+        .from('profiles')
+        .select('id, role')
+        .eq('id', id)
+        .single()
+
+      if (!profile) {
+        return reply.status(404).send({ error: 'Usuário não encontrado' })
+      }
+
+      // Buscar ou criar wallet
+      let { data: wallet } = await fastify.supabase
+        .from('wallets')
+        .select('id')
+        .eq('user_id', id)
+        .single()
+
+      if (!wallet) {
+        const { data: newWallet, error: createErr } = await fastify.supabase
+          .from('wallets')
+          .insert({ user_id: id })
+          .select('id')
+          .single()
+
+        if (createErr) {
+          return reply.status(500).send({ error: 'Erro ao criar carteira' })
+        }
+        wallet = newWallet
+      }
+
+      if (!wallet) {
+        return reply.status(500).send({ error: 'Erro ao obter carteira' })
+      }
+
+      // Inserir transação ADMIN_CREDIT como COMPLETED
+      const { error: txErr } = await fastify.supabase.from('transactions').insert({
+        wallet_id: wallet.id,
+        amount: body.data.amount,
+        type: 'SALE_CREDIT',
+        status: 'COMPLETED',
+        external_id: `admin-credit-${Date.now()}`,
+        metadata: {
+          admin_credit: true,
+          description: body.data.description,
+          credited_by: request.user.id,
+          credited_at: new Date().toISOString(),
+        },
+      })
+
+      if (txErr) {
+        return reply.status(500).send({ error: txErr.message })
+      }
+
+      await notifyUser(fastify, id, {
+        type: 'SYSTEM',
+        title: 'Saldo liberado',
+        message: `Um crédito de R$ ${(body.data.amount / 100).toFixed(2)} foi adicionado à sua carteira. Motivo: ${body.data.description}`,
+        link: '/wallet',
+      })
+
+      return reply.send({ data: { success: true } })
     }
   )
 

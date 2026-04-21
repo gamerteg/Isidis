@@ -10,6 +10,9 @@ import {
   getOrderDetail,
   cancelOrder,
   resolveDispute,
+  refundOrder,
+  forcePaidOrder,
+  forceOrderStatus,
   ORDER_STATUS_MAP,
   type AdminOrder,
 } from '@/services/orders'
@@ -20,7 +23,7 @@ export function OrderDetailPage() {
   const [order, setOrder] = useState<AdminOrder | null>(null)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
-  const [confirmAction, setConfirmAction] = useState<'cancel' | 'resolve' | null>(null)
+  const [confirmAction, setConfirmAction] = useState<'cancel' | 'resolve' | 'refund' | 'forcePaid' | 'forceDelivered' | 'forceCompleted' | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -51,6 +54,55 @@ export function OrderDetailPage() {
       setOrder((current) => (current ? { ...current, has_dispute: false } : current))
     } catch {
       toast.error('Erro ao encerrar disputa.')
+    } finally {
+      setProcessing(false)
+      setConfirmAction(null)
+    }
+  }
+
+  const handleRefund = async () => {
+    if (!id) return
+    setProcessing(true)
+    try {
+      const result = await refundOrder(id)
+      if (result.success) {
+        toast.success('Pedido estornado com sucesso.')
+      } else {
+        toast.warning(result.note)
+      }
+      setOrder((current) => (current ? { ...current, status: 'CANCELED' } : current))
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao estornar.')
+    } finally {
+      setProcessing(false)
+      setConfirmAction(null)
+    }
+  }
+
+  const handleForcePaid = async () => {
+    if (!id) return
+    setProcessing(true)
+    try {
+      await forcePaidOrder(id)
+      toast.success('Pedido marcado como pago.')
+      setOrder((current) => (current ? { ...current, status: 'PAID' } : current))
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao processar.')
+    } finally {
+      setProcessing(false)
+      setConfirmAction(null)
+    }
+  }
+
+  const handleForceStatus = async (status: string) => {
+    if (!id) return
+    setProcessing(true)
+    try {
+      await forceOrderStatus(id, status)
+      toast.success(`Pedido alterado para ${status}.`)
+      setOrder((current) => (current ? { ...current, status } : current))
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao alterar status.')
     } finally {
       setProcessing(false)
       setConfirmAction(null)
@@ -98,7 +150,40 @@ export function OrderDetailPage() {
               Encerrar Disputa
             </Button>
           )}
-          {order.status !== 'CANCELED' && order.status !== 'COMPLETED' && (
+          {order.status === 'PENDING_PAYMENT' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-green-400 border-green-500/30 hover:bg-green-500/10"
+              onClick={() => setConfirmAction('forcePaid')}
+              disabled={processing}
+            >
+              Confirmar Pagto Manual
+            </Button>
+          )}
+          {order.status === 'PAID' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
+              onClick={() => setConfirmAction('forceDelivered')}
+              disabled={processing}
+            >
+              Liberar Atendimento
+            </Button>
+          )}
+          {order.status === 'DELIVERED' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-blue-400 border-blue-500/30 hover:bg-blue-500/10"
+              onClick={() => setConfirmAction('forceCompleted')}
+              disabled={processing}
+            >
+              Concluir Pedido
+            </Button>
+          )}
+          {order.status !== 'CANCELED' && (
             <Button
               variant="destructive"
               size="sm"
@@ -106,7 +191,18 @@ export function OrderDetailPage() {
               disabled={processing}
             >
               <X className="h-4 w-4" />
-              Cancelar Pedido
+              Cancelar
+            </Button>
+          )}
+          {order.status !== 'CANCELED' && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => setConfirmAction('refund')}
+              disabled={processing}
+            >
+              💰 Estornar
             </Button>
           )}
         </div>
@@ -246,6 +342,65 @@ export function OrderDetailPage() {
             <Button variant="success" onClick={handleResolveDispute} disabled={processing}>
               Encerrar Disputa
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={confirmAction === 'refund'} onOpenChange={() => setConfirmAction(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Estornar Pedido?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Sera feita uma tentativa de estorno automatico via Mercado Pago. O pedido sera CANCELADO.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setConfirmAction(null)}>Voltar</Button>
+            <Button variant="destructive" onClick={handleRefund} disabled={processing}>Confirmar Estorno</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmAction === 'forcePaid'} onOpenChange={() => setConfirmAction(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Forçar como Pago?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            O status mudara para PAID e o saldo sera creditado na carteira da cartomante.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setConfirmAction(null)}>Voltar</Button>
+            <Button variant="success" onClick={handleForcePaid} disabled={processing}>Confirmar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmAction === 'forceDelivered'} onOpenChange={() => setConfirmAction(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Liberar Atendimento?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Força o status para DELIVERED, permitindo que a cartomante finalize o atendimento.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setConfirmAction(null)}>Voltar</Button>
+            <Button variant="warning" onClick={() => handleForceStatus('DELIVERED')} disabled={processing}>Confirmar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmAction === 'forceCompleted'} onOpenChange={() => setConfirmAction(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Concluir Pedido?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Força o status para COMPLETED. Isso libera o saldo definitivamente para saque.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setConfirmAction(null)}>Voltar</Button>
+            <Button variant="info" onClick={() => handleForceStatus('COMPLETED')} disabled={processing}>Confirmar</Button>
           </div>
         </DialogContent>
       </Dialog>

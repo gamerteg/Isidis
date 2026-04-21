@@ -135,3 +135,8 @@ export async function getDashboardOverview(): Promise<AdminDashboardOverview> {
     return legacyGetDashboardOverview()
   }
 }
+
+export async function creditBalance(userId: string, amount: number, description: string): Promise<void> {
+  await apiPost(`/admin/users/${userId}/credit-balance`, { amount, description })
+}
+
