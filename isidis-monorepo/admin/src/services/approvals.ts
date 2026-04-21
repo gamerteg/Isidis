@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '@/lib/supabase'
+import { apiGet, apiPost } from '@/lib/apiClient'
 
 export interface PendingReader {
   id: string
@@ -33,84 +33,36 @@ export interface ReaderDetail extends PendingReader {
 }
 
 export async function listPendingReaders(): Promise<PendingReader[]> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, full_name, social_name, avatar_url, bio, specialties, verification_status, created_at, ethics_accepted_at, tax_id, cellphone, birth_date, pix_key_type, pix_key')
-    .eq('role', 'READER')
-    .eq('verification_status', 'PENDING')
-    .order('created_at', { ascending: false })
-
-  if (error) throw error
-  return data ?? []
+  const response = await apiGet<{ data: PendingReader[] }>('/admin/approvals/readers')
+  return response.data
 }
 
 export async function getReaderDetail(id: string): Promise<ReaderDetail | null> {
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (error || !data) return null
-
-  let email = '—'
   try {
-    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(id)
-    email = authUser?.user?.email ?? '—'
-  } catch { /* ok */ }
-
-  return { ...data, email }
+    const response = await apiGet<{ data: ReaderDetail }>(`/admin/approvals/readers/${id}`)
+    return response.data
+  } catch {
+    return null
+  }
 }
 
 export async function getSignedDocUrl(path: string): Promise<string | null> {
   if (!path) return null
-  if (path.startsWith('http')) return path
-
-  const { data } = await supabaseAdmin.storage
-    .from('verification_documents')
-    .createSignedUrl(path, 3600)
-  return data?.signedUrl ?? null
+  const params = new URLSearchParams({ path })
+  const response = await apiGet<{ data: { signed_url: string } }>(
+    `/admin/verification-documents/signed-url?${params.toString()}`
+  )
+  return response.data.signed_url
 }
 
 export async function approveReader(id: string): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('profiles')
-    .update({ verification_status: 'APPROVED' })
-    .eq('id', id)
-  if (error) throw error
-
-  // Notify reader
-  await supabaseAdmin.from('notifications').insert({
-    user_id: id,
-    type: 'SYSTEM',
-    title: 'Cadastro aprovado!',
-    message: 'Seu cadastro foi aprovado. Agora você pode criar seus serviços e começar a atender.',
-    link: '/dashboard/cartomante',
-  })
+  await apiPost(`/admin/approvals/readers/${id}/approve`)
 }
 
 export async function rejectReader(id: string, reason?: string): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('profiles')
-    .update({ verification_status: 'REJECTED' })
-    .eq('id', id)
-  if (error) throw error
-
-  await supabaseAdmin.from('notifications').insert({
-    user_id: id,
-    type: 'SYSTEM',
-    title: 'Cadastro não aprovado',
-    message: reason ?? 'Seu cadastro não foi aprovado. Abra um ticket de suporte para mais informações.',
-    link: '/dashboard',
-  })
+  await apiPost(`/admin/approvals/readers/${id}/reject`, { reason })
 }
 
 export async function suspendReader(id: string): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('profiles')
-    .update({ verification_status: 'SUSPENDED' })
-    .eq('id', id)
-  if (error) throw error
-
-  await supabaseAdmin.from('gigs').update({ is_active: false }).eq('owner_id', id)
+  await apiPost(`/admin/approvals/readers/${id}/suspend`)
 }

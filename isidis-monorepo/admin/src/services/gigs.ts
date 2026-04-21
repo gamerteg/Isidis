@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '@/lib/supabase'
+import { apiGet, apiPost } from '@/lib/apiClient'
 
 export interface PendingGig {
   id: string
@@ -18,112 +18,29 @@ export interface PendingGig {
 }
 
 export async function listPendingGigs(): Promise<PendingGig[]> {
-  const { data, error } = await supabaseAdmin
-    .from('gigs')
-    .select('id, title, description, price, category, modality, status, image_url, delivery_method, delivery_time_hours, created_at, owner_id')
-    .eq('status', 'PENDING')
-    .order('created_at', { ascending: false })
-
-  if (error) throw error
-  const gigs = data ?? []
-
-  const ownerIds = [...new Set(gigs.map(g => g.owner_id))]
-  const { data: profiles } = await supabaseAdmin
-    .from('profiles')
-    .select('id, full_name, verification_status')
-    .in('id', ownerIds)
-
-  const profileMap = new Map((profiles ?? []).map(p => [p.id, p]))
-
-  return gigs.map(g => ({
-    ...g,
-    owner_name: profileMap.get(g.owner_id)?.full_name ?? 'Desconhecido',
-    owner_verification_status: profileMap.get(g.owner_id)?.verification_status ?? null,
-  }))
+  const response = await apiGet<{ data: PendingGig[] }>('/admin/gigs?status=PENDING')
+  return response.data
 }
 
 export async function listAllGigs(status?: string): Promise<PendingGig[]> {
-  let query = supabaseAdmin
-    .from('gigs')
-    .select('id, title, description, price, category, modality, status, image_url, delivery_method, delivery_time_hours, created_at, owner_id')
-    .order('created_at', { ascending: false })
-    .limit(100)
-
-  if (status) query = query.eq('status', status)
-
-  const { data, error } = await query
-  if (error) throw error
-  const gigs = data ?? []
-
-  const ownerIds = [...new Set(gigs.map(g => g.owner_id))]
-  const { data: profiles } = await supabaseAdmin
-    .from('profiles')
-    .select('id, full_name, verification_status')
-    .in('id', ownerIds)
-
-  const profileMap = new Map((profiles ?? []).map(p => [p.id, p]))
-
-  return gigs.map(g => ({
-    ...g,
-    owner_name: profileMap.get(g.owner_id)?.full_name ?? 'Desconhecido',
-    owner_verification_status: profileMap.get(g.owner_id)?.verification_status ?? null,
-  }))
+  const query = status ? `?status=${encodeURIComponent(status)}` : ''
+  const response = await apiGet<{ data: PendingGig[] }>(`/admin/gigs${query}`)
+  return response.data
 }
 
 export async function approveGig(id: string): Promise<void> {
-  const { data: gig, error: fetchError } = await supabaseAdmin
-    .from('gigs')
-    .select('owner_id, title')
-    .eq('id', id)
-    .single()
-  if (fetchError) throw fetchError
-
-  const { error } = await supabaseAdmin
-    .from('gigs')
-    .update({ status: 'APPROVED' })
-    .eq('id', id)
-  if (error) throw error
-
-  if (gig) {
-    await supabaseAdmin.from('notifications').insert({
-      user_id: gig.owner_id,
-      type: 'SYSTEM',
-      title: 'Serviço aprovado!',
-      message: `Seu serviço "${gig.title}" foi aprovado e já pode ser ativado.`,
-      link: '/dashboard/cartomante/servicos',
-    })
-  }
+  await apiPost(`/admin/gigs/${id}/approve`)
 }
 
 export async function rejectGig(id: string, reason?: string): Promise<void> {
-  const { data: gig } = await supabaseAdmin
-    .from('gigs')
-    .select('owner_id, title')
-    .eq('id', id)
-    .single()
-
-  const { error } = await supabaseAdmin
-    .from('gigs')
-    .update({ status: 'REJECTED' })
-    .eq('id', id)
-  if (error) throw error
-
-  if (gig) {
-    await supabaseAdmin.from('notifications').insert({
-      user_id: gig.owner_id,
-      type: 'SYSTEM',
-      title: 'Serviço não aprovado',
-      message: reason ?? `Seu serviço "${gig.title}" não foi aprovado. Edite e reenvie para revisão.`,
-      link: '/dashboard/cartomante/servicos',
-    })
-  }
+  await apiPost(`/admin/gigs/${id}/reject`, { reason })
 }
 
 export function formatDeliveryMethod(method: string): string {
   const map: Record<string, string> = {
     DIGITAL_SPREAD: 'Tiragem Digital',
-    PHYSICAL_PHOTO: 'Foto Física',
-    VIDEO: 'Vídeo',
+    PHYSICAL_PHOTO: 'Foto Fisica',
+    VIDEO: 'Video',
     OTHER: 'Outro',
   }
   return map[method] ?? method
@@ -132,7 +49,7 @@ export function formatDeliveryMethod(method: string): string {
 export function formatModality(mod: string): string {
   const map: Record<string, string> = {
     TAROT: 'Tarot',
-    ORACULO: 'Oráculo',
+    ORACULO: 'Oraculo',
     BARALHO_CIGANO: 'Baralho Cigano',
     ASTROLOGIA: 'Astrologia',
     OUTRO: 'Outro',

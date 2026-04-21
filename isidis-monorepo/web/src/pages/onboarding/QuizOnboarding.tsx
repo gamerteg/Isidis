@@ -1,41 +1,49 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, ArrowRight, Sparkles } from 'lucide-react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
+import confetti from 'canvas-confetti'
 
 import apiClient from '@/lib/apiClient'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-const intentions = [
-  { value: 'AMOR', label: 'Amor', description: 'Relacionamentos, conexao e vida afetiva.' },
-  { value: 'CARREIRA', label: 'Carreira', description: 'Trabalho, metas e proximos movimentos.' },
-  { value: 'FINANCAS', label: 'Financas', description: 'Dinheiro, estabilidade e oportunidades.' },
-  { value: 'SAUDE', label: 'Saude', description: 'Bem-estar, energia e equilibrio.' },
-  { value: 'ESPIRITUALIDADE', label: 'Espiritualidade', description: 'Intuicao, limpeza e autoconhecimento.' },
-  { value: 'FAMILIA', label: 'Familia', description: 'Lares, vinculos e convivencias delicadas.' },
-  { value: 'DECISAO', label: 'Decisao', description: 'Quando voce precisa escolher um caminho.' },
-] as const
+const STEPS = [
+  {
+    field: 'intention' as const,
+    question: 'O que mais pesa pra você hoje?',
+    options: [
+      { value: 'AMOR', label: 'Amor', emoji: '💕' },
+      { value: 'CARREIRA', label: 'Carreira', emoji: '💼' },
+      { value: 'FINANCAS', label: 'Finanças', emoji: '💰' },
+      { value: 'SAUDE', label: 'Saúde', emoji: '🌿' },
+      { value: 'ESPIRITUALIDADE', label: 'Espiritualidade', emoji: '✨' },
+      { value: 'FAMILIA', label: 'Família', emoji: '🏡' },
+      { value: 'DECISAO', label: 'Decisão', emoji: '🔮' },
+    ],
+  },
+  {
+    field: 'modality' as const,
+    question: 'Como prefere receber a leitura?',
+    options: [
+      { value: 'TAROT', label: 'Tarot', emoji: '🃏' },
+      { value: 'ORACULO', label: 'Oráculo', emoji: '🌙' },
+      { value: 'BARALHO_CIGANO', label: 'Baralho cigano', emoji: '🌹' },
+      { value: 'ASTROLOGIA', label: 'Astrologia', emoji: '⭐' },
+      { value: 'OUTRO', label: 'Sugerir para mim', emoji: '🤍' },
+    ],
+  },
+  {
+    field: 'urgency' as const,
+    question: 'Em que ritmo precisa disso?',
+    options: [
+      { value: 'AGORA', label: 'Agora', emoji: '⚡' },
+      { value: 'PROXIMOS_DIAS', label: 'Nos próximos dias', emoji: '📅' },
+      { value: 'COM_CALMA', label: 'Com calma', emoji: '🕊️' },
+    ],
+  },
+]
 
-const modalities = [
-  { value: 'TAROT', label: 'Tarot', description: 'Leitura classica e profunda.' },
-  { value: 'ORACULO', label: 'Oraculo', description: 'Mensagens mais leves e intuitivas.' },
-  { value: 'BARALHO_CIGANO', label: 'Baralho cigano', description: 'Objetividade, direcao e situacoes praticas.' },
-  { value: 'ASTROLOGIA', label: 'Astrologia', description: 'Ciclos, tendencias e mapa energetico.' },
-  { value: 'OUTRO', label: 'Quero ajuda para escolher', description: 'Deixe a plataforma sugerir o melhor formato.' },
-] as const
-
-const urgencyOptions = [
-  { value: 'AGORA', label: 'Preciso agora', description: 'Quero uma leitura o quanto antes.' },
-  { value: 'PROXIMOS_DIAS', label: 'Nos proximos dias', description: 'Posso receber em breve, sem extrema urgencia.' },
-  { value: 'COM_CALMA', label: 'Com calma', description: 'Estou aberta a uma escolha mais cuidadosa.' },
-] as const
-
-type QuizFormState = {
-  intention: string
-  modality: string
-  urgency: string
-}
+type FormState = { intention: string; modality: string; urgency: string }
 
 export default function QuizOnboardingPage() {
   const { user, loading: authLoading } = useAuth()
@@ -43,32 +51,27 @@ export default function QuizOnboardingPage() {
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [done, setDone] = useState(false)
   const [error, setError] = useState('')
-  const [form, setForm] = useState<QuizFormState>({
-    intention: '',
-    modality: '',
-    urgency: '',
-  })
+  const [form, setForm] = useState<FormState>({ intention: '', modality: '', urgency: '' })
+  const [stepIndex, setStepIndex] = useState(0)
+  const [direction, setDirection] = useState<'forward' | 'back'>('forward')
+  const [pending, setPending] = useState<string | null>(null)
+  const stepKey = `${stepIndex}-${direction}`
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (authLoading) return
-    if (!user) {
-      navigate('/login?next=/quiz-onboarding')
-      return
-    }
-    if (user.user_metadata?.role === 'READER') {
-      navigate('/dashboard/cartomante')
-      return
-    }
-
+    if (!user) { navigate('/login?next=/quiz-onboarding'); return }
+    if (user.user_metadata?.role === 'READER') { navigate('/dashboard/cartomante'); return }
     apiClient
       .get<{ data: { completed: boolean; intention?: string; modality?: string; urgency?: string } }>('/me/quiz')
-      .then((response) => {
-        if (response.data.data.completed) {
+      .then((res) => {
+        if (res.data.data.completed) {
           setForm({
-            intention: response.data.data.intention || '',
-            modality: response.data.data.modality || '',
-            urgency: response.data.data.urgency || '',
+            intention: res.data.data.intention || '',
+            modality: res.data.data.modality || '',
+            urgency: res.data.data.urgency || '',
           })
         }
       })
@@ -76,166 +79,164 @@ export default function QuizOnboardingPage() {
       .finally(() => setLoading(false))
   }, [authLoading, navigate, user])
 
-  const submit = async () => {
-    if (!form.intention || !form.modality || !form.urgency) {
-      setError('Escolha uma opcao em cada etapa antes de continuar.')
-      return
+  // Confetti + auto-redirect after done
+  useEffect(() => {
+    if (!done) return
+    const end = Date.now() + 2800
+    const burst = () => {
+      confetti({ particleCount: 4, angle: 60, spread: 60, origin: { x: 0 }, colors: ['#a78bfa', '#60a5fa', '#34d399'] })
+      confetti({ particleCount: 4, angle: 120, spread: 60, origin: { x: 1 }, colors: ['#a78bfa', '#f472b6', '#fbbf24'] })
+      if (Date.now() < end) requestAnimationFrame(burst)
     }
+    requestAnimationFrame(burst)
+    const t = setTimeout(() => navigate('/dashboard', { replace: true }), 3000)
+    return () => clearTimeout(t)
+  }, [done, navigate])
 
-    setSubmitting(true)
-    setError('')
+  const step = STEPS[stepIndex]
 
-    try {
-      await apiClient.post('/me/quiz', form)
-      navigate('/dashboard', { replace: true })
-    } catch (submitError: any) {
-      setError(submitError?.response?.data?.error || 'Nao foi possivel salvar suas preferencias agora.')
-    } finally {
-      setSubmitting(false)
-    }
+  const handleSelect = (value: string) => {
+    if (pending || submitting) return
+    setPending(value)
+    timerRef.current = setTimeout(async () => {
+      const updated = { ...form, [step.field]: value }
+      setForm(updated)
+      setPending(null)
+
+      if (stepIndex < STEPS.length - 1) {
+        setDirection('forward')
+        setStepIndex(stepIndex + 1)
+        return
+      }
+
+      // Last step — submit
+      setSubmitting(true)
+      setError('')
+      try {
+        await apiClient.post('/me/quiz', updated)
+        setDone(true)
+      } catch (e: any) {
+        setError(e?.response?.data?.error || 'Não foi possível salvar. Tente novamente.')
+        setSubmitting(false)
+      }
+    }, 180)
+  }
+
+  const goBack = () => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    setPending(null)
+    setDirection('back')
+    setStepIndex(i => Math.max(i - 1, 0))
   }
 
   if (authLoading || loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-slate-400">Carregando quiz de onboarding...</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#05040d]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     )
   }
 
+  // Done screen
+  if (done) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#05040d] px-4 text-center">
+        <div className="text-6xl mb-6 animate-in zoom-in-50 fade-in duration-500">🔮</div>
+        <h2 className="text-2xl font-display font-light text-white mb-2 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          Tudo certo!
+        </h2>
+        <p className="text-slate-400 text-sm animate-in fade-in slide-in-from-bottom-4 duration-700">
+          Preparando seu painel personalizado...
+        </p>
+        <Loader2 className="mt-6 h-5 w-5 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  const animClass = direction === 'forward'
+    ? 'animate-in slide-in-from-right-8 fade-in duration-300'
+    : 'animate-in slide-in-from-left-8 fade-in duration-300'
+
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.10),_transparent_24%),radial-gradient(circle_at_bottom,_rgba(168,85,247,0.16),_transparent_28%),linear-gradient(180deg,_#05040d,_#0a0914_30%,_#06050d_100%)] px-4 py-10 md:px-8">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <div className="max-w-3xl">
-          <span className="inline-flex items-center gap-2 rounded-full border border-violet-400/15 bg-violet-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-200">
-            <Sparkles className="h-3.5 w-3.5" />
-            Quiz de onboarding
-          </span>
-          <h1 className="mt-4 text-3xl font-semibold leading-tight text-white md:text-5xl">
-            Ajuste rapido de intencao para o web sugerir a leitura certa logo no primeiro acesso.
-          </h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400 md:text-base">
-            Este passo fecha a paridade do fluxo com o app e melhora a curadoria inicial sem mexer na identidade premium do site.
-          </p>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(168,85,247,0.14),_transparent_30%),linear-gradient(180deg,_#05040d,_#0a0914_100%)] px-4 py-10">
+      <div className="w-full max-w-sm">
+        {/* Progress */}
+        <div className="flex gap-1.5 mb-8">
+          {STEPS.map((_, i) => (
+            <div
+              key={i}
+              className={`h-1 flex-1 rounded-full transition-all duration-500 ${i <= stepIndex ? 'bg-primary' : 'bg-white/10'}`}
+            />
+          ))}
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-3">
-          <Card className="rounded-[2rem] border border-white/10 bg-white/5 text-slate-100 backdrop-blur-xl xl:col-span-1">
-            <CardHeader>
-              <CardTitle className="text-xl">Seu onboarding</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm text-slate-400">
-              <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-                <p className="font-semibold text-white">1. Intencao principal</p>
-                <p className="mt-1">Define que tipo de orientacao tem mais prioridade agora.</p>
-              </div>
-              <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-                <p className="font-semibold text-white">2. Modalidade</p>
-                <p className="mt-1">Ajuda a plataforma a destacar cartomantes e formatos mais aderentes.</p>
-              </div>
-              <div className="rounded-[1.5rem] border border-white/10 bg-black/20 p-4">
-                <p className="font-semibold text-white">3. Urgencia</p>
-                <p className="mt-1">Refina o ritmo do atendimento para as sugestoes iniciais do painel.</p>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Back button */}
+        {stepIndex > 0 && (
+          <button
+            onClick={goBack}
+            className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors mb-6"
+          >
+            <ArrowLeft className="h-4 w-4" /> Voltar
+          </button>
+        )}
 
-          <div className="space-y-6 xl:col-span-2">
-            <Card className="rounded-[2rem] border border-white/10 bg-white/5 text-slate-100 backdrop-blur-xl">
-              <CardHeader>
-                <CardTitle className="text-xl">Qual tema pesa mais hoje?</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-2">
-                {intentions.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setForm((current) => ({ ...current, intention: option.value }))}
-                    className={`rounded-[1.5rem] border p-4 text-left transition ${
-                      form.intention === option.value
-                        ? 'border-violet-400/40 bg-violet-400/10'
-                        : 'border-white/10 bg-black/20 hover:border-white/20'
-                    }`}
-                  >
-                    <p className="font-semibold text-white">{option.label}</p>
-                    <p className="mt-1 text-sm text-slate-400">{option.description}</p>
-                  </button>
-                ))}
-              </CardContent>
-            </Card>
+        {/* Step label */}
+        <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
+          {stepIndex + 1} de {STEPS.length}
+        </p>
 
-            <Card className="rounded-[2rem] border border-white/10 bg-white/5 text-slate-100 backdrop-blur-xl">
-              <CardHeader>
-                <CardTitle className="text-xl">Como voce prefere receber a leitura?</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-2">
-                {modalities.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setForm((current) => ({ ...current, modality: option.value }))}
-                    className={`rounded-[1.5rem] border p-4 text-left transition ${
-                      form.modality === option.value
-                        ? 'border-sky-400/40 bg-sky-400/10'
-                        : 'border-white/10 bg-black/20 hover:border-white/20'
-                    }`}
-                  >
-                    <p className="font-semibold text-white">{option.label}</p>
-                    <p className="mt-1 text-sm text-slate-400">{option.description}</p>
-                  </button>
-                ))}
-              </CardContent>
-            </Card>
+        {/* Question */}
+        <h1
+          key={stepKey + '-q'}
+          className={`text-2xl font-display font-light text-white mb-8 leading-tight ${animClass}`}
+        >
+          {step.question}
+        </h1>
 
-            <Card className="rounded-[2rem] border border-white/10 bg-white/5 text-slate-100 backdrop-blur-xl">
-              <CardHeader>
-                <CardTitle className="text-xl">Em que ritmo isso precisa acontecer?</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {urgencyOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setForm((current) => ({ ...current, urgency: option.value }))}
-                    className={`w-full rounded-[1.5rem] border p-4 text-left transition ${
-                      form.urgency === option.value
-                        ? 'border-emerald-400/40 bg-emerald-400/10'
-                        : 'border-white/10 bg-black/20 hover:border-white/20'
-                    }`}
-                  >
-                    <p className="font-semibold text-white">{option.label}</p>
-                    <p className="mt-1 text-sm text-slate-400">{option.description}</p>
-                  </button>
-                ))}
+        {/* Options */}
+        <div
+          key={stepKey}
+          className={`space-y-3 ${animClass}`}
+        >
+          {step.options.map((opt) => {
+            const selected = form[step.field] === opt.value || pending === opt.value
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleSelect(opt.value)}
+                disabled={submitting}
+                className={`w-full flex items-center gap-4 rounded-2xl border px-5 py-4 text-left transition-all duration-200 active:scale-[0.98] disabled:opacity-50 ${
+                  selected
+                    ? 'border-primary/60 bg-primary/15 shadow-[0_0_20px_rgba(139,92,246,0.15)]'
+                    : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/8'
+                }`}
+              >
+                <span className="text-2xl leading-none">{opt.emoji}</span>
+                <span className={`text-base font-medium ${selected ? 'text-white' : 'text-slate-200'}`}>
+                  {opt.label}
+                </span>
+                {pending === opt.value && submitting && (
+                  <Loader2 className="ml-auto h-4 w-4 animate-spin text-primary" />
+                )}
+              </button>
+            )
+          })}
+        </div>
 
-                {error ? (
-                  <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                    {error}
-                  </div>
-                ) : null}
-
-                <Button
-                  type="button"
-                  onClick={submit}
-                  disabled={submitting}
-                  className="mt-2 h-12 w-full rounded-2xl bg-emerald-400 font-semibold text-slate-950 hover:bg-emerald-300"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Salvando preferencias
-                    </>
-                  ) : (
-                    <>
-                      Continuar para o painel
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
+        {error && (
+          <div className="mt-5 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+            {error}
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => form.urgency && handleSelect(form.urgency)}
+              className="mt-2 w-full text-sm text-rose-300 hover:text-white"
+            >
+              Tentar novamente
+            </Button>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

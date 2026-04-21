@@ -7,8 +7,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { OpsHealthCard } from '@/components/admin/OpsHealthCard'
+import { SyncStatusBar } from '@/components/admin/SyncStatusBar'
+import { useAutoRefresh } from '@/hooks/useAutoRefresh'
 import { listOrders, ORDER_STATUS_MAP, type AdminOrder } from '@/services/orders'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { type AdminOpsHealth } from '@/types/admin-api'
 
 const PAGE_SIZE = 50
 
@@ -16,14 +20,23 @@ export function OrdersPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [orders, setOrders] = useState<AdminOrder[]>([])
   const [count, setCount] = useState(0)
+  const [health, setHealth] = useState<AdminOpsHealth | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
 
   const status = searchParams.get('status') ?? 'all'
   const dispute = searchParams.get('dispute') === 'true'
   const page = parseInt(searchParams.get('page') ?? '0')
 
-  const load = async () => {
-    setLoading(true)
+  const load = async (background = false) => {
+    if (background) {
+      setRefreshing(true)
+    } else {
+      setLoading(true)
+    }
+
     try {
       const result = await listOrders({
         status: status === 'all' ? undefined : status,
@@ -33,14 +46,26 @@ export function OrdersPage() {
       })
       setOrders(result.data)
       setCount(result.count)
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Erro ao carregar pedidos')
+      setHealth(result.health)
+      setLastUpdated(result.generated_at)
+      setSyncError(null)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro ao carregar pedidos'
+      setSyncError(message)
+      if (!background || orders.length === 0) {
+        toast.error(message)
+      }
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
-  useEffect(() => { load() }, [status, dispute, page])
+  useEffect(() => {
+    void load()
+  }, [status, dispute, page])
+
+  useAutoRefresh(() => load(true), { enabled: Boolean(lastUpdated) })
 
   const setFilter = (key: string, value: string | null) => {
     const next = new URLSearchParams(searchParams)
@@ -49,7 +74,11 @@ export function OrdersPage() {
     } else {
       next.set(key, value)
     }
-    next.delete('page')
+
+    if (key !== 'page') {
+      next.delete('page')
+    }
+
     setSearchParams(next)
   }
 
@@ -59,12 +88,22 @@ export function OrdersPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Pedidos</h1>
-        <p className="text-muted-foreground">Todos os pedidos da plataforma — {count} no total</p>
+        <p className="text-muted-foreground">Todos os pedidos da plataforma - {count} no total</p>
       </div>
 
-      {/* Filters */}
+      <SyncStatusBar
+        lastUpdated={lastUpdated}
+        error={syncError}
+        refreshing={refreshing}
+        onRefresh={() => {
+          void load(true)
+        }}
+      />
+
+      <OpsHealthCard health={health} />
+
       <div className="flex flex-wrap gap-3">
-        <Select value={status} onValueChange={v => setFilter('status', v)}>
+        <Select value={status} onValueChange={(value) => setFilter('status', value)}>
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -73,7 +112,7 @@ export function OrdersPage() {
             <SelectItem value="PENDING_PAYMENT">Aguard. Pagamento</SelectItem>
             <SelectItem value="PAID">Pago</SelectItem>
             <SelectItem value="DELIVERED">Entregue</SelectItem>
-            <SelectItem value="COMPLETED">Concluído</SelectItem>
+            <SelectItem value="COMPLETED">Concluido</SelectItem>
             <SelectItem value="CANCELED">Cancelado</SelectItem>
           </SelectContent>
         </Select>
@@ -85,14 +124,14 @@ export function OrdersPage() {
           className="gap-2"
         >
           <AlertTriangle className="w-4 h-4" />
-          {dispute ? 'Mostrando disputas' : 'Ver só disputas'}
+          {dispute ? 'Mostrando disputas' : 'Ver so disputas'}
         </Button>
       </div>
 
       <Card>
         <CardContent className="p-0">
-          {loading ? (
-            <div className="p-8 text-center text-muted-foreground">Carregando…</div>
+          {loading && orders.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">Carregando...</div>
           ) : (
             <Table>
               <TableHeader>
@@ -100,7 +139,7 @@ export function OrdersPage() {
                   <TableHead>Data</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Cartomante</TableHead>
-                  <TableHead>Serviço</TableHead>
+                  <TableHead>Servico</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Pagamento</TableHead>
                   <TableHead>Status</TableHead>
@@ -114,52 +153,69 @@ export function OrdersPage() {
                       Nenhum pedido encontrado.
                     </TableCell>
                   </TableRow>
-                ) : orders.map(o => {
-                  const statusInfo = ORDER_STATUS_MAP[o.status] ?? { label: o.status, variant: 'outline' as const }
-                  return (
-                    <TableRow key={o.id} className={o.has_dispute ? 'bg-red-900/10' : ''}>
-                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                        {formatDate(o.created_at)}
-                      </TableCell>
-                      <TableCell className="text-sm truncate max-w-[120px]">{o.client_name}</TableCell>
-                      <TableCell className="text-sm text-violet-300 truncate max-w-[120px]">{o.reader_name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground truncate max-w-[140px]">{o.gig_title}</TableCell>
-                      <TableCell className="font-bold text-sm">{formatCurrency(o.amount_total)}</TableCell>
-                      <TableCell>
-                        <Badge variant={o.payment_method === 'CARD' ? 'default' : 'info'} className="text-[10px]">
-                          {o.payment_method}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={statusInfo.variant} className="text-[10px]">
-                          {statusInfo.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {o.has_dispute ? (
-                          <Link to={`/orders/${o.id}`}>
-                            <AlertTriangle className="w-4 h-4 text-red-400 mx-auto hover:text-red-300" />
-                          </Link>
-                        ) : (
-                          <Link to={`/orders/${o.id}`} className="text-xs text-muted-foreground hover:text-primary">
-                            Ver
-                          </Link>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
+                ) : (
+                  orders.map((order) => {
+                    const statusInfo = ORDER_STATUS_MAP[order.status] ?? {
+                      label: order.status,
+                      variant: 'outline' as const,
+                    }
+
+                    return (
+                      <TableRow key={order.id} className={order.has_dispute ? 'bg-red-900/10' : ''}>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                          {formatDate(order.created_at)}
+                        </TableCell>
+                        <TableCell className="text-sm truncate max-w-[120px]">{order.client_name}</TableCell>
+                        <TableCell className="text-sm text-violet-300 truncate max-w-[120px]">
+                          {order.reader_name}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground truncate max-w-[140px]">
+                          {order.gig_title}
+                        </TableCell>
+                        <TableCell className="font-bold text-sm">
+                          {formatCurrency(order.amount_total)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={order.payment_method === 'CARD' ? 'default' : 'info'}
+                            className="text-[10px]"
+                          >
+                            {order.payment_method}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={statusInfo.variant} className="text-[10px]">
+                            {statusInfo.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {order.has_dispute ? (
+                            <Link to={`/orders/${order.id}`}>
+                              <AlertTriangle className="w-4 h-4 text-red-400 mx-auto hover:text-red-300" />
+                            </Link>
+                          ) : (
+                            <Link
+                              to={`/orders/${order.id}`}
+                              className="text-xs text-muted-foreground hover:text-primary"
+                            >
+                              Ver
+                            </Link>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
               </TableBody>
             </Table>
           )}
         </CardContent>
       </Card>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Página {page + 1} de {totalPages}
+            Pagina {page + 1} de {totalPages}
           </p>
           <div className="flex gap-2">
             <Button

@@ -1,4 +1,5 @@
-import { supabase, supabaseAdmin } from '@/lib/supabase'
+import { apiGet, apiPatch, apiPost } from '@/lib/apiClient'
+import { type AdminDashboardOverview } from '@/types/admin-api'
 
 export interface AdminUser {
   id: string
@@ -39,194 +40,46 @@ export interface WalletStats {
 }
 
 export async function listUsers(): Promise<AdminUser[]> {
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .select('id, full_name, social_name, avatar_url, role, verification_status, created_at, bio, cellphone, tax_id, pix_key_type, pix_key, rating_average, reviews_count')
-    .order('created_at', { ascending: false })
-
-  if (error) throw error
-
-  // Get emails from auth — try admin list
-  let emailMap: Map<string, string> = new Map()
-  try {
-    const { data: authData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
-    if (authData?.users) {
-      authData.users.forEach(u => emailMap.set(u.id, u.email ?? ''))
-    }
-  } catch {
-    // service role not available — emails won't show
-  }
-
-  return (data ?? []).map(p => ({
-    ...p,
-    email: emailMap.get(p.id) ?? '—',
-  })) as AdminUser[]
+  const response = await apiGet<{ data: AdminUser[] }>('/admin/users')
+  return response.data
 }
 
 export async function getUserDetail(id: string): Promise<AdminUser | null> {
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (error) return null
-
-  let email = '—'
   try {
-    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(id)
-    email = authUser?.user?.email ?? '—'
-  } catch { /* ok */ }
-
-  return { ...data, email } as AdminUser
+    const response = await apiGet<{ data: AdminUser }>(`/admin/users/${id}`)
+    return response.data
+  } catch {
+    return null
+  }
 }
 
 export async function updateUser(id: string, updates: Partial<AdminUser>): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('profiles')
-    .update(updates)
-    .eq('id', id)
-  if (error) throw error
+  await apiPatch(`/admin/users/${id}`, updates)
 }
 
 export async function suspendUser(id: string): Promise<void> {
-  const { error: profileError } = await supabaseAdmin
-    .from('profiles')
-    .update({ verification_status: 'SUSPENDED' })
-    .eq('id', id)
-  if (profileError) throw profileError
-
-  // Deactivate all gigs
-  await supabaseAdmin
-    .from('gigs')
-    .update({ is_active: false })
-    .eq('owner_id', id)
+  await apiPost(`/admin/users/${id}/suspend`)
 }
 
 export async function activateUser(id: string): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('profiles')
-    .update({ verification_status: 'APPROVED' })
-    .eq('id', id)
-  if (error) throw error
+  await apiPost(`/admin/users/${id}/activate`)
 }
 
 export async function changeRole(id: string, role: 'CLIENT' | 'READER' | 'ADMIN'): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('profiles')
-    .update({ role })
-    .eq('id', id)
-  if (error) throw error
+  await apiPost(`/admin/users/${id}/role`, { role })
 }
 
 export async function getUserOrders(userId: string): Promise<UserOrder[]> {
-  const { data: asClient } = await supabaseAdmin
-    .from('orders')
-    .select('id, created_at, status, amount_total, payment_method, has_dispute, client_id, reader_id, gig_id')
-    .eq('client_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(20)
-
-  const { data: asReader } = await supabaseAdmin
-    .from('orders')
-    .select('id, created_at, status, amount_total, payment_method, has_dispute, client_id, reader_id, gig_id')
-    .eq('reader_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(20)
-
-  const allOrders = [
-    ...(asClient ?? []).map(o => ({ ...o, role_in_order: 'client' as const })),
-    ...(asReader ?? []).map(o => ({ ...o, role_in_order: 'reader' as const })),
-  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-
-  // Resolve names
-  const userIds = [...new Set(allOrders.flatMap(o => [o.client_id, o.reader_id]))]
-  const gigIds = [...new Set(allOrders.map(o => o.gig_id))]
-
-  const { data: profiles } = await supabaseAdmin.from('profiles').select('id, full_name').in('id', userIds)
-  const { data: gigs } = await supabaseAdmin.from('gigs').select('id, title').in('id', gigIds)
-
-  const profileMap = new Map((profiles ?? []).map(p => [p.id, p.full_name]))
-  const gigMap = new Map((gigs ?? []).map(g => [g.id, g.title]))
-
-  return allOrders.map(o => ({
-    id: o.id,
-    created_at: o.created_at,
-    status: o.status,
-    amount_total: o.amount_total,
-    payment_method: o.payment_method,
-    has_dispute: o.has_dispute,
-    client_id: o.client_id,
-    reader_id: o.reader_id,
-    gig_title: gigMap.get(o.gig_id) ?? 'N/A',
-    other_party_name: o.role_in_order === 'client'
-      ? (profileMap.get(o.reader_id) ?? 'Cartomante')
-      : (profileMap.get(o.client_id) ?? 'Cliente'),
-    role_in_order: o.role_in_order,
-  }))
+  const response = await apiGet<{ data: UserOrder[] }>(`/admin/users/${userId}/orders`)
+  return response.data
 }
 
 export async function getUserWalletStats(userId: string): Promise<WalletStats | null> {
-  const { data: wallet } = await supabaseAdmin
-    .from('wallets')
-    .select('id')
-    .eq('user_id', userId)
-    .single()
-
-  if (!wallet) return null
-
-  const { data: txns } = await supabaseAdmin
-    .from('transactions')
-    .select('type, status, amount')
-    .eq('wallet_id', wallet.id)
-
-  if (!txns) return { available: 0, pending: 0, total_withdrawn: 0 }
-
-  const available = txns
-    .filter(t => t.status === 'COMPLETED')
-    .reduce((sum, t) => sum + t.amount, 0)
-
-  const pending = txns
-    .filter(t => t.type === 'SALE_CREDIT' && t.status === 'PENDING')
-    .reduce((sum, t) => sum + t.amount, 0)
-
-  const total_withdrawn = txns
-    .filter(t => t.type === 'WITHDRAWAL' && t.status === 'COMPLETED')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-
-  return { available, pending, total_withdrawn }
+  const response = await apiGet<{ data: WalletStats | null }>(`/admin/users/${userId}/wallet`)
+  return response.data
 }
 
-// Dashboard stats
-export async function getDashboardStats() {
-  const [
-    { count: totalUsers },
-    { count: totalReaders },
-    { count: approvedReaders },
-    { count: pendingReaders },
-    { count: pendingGigs },
-    { count: openDisputes },
-    { count: openTickets },
-    { count: totalOrders },
-  ] = await Promise.all([
-    supabase.from('profiles').select('*', { count: 'exact', head: true }),
-    supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'READER'),
-    supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'READER').eq('verification_status', 'APPROVED'),
-    supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'READER').eq('verification_status', 'PENDING'),
-    supabase.from('gigs').select('*', { count: 'exact', head: true }).eq('status', 'PENDING'),
-    supabase.from('orders').select('*', { count: 'exact', head: true }).eq('has_dispute', true),
-    supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('status', 'OPEN'),
-    supabase.from('orders').select('*', { count: 'exact', head: true }),
-  ])
-
-  return {
-    totalUsers: totalUsers ?? 0,
-    totalReaders: totalReaders ?? 0,
-    approvedReaders: approvedReaders ?? 0,
-    pendingReaders: pendingReaders ?? 0,
-    pendingGigs: pendingGigs ?? 0,
-    openDisputes: openDisputes ?? 0,
-    openTickets: openTickets ?? 0,
-    totalOrders: totalOrders ?? 0,
-  }
+export async function getDashboardOverview(): Promise<AdminDashboardOverview> {
+  const response = await apiGet<{ data: AdminDashboardOverview }>('/admin/dashboard')
+  return response.data
 }

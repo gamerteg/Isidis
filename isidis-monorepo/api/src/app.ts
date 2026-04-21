@@ -22,6 +22,7 @@ import deliveryRoutes from './routes/delivery/index.js'
 import messagesRoutes from './routes/messages/index.js'
 import notificationsRoutes from './routes/notifications/index.js'
 import quizRoutes from './routes/quiz/index.js'
+import adminRoutes from './routes/admin/index.js'
 
 function getProductionOrigins() {
   const configuredOrigins = [
@@ -93,6 +94,7 @@ export async function build() {
   await fastify.register(messagesRoutes)
   await fastify.register(notificationsRoutes)
   await fastify.register(quizRoutes)
+  await fastify.register(adminRoutes)
 
   return fastify
 }
