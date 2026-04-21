@@ -9,11 +9,19 @@ export function useAuth() {
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
+      setUser(prev => {
+        const next = session?.user ?? null
+        if (prev?.id === next?.id) return prev
+        return next
+      })
       setLoading(false)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      setUser(session?.user ?? null)
+      setUser(prev => {
+        const next = session?.user ?? null
+        if (prev?.id === next?.id) return prev
+        return next
+      })
     })
     return () => subscription.unsubscribe()
   }, [])

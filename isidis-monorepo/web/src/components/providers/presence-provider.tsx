@@ -63,7 +63,12 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
                         });
                     }
 
-                    setOnlineUsers(new Set(onlineIds));
+                    setOnlineUsers(prev => {
+                        const prevSorted = Array.from(prev).sort().join(',')
+                        const nextSorted = Array.from(onlineIds).sort().join(',')
+                        if (prevSorted === nextSorted) return prev
+                        return new Set(onlineIds)
+                    });
                 })
                 .on('presence', { event: 'join' }, ({ key, newPresences }) => {
                     console.log('join', key, newPresences)

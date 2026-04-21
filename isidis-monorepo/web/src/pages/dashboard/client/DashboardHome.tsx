@@ -30,12 +30,18 @@ export default function DashboardHome() {
         }
     }, [])
 
+    // Auth redirect — roda quando auth muda
     useEffect(() => {
-        if (authLoading) return
-        if (!user) { navigate('/login'); return }
+        if (!authLoading && !user) navigate('/login')
+    }, [user, authLoading, navigate])
+
+    // Dados estáticos — roda uma vez por login (user.id é string primitiva, estável)
+    useEffect(() => {
+        if (authLoading || !user) return
         if (user.user_metadata?.role === 'READER') { navigate('/dashboard/cartomante'); return }
 
         const supabase = createClient()
+        let cancelled = false
 
         Promise.all([
             supabase.from('profiles').select('role').eq('id', user.id).single(),
@@ -43,19 +49,16 @@ export default function DashboardHome() {
             getCategoryCounts(),
             getBestSellingGigs(4),
         ]).then(([{ data: profileData }, quizResponse, categories, gigs]) => {
-            if (profileData?.role === 'READER') {
-                navigate('/dashboard/cartomante')
-                return
-            }
-            if (quizResponse && !quizResponse.data.data.completed) {
-                navigate('/quiz-onboarding', { replace: true })
-                return
-            }
-
+            if (cancelled) return
+            if (profileData?.role === 'READER') { navigate('/dashboard/cartomante'); return }
+            if (quizResponse && !quizResponse.data.data.completed) { navigate('/quiz-onboarding', { replace: true }); return }
             setCategoryCounts(categories)
             setRecommendedGigs(gigs)
         })
-    }, [user, authLoading, navigate, refreshKey])
+
+        return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.id, authLoading])
 
     if (authLoading || !user) return (
         <div className="min-h-screen p-6 space-y-6 max-w-4xl mx-auto">

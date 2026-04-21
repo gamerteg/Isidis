@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import WebsiteLayout from '@/layouts/WebsiteLayout';
 import DashboardLayout from '@/layouts/DashboardLayout';
+import RouteErrorBoundary from '@/components/RouteErrorBoundary';
 
 // Public
 const Home = lazy(() => import('@/pages/public/Home'));
@@ -61,6 +62,7 @@ const fallback = (
 
 export function AppRoutes() {
   return (
+    <RouteErrorBoundary>
     <Suspense fallback={fallback}>
       <Routes>
         {/* Website */}
@@ -118,5 +120,6 @@ export function AppRoutes() {
         <Route path="/dashboard/cartomante/assinaturas" element={<ReaderAssinaturas />} />
       </Routes>
     </Suspense>
+    </RouteErrorBoundary>
   );
 }
