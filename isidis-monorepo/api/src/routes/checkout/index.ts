@@ -1016,47 +1016,48 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: [(fastify as any).authenticate] },
     async (request, reply) => {
       const { paymentId } = request.params
-      const { order_id: orderIdFallback } = (request.query ?? {}) as { order_id?: string }
+      const { order_id: orderIdParam } = (request.query ?? {}) as { order_id?: string }
 
-      // Busca por mercadopago_payment_id primeiro; fallback por order_id (caso update tenha falhado)
-      let order: { id: string; status: string; client_id: string; mercadopago_payment_id?: string | null } | null = null
+      type OrderRow = { id: string; status: string; client_id: string; mercadopago_payment_id?: string | null }
+      let order: OrderRow | null = null
 
-      const byPaymentId = await fastify.supabase
-        .from('orders')
-        .select('id, status, client_id, mercadopago_payment_id')
-        .eq('mercadopago_payment_id', paymentId)
-        .maybeSingle()
-
-      if (byPaymentId.data) {
-        order = byPaymentId.data
-      } else if (orderIdFallback) {
-        const byOrderId = await fastify.supabase
+      // Prioridade: order_id do query param (sempre disponível desde checkout direto)
+      if (orderIdParam) {
+        const { data } = await fastify.supabase
           .from('orders')
           .select('id, status, client_id, mercadopago_payment_id')
-          .eq('id', orderIdFallback)
+          .eq('id', orderIdParam)
           .maybeSingle()
+        if (data) order = data
+      }
 
-        if (byOrderId.data) {
-          order = byOrderId.data
-          request.log.warn(
-            { paymentId, orderId: orderIdFallback },
-            '[checkout] Status via fallback order_id — mercadopago_payment_id ausente no pedido'
-          )
-        }
+      // Fallback: buscar por mercadopago_payment_id
+      if (!order) {
+        const { data } = await fastify.supabase
+          .from('orders')
+          .select('id, status, client_id, mercadopago_payment_id')
+          .eq('mercadopago_payment_id', paymentId)
+          .maybeSingle()
+        if (data) order = data
       }
 
       if (!order || order.client_id !== request.user.id) {
+        request.log.warn({ paymentId, orderIdParam }, '[checkout] Pedido nao encontrado no status check')
         return reply.status(404).send({ error: 'Pedido nao encontrado' })
       }
 
-      // Reconcilia o mercadopago_payment_id se estava faltando
-      if (!order.mercadopago_payment_id && orderIdFallback) {
+      // Salva mercadopago_payment_id se ainda não estiver no pedido
+      if (!order.mercadopago_payment_id) {
         void fastify.supabase
           .from('orders')
           .update({ mercadopago_payment_id: paymentId })
           .eq('id', order.id)
           .then(({ error }) => {
-            if (error) request.log.error({ orderId: order!.id, paymentId, err: error.message }, '[checkout] Falha ao reconciliar mercadopago_payment_id')
+            if (error) {
+              request.log.error({ orderId: order!.id, paymentId, err: error.message }, '[checkout] Falha ao salvar mercadopago_payment_id via status check')
+            } else {
+              request.log.info({ orderId: order!.id, paymentId }, '[checkout] mercadopago_payment_id reconciliado via status check')
+            }
           })
       }
 
@@ -1068,6 +1069,8 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
         const charge = await fastify.mp.getPayment(paymentId)
         const mpStatus = charge.status
         const mappedStatus = ['approved', 'authorized'].includes(mpStatus) ? 'PAID' : mpStatus?.toUpperCase() ?? 'PENDING'
+
+        request.log.info({ paymentId, orderId: order.id, mpStatus, mappedStatus }, '[checkout] Status MP via polling')
 
         if (mappedStatus === 'PAID' && order.status === 'PENDING_PAYMENT') {
           try {
@@ -1081,7 +1084,8 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         return reply.send({ data: { status: mappedStatus, order_id: order.id } })
-      } catch {
+      } catch (mpErr: any) {
+        request.log.warn({ paymentId, err: mpErr?.message }, '[checkout] Erro ao consultar MP no polling')
         return reply.send({ data: { status: 'PENDING', order_id: order.id } })
       }
     }
