@@ -141,7 +141,7 @@ export function CheckoutForm({
         setPollError(true)
         setPollCount(c => c + 1)
       }
-    }, 5000)
+    }, 3000)
     return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current) }
   }, [checkoutResult?.paymentId, navigate])
 
@@ -484,7 +484,7 @@ export function CheckoutForm({
                 Ver meus pedidos
               </Button>
             </div>
-          ) : pollCount >= 24 ? (
+          ) : pollCount >= 40 ? (
             <div className="rounded-2xl border border-slate-500/30 bg-slate-500/10 px-4 py-4 text-sm text-slate-300 text-center space-y-3">
               <p>O pagamento pode levar alguns minutos para ser confirmado pelo banco.</p>
               <Button

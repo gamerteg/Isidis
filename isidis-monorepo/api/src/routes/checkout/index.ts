@@ -934,7 +934,13 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
           requestOptions,
         })
 
-        const pixPaymentId = charge.id?.toString()
+        const pixPaymentId = charge.id != null ? String(charge.id) : null
+
+        if (!pixPaymentId) {
+          request.log.error({ orderId: order.id }, '[checkout] CRÍTICO: charge.id ausente na resposta do MP')
+          await fastify.supabase.from('orders').update({ status: 'CANCELED' }).eq('id', order.id)
+          return reply.status(502).send({ error: 'Falha ao obter ID do pagamento PIX. Tente novamente.' })
+        }
 
         // Update crítico — mercadopago_payment_id é necessário para polling e webhook
         const { error: pixUpdateError } = await fastify.supabase
