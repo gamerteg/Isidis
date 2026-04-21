@@ -30,6 +30,7 @@ function getProductionOrigins() {
     ...(process.env.APP_URLS?.split(',') ?? []),
     'https://isidis.com.br',
     'https://www.isidis.com.br',
+    'https://admin.isidis.com.br',
     'https://isidis-web.vercel.app',
   ]
 
