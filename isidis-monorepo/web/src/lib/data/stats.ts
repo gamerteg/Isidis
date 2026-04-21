@@ -64,7 +64,6 @@ const CATEGORY_META: Record<string, { label: string; image: string }> = {
     'Love & Relationships': { label: 'Amor e Relacionamentos', image: '/img/Relacionamento.png' },
     'Career & Finance':     { label: 'Carreira e Finanças',    image: '/img/Financeiro.png' },
     'Spiritual Growth':     { label: 'Crescimento Espiritual', image: '/img/Espiritualidade.png' },
-    'General Reading':      { label: 'Leitura Geral',          image: '/img/Relacionamento.png' },
     'Health & Wellness':    { label: 'Saúde e Bem-estar',      image: '/img/Bem-estar.png' },
 }
 
@@ -106,20 +105,15 @@ export async function getBestSellingGigs(limit: number = 3): Promise<(Gig & { ow
 
     if (!gigs?.length) return []
 
-    // One gig per reader
+    // One gig per reader — owner can be object or array depending on Supabase response
     const seenOwners = new Set<string>()
     const diverse = gigs.filter((gig: any) => {
-        const id = gig.owner?.id
+        const owner = Array.isArray(gig.owner) ? gig.owner[0] : gig.owner
+        const id = owner?.id
         if (!id || seenOwners.has(id)) return false
         seenOwners.add(id)
         return true
     })
-
-    // Shuffle (Fisher-Yates) for variety on each load
-    for (let i = diverse.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [diverse[i], diverse[j]] = [diverse[j], diverse[i]]
-    }
 
     return diverse.slice(0, limit) as (Gig & { owner: Profile })[]
 }

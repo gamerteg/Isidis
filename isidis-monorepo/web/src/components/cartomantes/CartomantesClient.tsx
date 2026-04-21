@@ -20,7 +20,6 @@ const categories = [
     { key: 'Love & Relationships', label: 'Amor e Relacionamentos', count: 0 },
     { key: 'Career & Finance', label: 'Carreira e Finanças', count: 0 },
     { key: 'Spiritual Growth', label: 'Crescimento Espiritual', count: 0 },
-    { key: 'General Reading', label: 'Leitura Geral', count: 0 },
     { key: 'Health & Wellness', label: 'Saúde e Bem-estar', count: 0 },
 ]
 
