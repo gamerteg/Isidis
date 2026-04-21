@@ -94,7 +94,7 @@ export async function build() {
   await fastify.register(messagesRoutes)
   await fastify.register(notificationsRoutes)
   await fastify.register(quizRoutes)
-  await fastify.register(adminRoutes)
+  await fastify.register(adminRoutes, { prefix: '/admin' })
 
   return fastify
 }

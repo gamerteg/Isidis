@@ -1,6 +1,10 @@
 import { supabase } from '@/lib/supabase'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+let rawBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+if (rawBaseUrl && !rawBaseUrl.startsWith('http')) {
+  rawBaseUrl = `https://${rawBaseUrl}`
+}
+const API_BASE_URL = rawBaseUrl
 
 export class ApiError extends Error {
   status: number

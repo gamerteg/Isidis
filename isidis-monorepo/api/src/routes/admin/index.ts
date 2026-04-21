@@ -709,7 +709,7 @@ async function getTicketDetailInternal(fastify: FastifyWithSupabase, id: string)
 }
 
 const adminRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get('/admin/dashboard', { preHandler: [(fastify as any).requireAdmin] }, async (_, reply) => {
+  fastify.get('/dashboard', { preHandler: [(fastify as any).requireAdmin] }, async (_, reply) => {
     const generatedAt = new Date().toISOString()
     const [
       { count: totalUsers },
@@ -765,7 +765,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
     })
   })
 
-  fastify.get('/admin/orders', { preHandler: [(fastify as any).requireAdmin] }, async (request, reply) => {
+  fastify.get('/orders', { preHandler: [(fastify as any).requireAdmin] }, async (request, reply) => {
     const query = listOrdersQuerySchema.safeParse(request.query)
     if (!query.success) {
       return reply.status(400).send({ error: query.error.flatten() })
@@ -785,7 +785,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   })
 
   fastify.get(
-    '/admin/orders/:id',
+    '/orders/:id',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -803,7 +803,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   fastify.post(
-    '/admin/orders/:id/cancel',
+    '/orders/:id/cancel',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -827,7 +827,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   fastify.post(
-    '/admin/orders/:id/resolve-dispute',
+    '/orders/:id/resolve-dispute',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -872,7 +872,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
   // ─── Estornar pedido via Mercado Pago ───
   fastify.post(
-    '/admin/orders/:id/refund',
+    '/orders/:id/refund',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -937,7 +937,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
   // ─── Forçar pedido como pago (quando webhook falhou) ───
   fastify.post(
-    '/admin/orders/:id/force-paid',
+    '/orders/:id/force-paid',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1009,7 +1009,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
   // ─── Forçar mudança de status de pedido ───
   fastify.post(
-    '/admin/orders/:id/force-status',
+    '/orders/:id/force-status',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1073,7 +1073,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
     }
   )
 
-  fastify.get('/admin/financials', { preHandler: [(fastify as any).requireAdmin] }, async (_, reply) => {
+  fastify.get('/financials', { preHandler: [(fastify as any).requireAdmin] }, async (_, reply) => {
     const [stats, recentOrders, health] = await Promise.all([
       getFinancialStats(fastify),
       listRecentOrdersInternal(fastify, 50),
@@ -1090,7 +1090,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
     })
   })
 
-  fastify.get('/admin/withdrawals', { preHandler: [(fastify as any).requireAdmin] }, async (_, reply) => {
+  fastify.get('/withdrawals', { preHandler: [(fastify as any).requireAdmin] }, async (_, reply) => {
     const [withdrawals, health] = await Promise.all([
       listPendingWithdrawalsInternal(fastify),
       getAdminOpsHealth(fastify),
@@ -1104,7 +1104,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   })
 
   fastify.post(
-    '/admin/withdrawals/:id/status',
+    '/withdrawals/:id/status',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1129,7 +1129,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
   // ─── Nota/Comprovante de Saque ───
   fastify.get(
-    '/admin/withdrawals/:id/receipt',
+    '/withdrawals/:id/receipt',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1228,12 +1228,12 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
     }
   )
 
-  fastify.get('/admin/users', { preHandler: [(fastify as any).requireAdmin] }, async (_, reply) => {
+  fastify.get('/users', { preHandler: [(fastify as any).requireAdmin] }, async (_, reply) => {
     const users = await listUsersInternal(fastify)
     return reply.send({ data: users })
   })
 
-  fastify.get('/admin/users/:id', { preHandler: [(fastify as any).requireAdmin] }, async (request, reply) => {
+  fastify.get('/users/:id', { preHandler: [(fastify as any).requireAdmin] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const user = await getUserDetailInternal(fastify, id)
 
@@ -1244,7 +1244,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.send({ data: user })
   })
 
-  fastify.patch('/admin/users/:id', { preHandler: [(fastify as any).requireAdmin] }, async (request, reply) => {
+  fastify.patch('/users/:id', { preHandler: [(fastify as any).requireAdmin] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const body = updateUserSchema.safeParse(request.body)
 
@@ -1265,7 +1265,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   })
 
   fastify.get(
-    '/admin/users/:id/orders',
+    '/users/:id/orders',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1275,7 +1275,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   fastify.get(
-    '/admin/users/:id/wallet',
+    '/users/:id/wallet',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1286,7 +1286,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
   // ─── Liberar saldo manualmente na carteira da cartomante ───
   fastify.post(
-    '/admin/users/:id/credit-balance',
+    '/users/:id/credit-balance',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1362,7 +1362,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   fastify.post(
-    '/admin/users/:id/suspend',
+    '/users/:id/suspend',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1383,7 +1383,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   fastify.post(
-    '/admin/users/:id/activate',
+    '/users/:id/activate',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1401,7 +1401,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   fastify.post(
-    '/admin/users/:id/role',
+    '/users/:id/role',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1425,7 +1425,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   fastify.get(
-    '/admin/approvals/readers',
+    '/approvals/readers',
     { preHandler: [(fastify as any).requireAdmin] },
     async (_, reply) => {
       const readers = await listPendingReadersInternal(fastify)
@@ -1434,7 +1434,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   fastify.get(
-    '/admin/approvals/readers/:id',
+    '/approvals/readers/:id',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1449,7 +1449,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   fastify.get(
-    '/admin/verification-documents/signed-url',
+    '/verification-documents/signed-url',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const query = signedUrlQuerySchema.safeParse(request.query)
@@ -1474,7 +1474,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   fastify.post(
-    '/admin/approvals/readers/:id/approve',
+    '/approvals/readers/:id/approve',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1499,7 +1499,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   fastify.post(
-    '/admin/approvals/readers/:id/reject',
+    '/approvals/readers/:id/reject',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1532,7 +1532,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   fastify.post(
-    '/admin/approvals/readers/:id/suspend',
+    '/approvals/readers/:id/suspend',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1551,7 +1551,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
     }
   )
 
-  fastify.get('/admin/gigs', { preHandler: [(fastify as any).requireAdmin] }, async (request, reply) => {
+  fastify.get('/gigs', { preHandler: [(fastify as any).requireAdmin] }, async (request, reply) => {
     const query = listGigsQuerySchema.safeParse(request.query)
     if (!query.success) {
       return reply.status(400).send({ error: query.error.flatten() })
@@ -1562,7 +1562,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   })
 
   fastify.post(
-    '/admin/gigs/:id/approve',
+    '/gigs/:id/approve',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1598,7 +1598,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   fastify.post(
-    '/admin/gigs/:id/reject',
+    '/gigs/:id/reject',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1640,7 +1640,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
     }
   )
 
-  fastify.get('/admin/tickets', { preHandler: [(fastify as any).requireAdmin] }, async (request, reply) => {
+  fastify.get('/tickets', { preHandler: [(fastify as any).requireAdmin] }, async (request, reply) => {
     const query = listTicketsQuerySchema.safeParse(request.query)
     if (!query.success) {
       return reply.status(400).send({ error: query.error.flatten() })
@@ -1651,7 +1651,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   })
 
   fastify.get(
-    '/admin/tickets/:id',
+    '/tickets/:id',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1666,7 +1666,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   fastify.post(
-    '/admin/tickets/:id/messages',
+    '/tickets/:id/messages',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
@@ -1695,7 +1695,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
   )
 
   fastify.post(
-    '/admin/tickets/:id/status',
+    '/tickets/:id/status',
     { preHandler: [(fastify as any).requireAdmin] },
     async (request, reply) => {
       const { id } = request.params as { id: string }
