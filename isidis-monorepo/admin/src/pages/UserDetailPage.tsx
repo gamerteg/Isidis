@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   getUserDetail, updateUser, suspendUser, activateUser, changeRole,
@@ -414,12 +414,12 @@ export function UserDetailPage() {
               />
             </div>
           </div>
-          <DialogFooter>
+          <div className="flex gap-3 justify-end pt-4">
             <Button variant="outline" onClick={() => setCreditDialog(false)}>Cancelar</Button>
             <Button onClick={handleCreditBalance} disabled={crediting || !creditAmount || !creditDescription}>
               {crediting ? 'Creditando...' : 'Confirmar Crédito'}
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

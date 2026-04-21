@@ -405,11 +405,9 @@ export function FinancialsPage() {
           </div>
         </DialogContent>
       </Dialog>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Withdrawal Receipt Modal */}
+
       <Dialog open={!!receiptDialog} onOpenChange={() => setReceiptDialog(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="print:hidden">

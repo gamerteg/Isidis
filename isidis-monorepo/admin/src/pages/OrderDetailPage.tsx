@@ -385,7 +385,7 @@ export function OrderDetailPage() {
           </p>
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={() => setConfirmAction(null)}>Voltar</Button>
-            <Button variant="warning" onClick={() => handleForceStatus('DELIVERED')} disabled={processing}>Confirmar</Button>
+            <Button variant="default" onClick={() => handleForceStatus('DELIVERED')} disabled={processing}>Confirmar</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -400,7 +400,7 @@ export function OrderDetailPage() {
           </p>
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={() => setConfirmAction(null)}>Voltar</Button>
-            <Button variant="info" onClick={() => handleForceStatus('COMPLETED')} disabled={processing}>Confirmar</Button>
+            <Button variant="default" onClick={() => handleForceStatus('COMPLETED')} disabled={processing}>Confirmar</Button>
           </div>
         </DialogContent>
       </Dialog>
