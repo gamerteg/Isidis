@@ -1,5 +1,16 @@
-import { apiGet, apiPatch, apiPost } from '@/lib/apiClient'
+import { apiGet, apiPatch, apiPost, isApiNotFoundError } from '@/lib/apiClient'
 import { type AdminDashboardOverview } from '@/types/admin-api'
+import {
+  legacyActivateUser,
+  legacyChangeRole,
+  legacyGetDashboardOverview,
+  legacyGetUserDetail,
+  legacyGetUserOrders,
+  legacyGetUserWalletStats,
+  legacyListUsers,
+  legacySuspendUser,
+  legacyUpdateUser,
+} from '@/services/legacyAdmin'
 
 export interface AdminUser {
   id: string
@@ -40,46 +51,87 @@ export interface WalletStats {
 }
 
 export async function listUsers(): Promise<AdminUser[]> {
-  const response = await apiGet<{ data: AdminUser[] }>('/admin/users')
-  return response.data
+  try {
+    const response = await apiGet<{ data: AdminUser[] }>('/admin/users')
+    return response.data
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    return legacyListUsers()
+  }
 }
 
 export async function getUserDetail(id: string): Promise<AdminUser | null> {
   try {
     const response = await apiGet<{ data: AdminUser }>(`/admin/users/${id}`)
     return response.data
-  } catch {
-    return null
+  } catch (error) {
+    if (!isApiNotFoundError(error)) return null
+    return legacyGetUserDetail(id)
   }
 }
 
 export async function updateUser(id: string, updates: Partial<AdminUser>): Promise<void> {
-  await apiPatch(`/admin/users/${id}`, updates)
+  try {
+    await apiPatch(`/admin/users/${id}`, updates)
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    await legacyUpdateUser(id, updates)
+  }
 }
 
 export async function suspendUser(id: string): Promise<void> {
-  await apiPost(`/admin/users/${id}/suspend`)
+  try {
+    await apiPost(`/admin/users/${id}/suspend`)
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    await legacySuspendUser(id)
+  }
 }
 
 export async function activateUser(id: string): Promise<void> {
-  await apiPost(`/admin/users/${id}/activate`)
+  try {
+    await apiPost(`/admin/users/${id}/activate`)
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    await legacyActivateUser(id)
+  }
 }
 
 export async function changeRole(id: string, role: 'CLIENT' | 'READER' | 'ADMIN'): Promise<void> {
-  await apiPost(`/admin/users/${id}/role`, { role })
+  try {
+    await apiPost(`/admin/users/${id}/role`, { role })
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    await legacyChangeRole(id, role)
+  }
 }
 
 export async function getUserOrders(userId: string): Promise<UserOrder[]> {
-  const response = await apiGet<{ data: UserOrder[] }>(`/admin/users/${userId}/orders`)
-  return response.data
+  try {
+    const response = await apiGet<{ data: UserOrder[] }>(`/admin/users/${userId}/orders`)
+    return response.data
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    return legacyGetUserOrders(userId)
+  }
 }
 
 export async function getUserWalletStats(userId: string): Promise<WalletStats | null> {
-  const response = await apiGet<{ data: WalletStats | null }>(`/admin/users/${userId}/wallet`)
-  return response.data
+  try {
+    const response = await apiGet<{ data: WalletStats | null }>(`/admin/users/${userId}/wallet`)
+    return response.data
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    return legacyGetUserWalletStats(userId)
+  }
 }
 
 export async function getDashboardOverview(): Promise<AdminDashboardOverview> {
-  const response = await apiGet<{ data: AdminDashboardOverview }>('/admin/dashboard')
-  return response.data
+  try {
+    const response = await apiGet<{ data: AdminDashboardOverview }>('/admin/dashboard')
+    return response.data
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    return legacyGetDashboardOverview()
+  }
 }

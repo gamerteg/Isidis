@@ -1,5 +1,12 @@
-import { apiGet, apiPost } from '@/lib/apiClient'
+import { apiGet, apiPost, isApiNotFoundError } from '@/lib/apiClient'
 import { type AdminOpsHealth, type AdminOrderDetail, type AdminOrderListItem } from '@/types/admin-api'
+import {
+  createCompatibilityHealth,
+  legacyCancelOrder,
+  legacyGetOrderDetail,
+  legacyListOrders,
+  legacyResolveDispute,
+} from '@/services/legacyAdmin'
 
 export type AdminOrder = AdminOrderListItem
 
@@ -40,31 +47,53 @@ export async function listOrders(filters: OrderFilters = {}): Promise<{
   health: AdminOpsHealth
   generated_at: string
 }> {
-  const response = await apiGet<{
-    data: AdminOrder[]
-    count: number
-    health: AdminOpsHealth
-    generated_at: string
-  }>(`/admin/orders${toQueryString(filters)}`)
+  try {
+    const response = await apiGet<{
+      data: AdminOrder[]
+      count: number
+      health: AdminOpsHealth
+      generated_at: string
+    }>(`/admin/orders${toQueryString(filters)}`)
 
-  return response
+    return response
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+
+    const legacy = await legacyListOrders(filters)
+    return {
+      ...legacy,
+      health: createCompatibilityHealth(),
+      generated_at: new Date().toISOString(),
+    }
+  }
 }
 
 export async function getOrderDetail(id: string): Promise<AdminOrderDetail | null> {
   try {
     const response = await apiGet<{ data: AdminOrderDetail }>(`/admin/orders/${id}`)
     return response.data
-  } catch {
-    return null
+  } catch (error) {
+    if (!isApiNotFoundError(error)) return null
+    return legacyGetOrderDetail(id)
   }
 }
 
 export async function cancelOrder(orderId: string): Promise<void> {
-  await apiPost(`/admin/orders/${orderId}/cancel`)
+  try {
+    await apiPost(`/admin/orders/${orderId}/cancel`)
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    await legacyCancelOrder(orderId)
+  }
 }
 
 export async function resolveDispute(orderId: string): Promise<void> {
-  await apiPost(`/admin/orders/${orderId}/resolve-dispute`)
+  try {
+    await apiPost(`/admin/orders/${orderId}/resolve-dispute`)
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    await legacyResolveDispute(orderId)
+  }
 }
 
 export const ORDER_STATUS_MAP: Record<

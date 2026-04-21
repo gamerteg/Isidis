@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '@/lib/apiClient'
+import { apiGet, apiPost, isApiNotFoundError } from '@/lib/apiClient'
 import {
   type AdminFinancialOverview,
   type AdminFinancialStats,
@@ -6,13 +6,25 @@ import {
   type OrderFinancialRow,
   type PendingWithdrawalItem,
 } from '@/types/admin-api'
+import {
+  createCompatibilityHealth,
+  legacyGetFinancialOverview,
+  legacyListPendingWithdrawals,
+  legacyListRecentOrders,
+  legacyUpdateWithdrawalStatus,
+} from '@/services/legacyAdmin'
 
 export type FinancialStats = AdminFinancialStats
 export type PendingWithdrawal = PendingWithdrawalItem
 
 export async function getFinancialOverview(): Promise<AdminFinancialOverview> {
-  const response = await apiGet<{ data: AdminFinancialOverview }>('/admin/financials')
-  return response.data
+  try {
+    const response = await apiGet<{ data: AdminFinancialOverview }>('/admin/financials')
+    return response.data
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    return legacyGetFinancialOverview()
+  }
 }
 
 export async function getFinancialStats(): Promise<{
@@ -33,23 +45,42 @@ export async function listPendingWithdrawals(): Promise<{
   health: AdminOpsHealth
   generated_at: string
 }> {
-  const response = await apiGet<{
-    data: PendingWithdrawal[]
-    health: AdminOpsHealth
-    generated_at: string
-  }>('/admin/withdrawals')
+  try {
+    const response = await apiGet<{
+      data: PendingWithdrawal[]
+      health: AdminOpsHealth
+      generated_at: string
+    }>('/admin/withdrawals')
 
-  return response
+    return response
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    return {
+      data: await legacyListPendingWithdrawals(),
+      health: createCompatibilityHealth(),
+      generated_at: new Date().toISOString(),
+    }
+  }
 }
 
 export async function updateWithdrawalStatus(
   id: string,
   status: 'COMPLETED' | 'FAILED'
 ): Promise<void> {
-  await apiPost(`/admin/withdrawals/${id}/status`, { status })
+  try {
+    await apiPost(`/admin/withdrawals/${id}/status`, { status })
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    await legacyUpdateWithdrawalStatus(id, status)
+  }
 }
 
 export async function listRecentOrders(limit = 50): Promise<OrderFinancialRow[]> {
-  const overview = await getFinancialOverview()
-  return overview.recent_orders.slice(0, limit)
+  try {
+    const overview = await getFinancialOverview()
+    return overview.recent_orders.slice(0, limit)
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    return legacyListRecentOrders(limit)
+  }
 }

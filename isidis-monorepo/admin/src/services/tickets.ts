@@ -1,5 +1,11 @@
 import { supabase } from '@/lib/supabase'
-import { apiGet, apiPost } from '@/lib/apiClient'
+import { apiGet, apiPost, isApiNotFoundError } from '@/lib/apiClient'
+import {
+  legacyGetTicketDetail,
+  legacyListTickets,
+  legacySendTicketMessage,
+  legacyUpdateTicketStatus,
+} from '@/services/legacyAdmin'
 
 export interface Ticket {
   id: string
@@ -28,17 +34,23 @@ export interface TicketDetail extends Ticket {
 }
 
 export async function listTickets(statusFilter?: string): Promise<Ticket[]> {
-  const query = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : ''
-  const response = await apiGet<{ data: Ticket[] }>(`/admin/tickets${query}`)
-  return response.data
+  try {
+    const query = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : ''
+    const response = await apiGet<{ data: Ticket[] }>(`/admin/tickets${query}`)
+    return response.data
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    return legacyListTickets(statusFilter)
+  }
 }
 
 export async function getTicketDetail(id: string): Promise<TicketDetail | null> {
   try {
     const response = await apiGet<{ data: TicketDetail }>(`/admin/tickets/${id}`)
     return response.data
-  } catch {
-    return null
+  } catch (error) {
+    if (!isApiNotFoundError(error)) return null
+    return legacyGetTicketDetail(id)
   }
 }
 
@@ -47,11 +59,21 @@ export async function sendTicketMessage(
   _senderId: string,
   content: string
 ): Promise<void> {
-  await apiPost(`/admin/tickets/${ticketId}/messages`, { content })
+  try {
+    await apiPost(`/admin/tickets/${ticketId}/messages`, { content })
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    await legacySendTicketMessage(ticketId, _senderId, content)
+  }
 }
 
 export async function updateTicketStatus(id: string, status: Ticket['status']): Promise<void> {
-  await apiPost(`/admin/tickets/${id}/status`, { status })
+  try {
+    await apiPost(`/admin/tickets/${id}/status`, { status })
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    await legacyUpdateTicketStatus(id, status)
+  }
 }
 
 export function subscribeToTicketMessages(ticketId: string, onMessage: () => void) {

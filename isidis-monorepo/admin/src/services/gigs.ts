@@ -1,4 +1,5 @@
-import { apiGet, apiPost } from '@/lib/apiClient'
+import { apiGet, apiPost, isApiNotFoundError } from '@/lib/apiClient'
+import { legacyApproveGig, legacyListAllGigs, legacyRejectGig } from '@/services/legacyAdmin'
 
 export interface PendingGig {
   id: string
@@ -18,22 +19,42 @@ export interface PendingGig {
 }
 
 export async function listPendingGigs(): Promise<PendingGig[]> {
-  const response = await apiGet<{ data: PendingGig[] }>('/admin/gigs?status=PENDING')
-  return response.data
+  try {
+    const response = await apiGet<{ data: PendingGig[] }>('/admin/gigs?status=PENDING')
+    return response.data
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    return legacyListAllGigs('PENDING')
+  }
 }
 
 export async function listAllGigs(status?: string): Promise<PendingGig[]> {
-  const query = status ? `?status=${encodeURIComponent(status)}` : ''
-  const response = await apiGet<{ data: PendingGig[] }>(`/admin/gigs${query}`)
-  return response.data
+  try {
+    const query = status ? `?status=${encodeURIComponent(status)}` : ''
+    const response = await apiGet<{ data: PendingGig[] }>(`/admin/gigs${query}`)
+    return response.data
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    return legacyListAllGigs(status)
+  }
 }
 
 export async function approveGig(id: string): Promise<void> {
-  await apiPost(`/admin/gigs/${id}/approve`)
+  try {
+    await apiPost(`/admin/gigs/${id}/approve`)
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    await legacyApproveGig(id)
+  }
 }
 
 export async function rejectGig(id: string, reason?: string): Promise<void> {
-  await apiPost(`/admin/gigs/${id}/reject`, { reason })
+  try {
+    await apiPost(`/admin/gigs/${id}/reject`, { reason })
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    await legacyRejectGig(id, reason)
+  }
 }
 
 export function formatDeliveryMethod(method: string): string {

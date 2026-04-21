@@ -30,3 +30,4 @@ O foco principal e corrigir a migracao incompleta do Frontend (`/web`), padroniz
 - [[patches/PATCH-2026-04-21-performance-gigs-flickering]]: Singleton Supabase, useAuth estavel, DashboardHome deps corrigidas, PresenceProvider Set estavel, ErrorBoundary.
 - [[patches/PATCH-2026-04-21-checkout-redesign-3-steps]]: Checkout reescrito em 3 passos sequenciais mobile-first (Resumo -> Perguntas -> Pagamento), sidebar removida, textos de marketing eliminados.
 - [[patches/PATCH-2026-04-21-admin-orders-financial-hardening]]: Admin migrado para API Fastify com rotas protegidas, service role removida do browser, dashboard/orders/financials com polling, refresh manual e saude operacional.
+- [[patches/PATCH-2026-04-21-admin-api-404-compat-fallback]]: Fallback de compatibilidade no admin quando a API de producao ainda retorna 404 em /admin/*, usando temporariamente o fluxo legado via Supabase.

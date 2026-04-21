@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { initMercadoPago, Payment, StatusScreen } from '@mercadopago/sdk-react'
 import {
   ArrowLeft,
   CheckCircle2,
@@ -16,51 +15,12 @@ import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  checkPaymentStatus,
-  getCheckoutConfig,
-  submitCheckoutPayment,
-} from '@/lib/actions/checkout'
-import type { CheckoutConfigResponse, GigAddOn, GigRequirement } from '@/types'
+import { checkPaymentStatus, submitCheckoutPayment } from '@/lib/actions/checkout'
+import type { GigAddOn, GigRequirement } from '@/types'
 
 type CheckoutMethod = 'PIX' | 'CARD'
-
-type BrickFormData = {
-  paymentType: string
-  selectedPaymentMethod: string
-  formData: {
-    token?: string
-    issuer_id?: string
-    payment_method_id?: string
-    transaction_amount?: number
-    installments?: number
-    payer?: {
-      email?: string
-      first_name?: string
-      last_name?: string
-      firstName?: string
-      lastName?: string
-      identification?: { type?: string; number?: string }
-      address?: {
-        zip_code?: string
-        street_number?: string | number
-        federal_unit?: string
-        city?: string
-        neighborhood?: string
-        street_name?: string
-      }
-    }
-  }
-}
-
-type BrickAdditionalData = {
-  bin?: string
-  lastFourDigits?: string
-  cardholderName?: string
-  paymentTypeId?: string
-}
 
 interface CheckoutResultState {
   orderId: string
@@ -131,9 +91,6 @@ export function CheckoutForm({
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [configLoading, setConfigLoading] = useState(true)
-  const [sdkReady, setSdkReady] = useState(false)
-  const [checkoutConfig, setCheckoutConfig] = useState<CheckoutConfigResponse | null>(null)
   const [orderId, setOrderId] = useState<string | null>(existingOrderId || null)
   const [checkoutResult, setCheckoutResult] = useState<CheckoutResultState | null>(null)
   const [requirementsAnswers, setRequirementsAnswers] = useState<Record<string, string>>({})
@@ -160,26 +117,6 @@ export function CheckoutForm({
     [selectedAddOns],
   )
 
-  // Carrega SDK do Mercado Pago em background, não bloqueia passos anteriores
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      try {
-        const config = await getCheckoutConfig()
-        if (cancelled) return
-        initMercadoPago(config.public_key, { locale: config.locale })
-        setCheckoutConfig(config)
-        setSdkReady(true)
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message ?? 'Nao foi possivel carregar o checkout.')
-      } finally {
-        if (!cancelled) setConfigLoading(false)
-      }
-    }
-    void load()
-    return () => { cancelled = true }
-  }, [])
-
   // Polling de status após PIX gerado
   useEffect(() => {
     if (!checkoutResult?.paymentId) return
@@ -201,23 +138,6 @@ export function CheckoutForm({
     if (missing.length === 0) return null
     return 'Preencha as informacoes obrigatorias para continuar.'
   }, [requiredQuestions])
-
-  const paymentBrickCustomization = useMemo<ComponentProps<typeof Payment>['customization']>(() => {
-    if (method === 'PIX') {
-      return {
-        paymentMethods: { bankTransfer: 'all', types: { included: ['bank_transfer'] } },
-        visual: { defaultPaymentOption: { bankTransferForm: true } },
-      }
-    }
-    return {
-      paymentMethods: {
-        creditCard: 'all', debitCard: 'all',
-        minInstallments: 1, maxInstallments: 1,
-        types: { included: ['creditCard', 'debitCard'] },
-      },
-      visual: { defaultPaymentOption: { creditCardForm: true } },
-    }
-  }, [method])
 
   const handleCardProSubmit = useCallback(async () => {
     const err = validateRequirements(requirementsAnswers)
@@ -243,60 +163,37 @@ export function CheckoutForm({
     }
   }, [existingOrderId, gigId, orderId, requirementsAnswers, selectedAddOnIds, validateRequirements])
 
-  const handleBrickSubmit = useCallback(async (paymentData: BrickFormData, additionalData?: BrickAdditionalData | null) => {
-    const err = validateRequirements(requirementsAnswers)
-    if (err) { setError(err); throw new Error(err) }
-    setSubmitting(true); setError('')
+  const handlePixDirectSubmit = useCallback(async () => {
+    setSubmitting(true)
+    setError('')
     try {
       const result = await submitCheckoutPayment({
         order_id: orderId ?? existingOrderId,
         gig_id: gigId,
         add_on_ids: selectedAddOnIds,
         requirements_answers: requirementsAnswers,
-        payment_method: method,
-        transaction_amount: paymentData.formData.transaction_amount,
-        card_token: paymentData.formData.token,
-        payment_method_id: paymentData.formData.payment_method_id,
-        installments: paymentData.formData.installments,
-        issuer_id: paymentData.formData.issuer_id,
-        payer: paymentData.formData.payer,
-        brick_payment_type: paymentData.paymentType,
-        brick_selected_payment_method: paymentData.selectedPaymentMethod,
-        brick_additional_data: additionalData ?? undefined,
-        card_holder_name: additionalData?.cardholderName,
+        payment_method: 'PIX',
       })
-
       const resolvedOrderId = result.order_id
       const paymentId = result.payment_id ?? result.mercadopago_payment_id ?? result.pix_qr_code_id
       setOrderId(resolvedOrderId)
-
-      if (!paymentId) throw new Error('Nao foi possivel identificar o pagamento.')
-
-      const nextResult: CheckoutResultState = {
-        orderId: resolvedOrderId, paymentId, method,
+      if (!paymentId) throw new Error('Não foi possível identificar o pagamento.')
+      setCheckoutResult({
+        orderId: resolvedOrderId, paymentId, method: 'PIX',
         status: result.status,
-        amountCardFee: result.amount_card_fee ?? null,
         pix: result.pix ? {
           qrcode: result.pix.qr_code_base64,
           content: result.pix.copy_paste_code,
           expiresAt: result.pix.expires_at,
         } : undefined,
-      }
-      setCheckoutResult(nextResult)
-
-      if (method === 'CARD' && result.status === 'CONFIRMED') {
-        toast.success('Pagamento confirmado!')
-        navigate(`/dashboard/pedido/${resolvedOrderId}`)
-        return
-      }
-      toast.success(method === 'PIX' ? 'PIX gerado com sucesso!' : 'Pagamento enviado. Acompanhando confirmacao.')
+      })
+      toast.success('PIX gerado com sucesso!')
     } catch (e: any) {
-      setError(e?.message ?? 'Nao foi possivel processar o pagamento.')
-      throw e
+      setError(e?.message ?? 'Não foi possível processar o pagamento.')
     } finally {
       setSubmitting(false)
     }
-  }, [existingOrderId, gigId, method, navigate, orderId, requirementsAnswers, selectedAddOnIds, validateRequirements])
+  }, [existingOrderId, gigId, orderId, requirementsAnswers, selectedAddOnIds])
 
   const copyToClipboard = async () => {
     const content = checkoutResult?.pix?.content
@@ -315,7 +212,6 @@ export function CheckoutForm({
   }
 
   const pixActive = checkoutResult?.method === 'PIX' && checkoutResult.pix
-  const cardActive = checkoutResult?.method === 'CARD'
   const totalSteps = steps.length
 
   // ─── Progress bar ───────────────────────────────────────────────────────────
@@ -478,10 +374,6 @@ export function CheckoutForm({
   }
 
   // ─── Passo 3: Pagamento ─────────────────────────────────────────────────────
-  const statusReturnUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/dashboard/pedido/${checkoutResult?.orderId ?? ''}`
-    : undefined
-
   const paymentStep = (
     <div className="w-full">
       {progressBar}
@@ -573,17 +465,6 @@ export function CheckoutForm({
           </div>
         </div>
 
-      ) : cardActive ? (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-white/10 bg-white p-3">
-            <StatusScreen
-              initialization={{ paymentId: checkoutResult!.paymentId }}
-              customization={statusReturnUrl ? { backUrls: { return: statusReturnUrl, error: statusReturnUrl } } : undefined}
-              locale="pt-BR"
-            />
-          </div>
-        </div>
-
       ) : method === 'CARD' ? (
         <div className="space-y-4">
           <div className="rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-4 text-sm text-sky-200 text-center leading-6">
@@ -604,35 +485,20 @@ export function CheckoutForm({
         </div>
 
       ) : (
+        /* PIX — chamada direta, sem Brick */
         <div className="space-y-4">
-          {/* Brick PIX */}
-          <div className="rounded-2xl border border-white/10 bg-white p-3">
-            {configLoading ? (
-              <div className="flex min-h-[260px] items-center justify-center text-sm text-slate-500">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando...
-              </div>
-            ) : sdkReady ? (
-              <Payment
-                key={`pix-${checkoutResult?.paymentId ?? 'new'}`}
-                initialization={{ amount: amountTotal, payer: checkoutConfig?.payer }}
-                customization={paymentBrickCustomization}
-                locale="pt-BR"
-                onSubmit={handleBrickSubmit}
-                onReady={() => undefined}
-                onError={(e) => console.error('[MercadoPago Brick]', e)}
-              />
+          <Button
+            type="button"
+            onClick={() => void handlePixDirectSubmit()}
+            disabled={submitting}
+            className="w-full py-6 text-base font-bold rounded-2xl aurora border-shine text-white hover:opacity-90 disabled:opacity-60"
+          >
+            {submitting ? (
+              <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Gerando PIX...</>
             ) : (
-              <div className="flex min-h-[220px] items-center justify-center text-sm text-rose-400">
-                Nao foi possivel inicializar o checkout.
-              </div>
+              <><QrCode className="h-5 w-5 mr-2" /> Gerar QR Code PIX — {formatBRL(amountTotal)}</>
             )}
-          </div>
-
-          {submitting && (
-            <div className="flex items-center justify-center gap-2 rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3 text-sm text-sky-200">
-              <Loader2 className="h-4 w-4 animate-spin" /> Processando pagamento...
-            </div>
-          )}
+          </Button>
         </div>
       )}
     </div>

@@ -185,6 +185,7 @@
   },
   "active": "7af29b2aee223953",
   "lastOpenFiles": [
+    "patches/PATCH-2026-04-21-admin-api-404-compat-fallback.md",
     "patches/PATCH-2026-04-21-performance-gigs-flickering.md",
     "00-Index.md",
     "patches/PATCH-2026-04-21-admin-orders-financial-hardening.md",

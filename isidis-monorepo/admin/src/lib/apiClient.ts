@@ -2,6 +2,18 @@ import { supabase } from '@/lib/supabase'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
+export class ApiError extends Error {
+  status: number
+  payload: unknown
+
+  constructor(message: string, status: number, payload: unknown) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.payload = payload
+  }
+}
+
 type RequestOptions = {
   body?: unknown
   method?: 'GET' | 'POST' | 'PATCH'
@@ -44,7 +56,7 @@ async function requestJson<T>(path: string, options: RequestOptions = {}) {
       payload?.message ||
       `Erro HTTP ${response.status}`
 
-    throw new Error(message)
+    throw new ApiError(message, response.status, payload)
   }
 
   return payload as T
@@ -60,4 +72,8 @@ export function apiPost<T>(path: string, body?: unknown) {
 
 export function apiPatch<T>(path: string, body?: unknown) {
   return requestJson<T>(path, { method: 'PATCH', body })
+}
+
+export function isApiNotFoundError(error: unknown) {
+  return error instanceof ApiError && error.status === 404
 }
