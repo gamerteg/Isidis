@@ -626,23 +626,25 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'Essa forma de pagamento nao esta disponivel para este servico' })
       }
 
+      // Limite simultâneo: conta apenas pedidos efetivamente pagos (não tentativas)
       const { count: simultaneousCount } = await fastify.supabase
         .from('orders')
         .select('id', { count: 'exact', head: true })
         .eq('reader_id', gig.owner_id)
-        .in('status', ['PAID', 'PENDING_PAYMENT'])
+        .in('status', ['PAID', 'DELIVERED'])
 
       if (reader.max_simultaneous_orders && (simultaneousCount ?? 0) >= reader.max_simultaneous_orders) {
         return reply.status(400).send({ error: 'Cartomante esta com capacidade maxima no momento' })
       }
 
+      // Limite diário: conta apenas pedidos que foram pagos (tentativas não contam)
       const today = new Date().toISOString().split('T')[0]
       const { count: dailyCount } = await fastify.supabase
         .from('orders')
         .select('id', { count: 'exact', head: true })
         .eq('reader_id', gig.owner_id)
         .gte('created_at', `${today}T00:00:00`)
-        .neq('status', 'CANCELED')
+        .in('status', ['PAID', 'DELIVERED', 'COMPLETED'])
 
       if (reader.max_orders_per_day && (dailyCount ?? 0) >= reader.max_orders_per_day) {
         return reply.status(400).send({ error: 'Cartomante atingiu o limite de pedidos do dia' })
