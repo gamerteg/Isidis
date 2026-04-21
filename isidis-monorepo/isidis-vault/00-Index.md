@@ -26,3 +26,4 @@ O foco principal é corrigir a migração incompleta do Frontend (`/web`), padro
 - [[patches/PATCH-2026-04-20-migracao-nextjs-vite]]: Migração completa Next.js → React + Vite (estrutura, deps, auth, rotas).
 - [[patches/PATCH-2026-04-20-admin-removal-mobile-first]]: Remoção do admin, limpeza final de src/app/, Mobile First aplicado.
 - [[patches/PATCH-2026-04-20-scroll-reset-performance]]: Scroll reset na navegação + otimizações de performance (WebSocket guard, code splitting, animações).
+- [[patches/PATCH-2026-04-20-footers-filtros-gigs]]: Footers removidos, filtros de categoria corrigidos (divergência API/UI/banco), gigs com dedup+shuffle.

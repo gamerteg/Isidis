@@ -60,75 +60,66 @@ const _getLandingStats = async (): Promise<LandingStats> => {
 
 export const getLandingStats = _getLandingStats
 
+const CATEGORY_META: Record<string, { label: string; image: string }> = {
+    'Love & Relationships': { label: 'Amor e Relacionamentos', image: '/img/Relacionamento.png' },
+    'Career & Finance':     { label: 'Carreira e Finanças',    image: '/img/Financeiro.png' },
+    'Spiritual Growth':     { label: 'Crescimento Espiritual', image: '/img/Espiritualidade.png' },
+    'General Reading':      { label: 'Leitura Geral',          image: '/img/Relacionamento.png' },
+    'Health & Wellness':    { label: 'Saúde e Bem-estar',      image: '/img/Bem-estar.png' },
+}
+
 const _getCategoryCounts = async (): Promise<CategoryCount[]> => {
     const supabase = getPublicClient()
 
-    // This is a bit complex in Supabase without a dedicated category table/column on profiles or gigs.
-    // Assuming 'specialties' in profiles or some category field in gigs. 
-    // Based on current schema, profiles has 'specialties' array.
+    const { data: gigs } = await supabase
+        .from('gigs')
+        .select('category, owner_id')
+        .eq('is_active', true)
+        .eq('status', 'APPROVED')
 
-    // We'll fetch all readers and aggregate their specialties
-    const { data: readers } = await supabase
-        .from('profiles')
-        .select('specialties')
-        .eq('role', 'READER')
-
-    const counts: Record<string, number> = {
-        'Amor & Relacionamentos': 0,
-        'Carreira & Financas': 0,
-        'Espiritualidade': 0,
-        'Saude & Bem-estar': 0
-    }
-
-    readers?.forEach(reader => {
-        reader.specialties?.forEach((specialty: string) => {
-            const s = specialty.toLowerCase()
-            if (s.includes('amor') || s.includes('relacionamento') || s.includes('casal')) counts['Amor & Relacionamentos']++
-            else if (s.includes('carreira') || s.includes('trabalho') || s.includes('dinheiro') || s.includes('financa') || s.includes('finança')) counts['Carreira & Financas']++
-            else if (s.includes('espiritual') || s.includes('alma') || s.includes('karma')) counts['Espiritualidade']++
-            else if (s.includes('saude') || s.includes('saúde') || s.includes('bem-estar') || s.includes('cura')) counts['Saude & Bem-estar']++
-        })
+    const readersByCategory: Record<string, Set<string>> = {}
+    gigs?.forEach((gig: { category: string; owner_id: string }) => {
+        if (!gig.category || !CATEGORY_META[gig.category]) return
+        if (!readersByCategory[gig.category]) readersByCategory[gig.category] = new Set()
+        readersByCategory[gig.category].add(gig.owner_id)
     })
 
-    // Ensure minimums for visual appeal if data is empty
-    if (Object.values(counts).every(c => c === 0)) {
-        return [
-            { category: 'Amor & Relacionamentos', count: 0, slug: 'Amor & Relacionamentos', image: '/img/Relacionamento.png' },
-            { category: 'Carreira & Financas', count: 0, slug: 'Carreira & Financas', image: '/img/Financeiro.png' },
-            { category: 'Espiritualidade', count: 0, slug: 'Espiritualidade', image: '/img/Espiritualidade.png' },
-            { category: 'Saude & Bem-estar', count: 0, slug: 'Saude & Bem-estar', image: '/img/Bem-estar.png' }
-        ]
-    }
-
-    return [
-        { category: 'Amor & Relacionamentos', count: counts['Amor & Relacionamentos'], slug: 'Amor & Relacionamentos', image: '/img/Relacionamento.png' },
-        { category: 'Carreira & Financas', count: counts['Carreira & Financas'], slug: 'Carreira & Financas', image: '/img/Financeiro.png' },
-        { category: 'Espiritualidade', count: counts['Espiritualidade'], slug: 'Espiritualidade', image: '/img/Espiritualidade.png' },
-        { category: 'Saude & Bem-estar', count: counts['Saude & Bem-estar'], slug: 'Saude & Bem-estar', image: '/img/Bem-estar.png' }
-    ]
+    return Object.entries(CATEGORY_META).map(([slug, meta]) => ({
+        category: meta.label,
+        count: readersByCategory[slug]?.size ?? 0,
+        slug,
+        image: meta.image,
+    }))
 }
 
 export const getCategoryCounts = _getCategoryCounts
 
 export async function getBestSellingGigs(limit: number = 3): Promise<(Gig & { owner: Profile })[]> {
-    const supabase = await createClient()
-
-    // To get best selling, we'd ideally aggregate orders by gig_id.
-    // Standard SQL would be `SELECT gig_id, COUNT(*) as count FROM orders GROUP BY gig_id ORDER BY count DESC`
-    // Supabase JS doesn't support easy aggregation in one query unless we use a view or RPC.
-    // For now, we can simple logic: fetch all valid gigs and maybe order by a 'sales_count' if we added it, 
-    // or just return 'featured'/random ones if sales_count isn't available yet. 
-
-    // TODO: Add 'sales_count' to gigs table and update via trigger on order completion for performance.
-    // For now, let's just fetch active gigs.
+    const supabase = createClient()
 
     const { data: gigs } = await supabase
         .from('gigs')
         .select('*, owner:profiles(*)')
         .eq('is_active', true)
         .eq('status', 'APPROVED')
-        .limit(limit)
+        .limit(20)
 
-    // If we had sales data we could sort here, but for now returned gigs is better than mock data
-    return (gigs as (Gig & { owner: Profile })[]) || []
+    if (!gigs?.length) return []
+
+    // One gig per reader
+    const seenOwners = new Set<string>()
+    const diverse = gigs.filter((gig: any) => {
+        const id = gig.owner?.id
+        if (!id || seenOwners.has(id)) return false
+        seenOwners.add(id)
+        return true
+    })
+
+    // Shuffle (Fisher-Yates) for variety on each load
+    for (let i = diverse.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [diverse[i], diverse[j]] = [diverse[j], diverse[i]]
+    }
+
+    return diverse.slice(0, limit) as (Gig & { owner: Profile })[]
 }

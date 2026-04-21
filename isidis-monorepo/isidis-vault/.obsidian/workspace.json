@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "patches/PATCH-2026-04-20-scroll-reset-performance.md",
+                "file": "patches/PATCH-2026-04-20-footers-filtros-gigs.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "PATCH-2026-04-20-scroll-reset-performance"
+              "title": "PATCH-2026-04-20-footers-filtros-gigs"
             }
           }
         ]
@@ -185,10 +185,11 @@
   },
   "active": "7af29b2aee223953",
   "lastOpenFiles": [
-    "00-Index.md",
     "patches/PATCH-2026-04-20-migracao-nextjs-vite.md",
-    "patches/PATCH-2026-04-20-scroll-reset-performance.md",
     "patches/PATCH-2026-04-20-admin-removal-mobile-first.md",
+    "patches/PATCH-2026-04-20-scroll-reset-performance.md",
+    "patches/PATCH-2026-04-20-footers-filtros-gigs.md",
+    "00-Index.md",
     "07-Telas-Dashboards.md",
     "patches",
     "15-Deployment-e-Ambientes.md",

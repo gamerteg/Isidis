@@ -17,13 +17,11 @@ import type { PaginationMeta } from '@/types'
 
 const categories = [
     { key: 'all', label: 'Todos', count: 0 },
-    { key: 'Amor & Relacionamentos', label: 'Amor & Relacionamentos', count: 0 },
-    { key: 'Carreira & Financas', label: 'Carreira & Financas', count: 0 },
-    { key: 'Espiritualidade', label: 'Espiritualidade', count: 0 },
-    { key: 'Familia & Amigos', label: 'Familia & Amigos', count: 0 },
-    { key: 'Vidas Passadas', label: 'Vidas Passadas', count: 0 },
-    { key: 'Interpretacao de Sonhos', label: 'Interpretacao de Sonhos', count: 0 },
-    { key: 'Saude & Bem-estar', label: 'Saude & Bem-estar', count: 0 },
+    { key: 'Love & Relationships', label: 'Amor e Relacionamentos', count: 0 },
+    { key: 'Career & Finance', label: 'Carreira e Finanças', count: 0 },
+    { key: 'Spiritual Growth', label: 'Crescimento Espiritual', count: 0 },
+    { key: 'General Reading', label: 'Leitura Geral', count: 0 },
+    { key: 'Health & Wellness', label: 'Saúde e Bem-estar', count: 0 },
 ]
 
 const deckTypes = [

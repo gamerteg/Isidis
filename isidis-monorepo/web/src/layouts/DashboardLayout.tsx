@@ -1,6 +1,5 @@
 import { Outlet } from 'react-router-dom';
 import { DashboardBottomNav } from "@/components/layout/dashboard-bottom-nav"
-import { Footer } from "@/components/layout/Footer"
 
 export default function DashboardLayout() {
     return (
@@ -8,7 +7,6 @@ export default function DashboardLayout() {
             <main className="flex-1">
                 <Outlet />
             </main>
-            <Footer />
             <DashboardBottomNav />
         </div>
     )

@@ -134,7 +134,7 @@ const readersRoutes: FastifyPluginAsync = async (fastify) => {
       .range(offset, offset + limit - 1)
 
     if (specialty) {
-      dbQuery = dbQuery.contains('specialties', [specialty])
+      dbQuery = dbQuery.eq('gigs.category', specialty)
     }
 
     if (deck) {
