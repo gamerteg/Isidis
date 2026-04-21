@@ -1021,7 +1021,7 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
       const { data: order, error: fetchErr } = await fastify.supabase
         .from('orders')
-        .select('id, status, client_id, reader_id')
+        .select('id, status, client_id, reader_id, delivered_at')
         .eq('id', id)
         .single()
 
