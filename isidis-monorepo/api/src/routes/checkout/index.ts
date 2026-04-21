@@ -934,19 +934,37 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
           requestOptions,
         })
 
-        await fastify.supabase
+        const pixPaymentId = charge.id?.toString()
+
+        // Update crítico — mercadopago_payment_id é necessário para polling e webhook
+        const { error: pixUpdateError } = await fastify.supabase
           .from('orders')
-          .update({
-            mercadopago_payment_id: charge.id?.toString(),
-            metadata: {
-              ...orderMetadata,
-              mercadopago: {
-                checkout_mode: transaction_amount ? 'checkout_bricks' : 'direct_api',
-                payment_method_id: 'pix',
-              },
-            },
-          })
+          .update({ mercadopago_payment_id: pixPaymentId })
           .eq('id', order.id)
+
+        if (pixUpdateError) {
+          request.log.error(
+            { orderId: order.id, pixPaymentId, err: pixUpdateError.message },
+            '[checkout] CRÍTICO: falha ao salvar mercadopago_payment_id no pedido'
+          )
+        } else {
+          // Metadata separada — falha não impede o checkout
+          void fastify.supabase
+            .from('orders')
+            .update({
+              metadata: {
+                ...orderMetadata,
+                mercadopago: {
+                  checkout_mode: transaction_amount ? 'checkout_bricks' : 'direct_api',
+                  payment_method_id: 'pix',
+                },
+              },
+            })
+            .eq('id', order.id)
+            .then(({ error }) => {
+              if (error) request.log.warn({ orderId: order.id, err: error.message }, '[checkout] Falha ao atualizar metadata do PIX')
+            })
+        }
 
         const transactionData = charge.point_of_interaction?.transaction_data
 
@@ -998,15 +1016,48 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: [(fastify as any).authenticate] },
     async (request, reply) => {
       const { paymentId } = request.params
+      const { order_id: orderIdFallback } = (request.query ?? {}) as { order_id?: string }
 
-      const { data: order } = await fastify.supabase
+      // Busca por mercadopago_payment_id primeiro; fallback por order_id (caso update tenha falhado)
+      let order: { id: string; status: string; client_id: string; mercadopago_payment_id?: string | null } | null = null
+
+      const byPaymentId = await fastify.supabase
         .from('orders')
-        .select('id, status, client_id')
+        .select('id, status, client_id, mercadopago_payment_id')
         .eq('mercadopago_payment_id', paymentId)
-        .single()
+        .maybeSingle()
+
+      if (byPaymentId.data) {
+        order = byPaymentId.data
+      } else if (orderIdFallback) {
+        const byOrderId = await fastify.supabase
+          .from('orders')
+          .select('id, status, client_id, mercadopago_payment_id')
+          .eq('id', orderIdFallback)
+          .maybeSingle()
+
+        if (byOrderId.data) {
+          order = byOrderId.data
+          request.log.warn(
+            { paymentId, orderId: orderIdFallback },
+            '[checkout] Status via fallback order_id — mercadopago_payment_id ausente no pedido'
+          )
+        }
+      }
 
       if (!order || order.client_id !== request.user.id) {
         return reply.status(404).send({ error: 'Pedido nao encontrado' })
+      }
+
+      // Reconcilia o mercadopago_payment_id se estava faltando
+      if (!order.mercadopago_payment_id && orderIdFallback) {
+        void fastify.supabase
+          .from('orders')
+          .update({ mercadopago_payment_id: paymentId })
+          .eq('id', order.id)
+          .then(({ error }) => {
+            if (error) request.log.error({ orderId: order!.id, paymentId, err: error.message }, '[checkout] Falha ao reconciliar mercadopago_payment_id')
+          })
       }
 
       if (order.status === 'PAID') {

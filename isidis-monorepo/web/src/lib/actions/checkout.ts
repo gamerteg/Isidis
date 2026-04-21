@@ -36,8 +36,9 @@ export async function submitCheckoutPayment(payload: CheckoutCreatePayload) {
   }
 }
 
-export async function checkPaymentStatus(paymentId: string) {
-  const response = await apiClient.get<{ data: PaymentStatusResponse }>(`/checkout/status/${paymentId}`)
+export async function checkPaymentStatus(paymentId: string, orderId?: string) {
+  const params = orderId ? `?order_id=${encodeURIComponent(orderId)}` : ''
+  const response = await apiClient.get<{ data: PaymentStatusResponse }>(`/checkout/status/${paymentId}${params}`)
   return {
     status: response.data.data.status,
     orderId: response.data.data.order_id,

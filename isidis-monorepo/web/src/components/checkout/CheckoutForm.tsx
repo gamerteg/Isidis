@@ -94,6 +94,8 @@ export function CheckoutForm({
   const [orderId, setOrderId] = useState<string | null>(existingOrderId || null)
   const [checkoutResult, setCheckoutResult] = useState<CheckoutResultState | null>(null)
   const [requirementsAnswers, setRequirementsAnswers] = useState<Record<string, string>>({})
+  const [pollCount, setPollCount] = useState(0)
+  const [pollError, setPollError] = useState(false)
 
   // Passo: summary → (requirements) → payment
   const steps = useMemo(
@@ -120,16 +122,26 @@ export function CheckoutForm({
   // Polling de status após PIX gerado
   useEffect(() => {
     if (!checkoutResult?.paymentId) return
+    setPollCount(0)
+    setPollError(false)
+    const paymentId = checkoutResult.paymentId
+    const orderId = checkoutResult.orderId
     pollingIntervalRef.current = setInterval(async () => {
       try {
-        const result = await checkPaymentStatus(checkoutResult.paymentId)
+        const result = await checkPaymentStatus(paymentId, orderId)
+        setPollError(false)
         if (result.status === 'PAID') {
           clearInterval(pollingIntervalRef.current!)
           toast.success('Pagamento confirmado!')
           navigate(`/dashboard/pedido/${result.orderId}`)
+        } else {
+          setPollCount(c => c + 1)
         }
-      } catch { /* continua polling */ }
-    }, 4000)
+      } catch {
+        setPollError(true)
+        setPollCount(c => c + 1)
+      }
+    }, 5000)
     return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current) }
   }, [checkoutResult?.paymentId, navigate])
 
@@ -459,10 +471,37 @@ export function CheckoutForm({
             </div>
           )}
 
-          <div className="flex items-center justify-center gap-2 rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3 text-sm text-sky-200">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Aguardando confirmação do pagamento...
-          </div>
+          {/* Status do polling */}
+          {pollError ? (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-4 text-sm text-amber-200 text-center space-y-3">
+              <p>Não conseguimos verificar o status automaticamente.</p>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => navigate('/dashboard')}
+                className="w-full rounded-xl text-amber-200 hover:text-white border border-amber-500/30"
+              >
+                Ver meus pedidos
+              </Button>
+            </div>
+          ) : pollCount >= 24 ? (
+            <div className="rounded-2xl border border-slate-500/30 bg-slate-500/10 px-4 py-4 text-sm text-slate-300 text-center space-y-3">
+              <p>O pagamento pode levar alguns minutos para ser confirmado pelo banco.</p>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => navigate('/dashboard')}
+                className="w-full rounded-xl text-slate-300 hover:text-white border border-slate-500/30"
+              >
+                Já paguei — Ver meus pedidos
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2 rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3 text-sm text-sky-200">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Aguardando confirmação do banco...
+            </div>
+          )}
         </div>
 
       ) : method === 'CARD' ? (

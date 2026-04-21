@@ -14,6 +14,11 @@ async function processMercadoPagoNotification(
   const status = charge.status
   const externalReference = typeof charge.external_reference === 'string' ? charge.external_reference : undefined
 
+  fastify.log.info(
+    { paymentId, mpStatus: status, externalReference, paymentMethod: charge.payment_method_id },
+    '[webhook:mp] Status do pagamento no MP'
+  )
+
   const findOrder = async () => {
     const byPaymentId = await fastify.supabase
       .from('orders')
@@ -132,13 +137,19 @@ const mercadopagoWebhookRoute: FastifyPluginAsync = async (fastify) => {
     const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET
     const shouldValidateSignature = process.env.NODE_ENV === 'production' || Boolean(webhookSecret)
 
+    request.log.info(
+      { topic, paymentId, query, bodyAction: body?.action, bodyType: body?.type },
+      '[webhook:mp] Notificacao recebida'
+    )
+
     if (topic !== 'payment' || !paymentId) {
+      request.log.warn({ topic, paymentId }, '[webhook:mp] Topico ignorado (nao e pagamento)')
       return reply.status(200).send({ received: true })
     }
 
     if (shouldValidateSignature) {
       if (!webhookSecret) {
-        request.log.error('[webhook:mp] MERCADOPAGO_WEBHOOK_SECRET ausente')
+        request.log.error('[webhook:mp] MERCADOPAGO_WEBHOOK_SECRET ausente — configure no Easypanel')
         return reply.status(500).send({ error: 'Webhook do Mercado Pago nao configurado' })
       }
 
@@ -149,10 +160,20 @@ const mercadopagoWebhookRoute: FastifyPluginAsync = async (fastify) => {
         requestIdHeader: request.headers['x-request-id'],
       })
 
+      request.log.info(
+        {
+          paymentId,
+          signatureValid: signatureIsValid,
+          hasXSignature: Boolean(request.headers['x-signature']),
+          hasXRequestId: Boolean(request.headers['x-request-id']),
+        },
+        '[webhook:mp] Validacao de assinatura'
+      )
+
       if (!signatureIsValid) {
         request.log.warn(
           { paymentId, requestId: request.headers['x-request-id'] },
-          '[webhook:mp] Assinatura invalida'
+          '[webhook:mp] Assinatura invalida — verifique MERCADOPAGO_WEBHOOK_SECRET no Easypanel'
         )
         return reply.status(401).send({ error: 'Assinatura de webhook invalida' })
       }
