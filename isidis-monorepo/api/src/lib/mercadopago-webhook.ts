@@ -82,7 +82,7 @@ export function validateMercadoPagoWebhookSignature(params: {
     return false
   }
 
-  const template = `id:${params.dataId.toLowerCase()};request-id:${requestId};ts:${timestamp};`
+  const template = `id:${params.dataId};request-id:${requestId};ts:${timestamp};`
   const expectedHash = createHmac('sha256', params.secret)
     .update(template)
     .digest('hex')

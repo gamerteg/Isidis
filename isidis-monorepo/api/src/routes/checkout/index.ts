@@ -1080,10 +1080,12 @@ const checkoutRoutes: FastifyPluginAsync = async (fastify) => {
 
         if (mappedStatus === 'PAID' && order.status === 'PENDING_PAYMENT') {
           try {
-            await processPaidMpOrder(fastify, paymentId)
+            await processPaidMpOrder(fastify, paymentId, {
+              externalReference: order.id,
+            })
           } catch (reconcileErr: any) {
             request.log.error(
-              { paymentId, err: reconcileErr?.message ?? reconcileErr },
+              { paymentId, orderId: order.id, err: reconcileErr?.message ?? reconcileErr },
               '[checkout] Erro ao reconciliar pagamento confirmado via polling'
             )
           }
