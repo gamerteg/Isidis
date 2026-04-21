@@ -284,7 +284,7 @@ export default function Home() {
       </PageSection>
 
       {/* =============== CTA FINAL =============== */}
-      <PageSection withOrbs withShootingStars className="text-center pb-40">
+      <PageSection withOrbs className="text-center pb-40">
         <PageContainer maxWidth="4xl">
           <div className="relative">
             {/* Decorative element */}

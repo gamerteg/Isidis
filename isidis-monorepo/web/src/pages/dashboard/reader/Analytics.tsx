@@ -146,7 +146,7 @@ export default function AnalyticsPage() {
         <div className="min-h-screen bg-background-deep text-slate-200 font-sans selection:bg-purple-500/30 flex overflow-hidden">
             <CartomanteSidebar profile={profile} userId={user.id} />
 
-            <main className="relative z-10 flex-1 h-screen overflow-y-auto scrollbar-hide pb-24 md:pb-8">
+            <main className="relative z-10 flex-1 min-h-screen pb-24 md:pb-8">
                 <PageContainer className="px-4 md:px-8 py-6 md:py-12">
                     <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-slate-500 mb-2 pl-1">
                         <span className="text-purple-400 font-bold">Isidis</span>

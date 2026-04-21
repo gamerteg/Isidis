@@ -36,8 +36,10 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
         return () => subscription.unsubscribe()
     }, [supabase])
 
-    // 2. Presence Logic
+    // 2. Presence Logic — only connect WebSocket if authenticated
     useEffect(() => {
+        if (!user) return;
+
         let isMounted = true;
         let channel = supabase.channel('global_presence', {
             config: {

@@ -106,7 +106,7 @@ export default function WalletPage() {
         <div className="min-h-screen bg-background-deep text-slate-200 font-sans selection:bg-purple-500/30 flex overflow-hidden">
             <CartomanteSidebar profile={profile} userId={user.id} />
 
-            <main className="relative z-10 flex-1 h-screen overflow-y-auto scrollbar-hide pb-24 md:pb-8">
+            <main className="relative z-10 flex-1 min-h-screen pb-24 md:pb-8">
                 {/* Hero editorial */}
                 <section className="px-6 md:px-10 pt-10 pb-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <div className="max-w-[1600px] mx-auto">

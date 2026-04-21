@@ -61,7 +61,7 @@ export default function ClientSubscriptionsPage() {
         <div className="min-h-screen bg-background-deep text-slate-200 font-sans selection:bg-purple-500/30 flex overflow-hidden">
             <UserSidebar />
 
-            <main className="relative z-10 flex-1 h-screen overflow-y-auto scrollbar-hide pb-24 md:pb-8">
+            <main className="relative z-10 flex-1 min-h-screen pb-24 md:pb-8">
                 <MainHero
                     className="pt-12 pb-12 px-4 md:px-8 mb-8"
                     padding="none"

@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "patches/PATCH-2026-04-20-migracao-nextjs-vite.md",
+                "file": "patches/PATCH-2026-04-20-scroll-reset-performance.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "PATCH-2026-04-20-migracao-nextjs-vite"
+              "title": "PATCH-2026-04-20-scroll-reset-performance"
             }
           }
         ]
@@ -185,9 +185,11 @@
   },
   "active": "7af29b2aee223953",
   "lastOpenFiles": [
+    "00-Index.md",
+    "patches/PATCH-2026-04-20-migracao-nextjs-vite.md",
+    "patches/PATCH-2026-04-20-scroll-reset-performance.md",
     "patches/PATCH-2026-04-20-admin-removal-mobile-first.md",
     "07-Telas-Dashboards.md",
-    "patches/PATCH-2026-04-20-migracao-nextjs-vite.md",
     "patches",
     "15-Deployment-e-Ambientes.md",
     "14-Estrategia-de-Testes.md",
@@ -200,7 +202,6 @@
     "08-Func-Mensagens-Presenca.md",
     "05-Telas-Publicas.md",
     "04-Melhorias-API.md",
-    "00-Index.md",
     "10-Func-Ciclo-Leitura.md",
     "01-Erros-Identificados.md"
   ]

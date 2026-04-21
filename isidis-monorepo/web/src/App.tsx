@@ -3,11 +3,13 @@ import { AppRoutes } from '@/routes';
 import { Toaster } from "@/components/ui/sonner";
 import { PresenceProvider } from "@/components/providers/presence-provider";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
+import { ScrollToTop } from "@/components/ScrollToTop";
 
 export default function App() {
   return (
     <PresenceProvider>
       <BrowserRouter>
+        <ScrollToTop />
         <div className="min-h-screen bg-background font-sans antialiased flex flex-col dark">
           <AppRoutes />
         </div>

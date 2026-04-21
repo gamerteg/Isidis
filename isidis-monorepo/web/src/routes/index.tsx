@@ -53,7 +53,11 @@ const ReaderOnboarding = lazy(() => import('@/pages/dashboard/reader/Onboarding'
 const ReaderUnderReview = lazy(() => import('@/pages/dashboard/reader/UnderReview'));
 const ReaderAssinaturas = lazy(() => import('@/pages/dashboard/reader/Assinaturas'));
 
-const fallback = <div className="p-8 text-center" style={{ minHeight: '100vh' }}>Carregando...</div>;
+const fallback = (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+  </div>
+);
 
 export function AppRoutes() {
   return (
