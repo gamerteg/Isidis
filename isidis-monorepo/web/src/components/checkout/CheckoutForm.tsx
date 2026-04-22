@@ -6,6 +6,7 @@ import {
   Clock3,
   Copy,
   CreditCard,
+  Info,
   Loader2,
   QrCode,
   Sparkles,
@@ -470,6 +471,16 @@ export function CheckoutForm({
               </Button>
             </div>
           )}
+
+          {/* Aviso sobre o recebedor */}
+          <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-400">
+            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-slate-500" />
+            <span>
+              O pagamento será recebido pela conta{' '}
+              <span className="font-semibold text-slate-200">Cristian Paxur de Araujo Alexandre</span>{' '}
+              (CNPJ 58.054.513) via Mercado Pago.
+            </span>
+          </div>
 
           {/* Status do polling */}
           {pollError ? (
