@@ -90,3 +90,24 @@ export async function getWithdrawalReceipt(id: string): Promise<any> {
   return response.data
 }
 
+export interface PendingSaleCredit {
+  id: string
+  created_at: string
+  amount: number
+  status: string
+  order_id: string
+  order_status: string
+  gig_title: string
+  client_name: string
+  reader_name: string
+}
+
+export async function listPendingSaleCredits(): Promise<PendingSaleCredit[]> {
+  const response = await apiGet<{ data: PendingSaleCredit[] }>('/admin/transactions/sale-credits/pending')
+  return response.data
+}
+
+export async function releaseSaleCredit(id: string): Promise<void> {
+  await apiPost(`/admin/transactions/sale-credits/${id}/release`)
+}
+

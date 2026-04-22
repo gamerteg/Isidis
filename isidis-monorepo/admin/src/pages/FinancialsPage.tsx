@@ -14,7 +14,10 @@ import {
   listPendingWithdrawals,
   updateWithdrawalStatus,
   getWithdrawalReceipt,
+  listPendingSaleCredits,
+  releaseSaleCredit,
   type PendingWithdrawal,
+  type PendingSaleCredit,
 } from '@/services/financials'
 import { formatCurrency, formatDate, pixKeyTypeLabel } from '@/lib/utils'
 import { type AdminFinancialOverview, type AdminOpsHealth } from '@/types/admin-api'
@@ -37,6 +40,8 @@ export function FinancialsPage() {
   const [confirmDialog, setConfirmDialog] = useState<{ id: string; action: 'COMPLETED' | 'FAILED' } | null>(null)
   const [receiptDialog, setReceiptDialog] = useState<any | null>(null)
   const [loadingReceipt, setLoadingReceipt] = useState(false)
+  const [pendingHolds, setPendingHolds] = useState<PendingSaleCredit[]>([])
+  const [releasing, setReleasing] = useState<string | null>(null)
 
   const load = async (background = false) => {
     if (background) {
@@ -46,13 +51,15 @@ export function FinancialsPage() {
     }
 
     try {
-      const [financialOverview, pendingWithdrawals] = await Promise.all([
+      const [financialOverview, pendingWithdrawals, holdTransactions] = await Promise.all([
         getFinancialOverview(),
         listPendingWithdrawals(),
+        listPendingSaleCredits(),
       ])
 
       setOverview(financialOverview)
       setWithdrawals(pendingWithdrawals.data)
+      setPendingHolds(holdTransactions)
       setHealth(pendingWithdrawals.health ?? financialOverview.health)
       setLastUpdated(
         pendingWithdrawals.generated_at > financialOverview.generated_at
@@ -103,6 +110,19 @@ export function FinancialsPage() {
       toast.error('Erro ao carregar recibo.')
     } finally {
       setLoadingReceipt(false)
+    }
+  }
+
+  const handleReleaseHold = async (id: string) => {
+    setReleasing(id)
+    try {
+      await releaseSaleCredit(id)
+      toast.success('Saldo liberado com sucesso.')
+      await load(true)
+    } catch {
+      toast.error('Erro ao liberar saldo.')
+    } finally {
+      setReleasing(null)
     }
   }
 
@@ -278,6 +298,67 @@ export function FinancialsPage() {
                           <X className="w-4 h-4" />
                         </Button>
                       </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-blue-500/20 bg-blue-500/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-blue-400">
+            <Clock className="w-5 h-5" />
+            Liberações de Saldo - Hold ({pendingHolds.length})
+          </CardTitle>
+          <CardDescription className="text-blue-500/60">
+            Repasses de vendas que estão aguardando liberação manual para ficarem disponíveis para saque pelas cartomantes.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {pendingHolds.length === 0 ? (
+            <p className="text-center text-muted-foreground py-6">Nenhuma liberação pendente no momento.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data Venda</TableHead>
+                  <TableHead>Cartomante</TableHead>
+                  <TableHead>Serviço</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="text-center">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingHolds.map((hold) => (
+                  <TableRow key={hold.id}>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {formatDate(hold.created_at)}
+                    </TableCell>
+                    <TableCell className="font-medium text-violet-300">{hold.reader_name}</TableCell>
+                    <TableCell className="text-sm truncate max-w-[200px]">{hold.gig_title}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{hold.client_name}</TableCell>
+                    <TableCell className="text-right font-bold">
+                      {formatCurrency(hold.amount)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-2 text-blue-400 border-blue-500/30 hover:bg-blue-500/10"
+                        disabled={releasing === hold.id}
+                        onClick={() => handleReleaseHold(hold.id)}
+                      >
+                        {releasing === hold.id ? 'Liberando...' : (
+                          <>
+                            <Check className="w-4 h-4" />
+                            Liberar
+                          </>
+                        )}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -48,6 +48,9 @@ export async function runReleaseHold(fastify: FastifyInstance) {
     return { released: 0, errors: 0 }
   }
 
+  /* 
+  // [MANUAL RELEASE] Automatic release disabled as per user request.
+  // Balances must now be released manually via the Admin Panel.
   const ids = releasable.map((t) => t.id)
 
   const { error: updateError } = await fastify.supabase
@@ -84,4 +87,8 @@ export async function runReleaseHold(fastify: FastifyInstance) {
 
   fastify.log.info({ count: ids.length }, '[cron:release-hold] Holds liberados')
   return { released: ids.length, errors: 0 }
+  */
+
+  fastify.log.info({ count: releasable.length }, '[cron:release-hold] Liberação automática ignorada (modo manual ativo)')
+  return { released: 0, errors: 0 }
 }

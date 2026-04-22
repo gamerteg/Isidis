@@ -54,6 +54,16 @@ async function requestJson<T>(path: string, options: RequestOptions = {}) {
   const payload = await response.json().catch(() => null)
 
   if (!response.ok) {
+    // If unauthorized, clear session to prevent loops with stale tokens
+    if (response.status === 401 && token) {
+      console.warn('[apiClient] 401 Unauthorized detected. Signing out...')
+      supabase.auth.signOut()
+      // Only redirect if not already on login page
+      if (!window.location.pathname.includes('/login')) {
+         window.location.href = '/login'
+      }
+    }
+
     const message =
       payload?.error?.message ||
       payload?.error ||

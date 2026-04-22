@@ -15,17 +15,32 @@ export function LoginPage() {
 
   // Redirect if already logged in as admin
   useEffect(() => {
+    let mounted = true
+    
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) return
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .single()
-      if (profile?.role === 'ADMIN') {
-        navigate('/dashboard', { replace: true })
+      if (!mounted || !session) return
+      
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+        
+        if (profile?.role === 'ADMIN') {
+          navigate('/dashboard', { replace: true })
+        } else {
+          // If logged in but not admin, clear the session so they can try another account
+          await supabase.auth.signOut()
+        }
+      } catch (err) {
+        console.error('[LoginPage] Auth recovery failed:', err)
+        // If recovery fails, clear session to allow clean login
+        await supabase.auth.signOut()
       }
     })
+
+    return () => { mounted = false }
   }, [navigate])
 
   const handleLogin = async (e: React.FormEvent) => {

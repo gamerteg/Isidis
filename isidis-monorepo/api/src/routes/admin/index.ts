@@ -173,7 +173,7 @@ async function getAdminOpsHealth(fastify: FastifyWithSupabase) {
     warnings.push('Existem pedidos presos em PENDING_PAYMENT acima do prazo esperado.')
   }
   if ((stuckSaleCredits ?? 0) > 0) {
-    warnings.push('Existem repasses SALE_CREDIT em hold por mais de 48h.')
+    warnings.push('Existem repasses SALE_CREDIT aguardando liberação manual (hold > 48h).')
   }
   if ((pendingWithdrawals ?? 0) > 0) {
     warnings.push('Existem saques pendentes aguardando tratamento manual.')
@@ -1712,6 +1712,98 @@ const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (error) {
         return reply.status(500).send({ error: error.message })
+      }
+
+      return reply.send({ data: { success: true } })
+    }
+  )
+  fastify.get(
+    '/transactions/sale-credits/pending',
+    { preHandler: [(fastify as any).requireAdmin] },
+    async (request, reply) => {
+      const { data, error } = await fastify.supabase
+        .from('transactions')
+        .select(`
+          id, created_at, amount, status, order_id, wallet_id,
+          orders!inner(id, status, client_id, reader_id, gigs(title)),
+          wallets!inner(user_id)
+        `)
+        .eq('type', 'SALE_CREDIT')
+        .eq('status', 'PENDING')
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        return reply.status(500).send({ error: error.message })
+      }
+
+      const profileIds =
+        data?.flatMap((tx: any) => [tx.orders.client_id, tx.orders.reader_id]) ?? []
+
+      const profileMap = await getProfilesMap(fastify, profileIds, 'id, full_name')
+
+      const result = data?.map((tx: any) => ({
+        id: tx.id,
+        created_at: tx.created_at,
+        amount: tx.amount,
+        status: tx.status,
+        order_id: tx.order_id,
+        order_status: tx.orders.status,
+        gig_title: tx.orders.gigs.title,
+        client_name: profileMap.get(tx.orders.client_id)?.full_name ?? 'Cliente',
+        reader_name: profileMap.get(tx.orders.reader_id)?.full_name ?? 'Cartomante',
+      }))
+
+      return reply.send({ data: result })
+    }
+  )
+
+  fastify.post(
+    '/transactions/sale-credits/:id/release',
+    { preHandler: [(fastify as any).requireAdmin] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string }
+
+      const { data: tx, error: fetchError } = await fastify.supabase
+        .from('transactions')
+        .select('id, amount, wallet_id, status, type')
+        .eq('id', id)
+        .single()
+
+      if (fetchError || !tx) {
+        return reply.status(404).send({ error: 'Transação não encontrada' })
+      }
+
+      if (tx.status !== 'PENDING' || tx.type !== 'SALE_CREDIT') {
+        return reply.status(400).send({
+          error: 'Apenas transações de repasse pendentes podem ser liberadas',
+        })
+      }
+
+      const { error: updateError } = await fastify.supabase
+        .from('transactions')
+        .update({ status: 'COMPLETED' })
+        .eq('id', id)
+
+      if (updateError) {
+        return reply.status(500).send({ error: updateError.message })
+      }
+
+      // Notificar o reader
+      const { data: wallet } = await fastify.supabase
+        .from('wallets')
+        .select('user_id')
+        .eq('id', tx.wallet_id)
+        .single()
+
+      if (wallet) {
+        await notifyUser(fastify, wallet.user_id, {
+          type: 'WITHDRAWAL_UPDATE',
+          title: 'Saldo liberado para saque',
+          message: `R$${(tx.amount / 100).toFixed(
+            2
+          )} foi liberado para saque pela equipe financeira.`,
+          link: '/wallet',
+        })
       }
 
       return reply.send({ data: { success: true } })

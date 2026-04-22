@@ -27,33 +27,45 @@ export function useAuth(): AuthState & { signOut: () => Promise<void> } {
   })
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const profile = await fetchProfile(session.user.id)
-        setState({
-          user: session.user,
-          session,
-          profile,
-          loading: false,
-          isAdmin: profile?.role === 'ADMIN',
-        })
-      } else {
-        setState(s => ({ ...s, loading: false }))
-      }
-    })
+    let mounted = true
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    async function handleAuthChange(session: Session | null) {
+      if (!mounted) return
+
       if (session?.user) {
-        const profile = await fetchProfile(session.user.id)
-        setState({
-          user: session.user,
-          session,
-          profile,
-          loading: false,
-          isAdmin: profile?.role === 'ADMIN',
-        })
+        try {
+          const profile = await fetchProfile(session.user.id)
+          
+          if (!mounted) return
+
+          setState({
+            user: session.user,
+            session,
+            profile,
+            loading: false,
+            isAdmin: profile?.role === 'ADMIN',
+          })
+        } catch (error) {
+          console.error('[useAuth] Error fetching profile:', error)
+          
+          if (!mounted) return
+
+          // If we have a session but can't fetch the profile, it might be a stale session.
+          // We clear the state but don't force a sign out immediately to avoid loops,
+          // but we set loading to false so the UI can respond.
+          setState({
+            user: session.user,
+            session,
+            profile: null,
+            loading: false,
+            isAdmin: false,
+          })
+
+          // Optional: If error is 401, sign out
+          if (error instanceof Error && (error.message.includes('401') || error.message.includes('JWT'))) {
+            supabase.auth.signOut()
+          }
+        }
       } else {
         setState({
           user: null,
@@ -63,9 +75,22 @@ export function useAuth(): AuthState & { signOut: () => Promise<void> } {
           isAdmin: false,
         })
       }
+    }
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleAuthChange(session)
     })
 
-    return () => subscription.unsubscribe()
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      handleAuthChange(session)
+    })
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signOut = async () => {
@@ -76,10 +101,15 @@ export function useAuth(): AuthState & { signOut: () => Promise<void> } {
 }
 
 async function fetchProfile(userId: string): Promise<AdminProfile | null> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('id, full_name, role, avatar_url')
     .eq('id', userId)
     .single()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
   return data
 }
