@@ -103,8 +103,13 @@ export interface PendingSaleCredit {
 }
 
 export async function listPendingSaleCredits(): Promise<PendingSaleCredit[]> {
-  const response = await apiGet<{ data: PendingSaleCredit[] }>('/admin/transactions/sale-credits/pending')
-  return response.data
+  try {
+    const response = await apiGet<{ data: PendingSaleCredit[] }>('/admin/transactions/sale-credits/pending')
+    return response.data
+  } catch (error) {
+    if (!isApiNotFoundError(error)) throw error
+    return []
+  }
 }
 
 export async function releaseSaleCredit(id: string): Promise<void> {
