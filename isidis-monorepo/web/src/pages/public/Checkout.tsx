@@ -89,8 +89,8 @@ export default function CheckoutPage() {
     : ['PIX', 'CARD']
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.12),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.16),_transparent_24%),linear-gradient(180deg,_#05040d,_#0b0916_32%,_#07060f_100%)]">
-      <div className="mx-auto max-w-lg px-4 py-6">
+    <div className="min-h-screen bg-background-deep">
+      <div className="mobile-canvas px-4 py-8">
         <Suspense
           fallback={
             <div className="flex items-center justify-center py-20">

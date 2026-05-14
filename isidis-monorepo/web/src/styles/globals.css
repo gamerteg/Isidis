@@ -778,3 +778,181 @@
   0%, 100% { opacity: 0; transform: scale(0.5) rotate(0deg); }
   50% { opacity: 1; transform: scale(1) rotate(180deg); }
 }
+
+/* ========================================
+   APP CLIENTE — tokens do claude.ai/design
+   ======================================== */
+
+/* Tarot mini card (arcano avatar) — match design exatamente */
+.tarot-mini {
+  background: linear-gradient(160deg, #2a1b5e, #1a0e3d);
+  border: 1px solid rgba(245, 196, 81, 0.25);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px;
+  position: relative;
+  overflow: hidden;
+}
+.tarot-mini::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 6px;
+  border: 1px solid rgba(245, 196, 81, 0.12);
+  pointer-events: none;
+}
+
+/* Chip filter — category pill com estado ativo roxo */
+.chip-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  font-family: inherit;
+}
+.chip-filter:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+}
+.chip-filter.active {
+  background: rgba(167, 139, 250, 0.2);
+  border-color: rgba(167, 139, 250, 0.4);
+  color: #a78bfa;
+}
+
+/* Chat bubbles */
+.bubble-them {
+  background: rgba(30, 20, 60, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px 18px 18px 4px;
+  padding: 10px 14px;
+  max-width: 75%;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.bubble-me {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.9), rgba(91, 33, 182, 0.9));
+  border-radius: 18px 18px 4px 18px;
+  padding: 10px 14px;
+  max-width: 75%;
+  font-size: 13px;
+  line-height: 1.4;
+  align-self: flex-end;
+}
+
+/* Reader card — press-down feedback no mobile */
+.reader-card {
+  background: rgba(17, 13, 34, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 20px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reader-card:active {
+  transform: scale(0.97);
+}
+
+/* Surface card — base opaca sem glass */
+.surface-card {
+  background: rgba(17, 13, 34, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 20px;
+}
+
+/* Glass card (variant do design, com radius 20) */
+.glass-card {
+  background: rgba(17, 13, 34, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 20px;
+}
+
+/* Botões do design */
+.btn-primary-design {
+  background: linear-gradient(135deg, #8b5cf6, #5b21b6);
+  color: white;
+  border: none;
+  border-radius: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 8px 24px -8px rgba(139, 92, 246, 0.5);
+  font-family: inherit;
+}
+.btn-primary-design:active {
+  transform: scale(0.97);
+}
+.btn-primary-design:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-gold-design {
+  background: linear-gradient(135deg, #f5c451, #d4a017);
+  color: #1a0e3d;
+  border: none;
+  border-radius: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.btn-gold-design:active {
+  transform: scale(0.97);
+}
+.btn-ghost-design {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.btn-ghost-design:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Pulse ring (typing / online indicator) */
+.animate-pulse-ring {
+  animation: pulseRing 1.2s ease-in-out infinite;
+}
+@keyframes pulseRing {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.15); opacity: 0; }
+}
+
+/* Pill badge genérica */
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Mobile canvas — centraliza conteúdo mobile em telas largas */
+.mobile-canvas {
+  max-width: 440px;
+  margin-inline: auto;
+  position: relative;
+}

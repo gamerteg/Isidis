@@ -22,6 +22,7 @@ const Register = lazy(() => import('@/pages/auth/Register'));
 const RegisterConfirm = lazy(() => import('@/pages/auth/RegisterConfirm'));
 const Recover = lazy(() => import('@/pages/auth/Recover'));
 const UpdatePassword = lazy(() => import('@/pages/auth/UpdatePassword'));
+const AuthCallback = lazy(() => import('@/pages/auth/AuthCallback'));
 const AuthCodeError = lazy(() => import('@/pages/auth/AuthCodeError'));
 const Onboarding = lazy(() => import('@/pages/onboarding/Onboarding'));
 const QuizOnboarding = lazy(() => import('@/pages/onboarding/QuizOnboarding'));
@@ -85,6 +86,7 @@ export function AppRoutes() {
         <Route path="/register/confirm" element={<RegisterConfirm />} />
         <Route path="/recover" element={<Recover />} />
         <Route path="/update-password" element={<UpdatePassword />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/auth/auth-code-error" element={<AuthCodeError />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/quiz-onboarding" element={<QuizOnboarding />} />

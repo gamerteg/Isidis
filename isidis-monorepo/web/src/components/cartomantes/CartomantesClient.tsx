@@ -2,18 +2,43 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-    Search, Star, ChevronLeft, ChevronRight, ArrowRight,
-    Users, User, Heart, Sparkles, X
+    Search, Star, ChevronLeft, ChevronRight,
+    Users, Sparkles, X
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { AnalyticsTracker } from '@/components/analytics-tracker'
 import { UserSidebar } from '@/components/user-sidebar'
 import { DashboardBottomNav } from '@/components/layout/dashboard-bottom-nav'
 import { usePresence } from '@/components/providers/presence-provider'
+import { OrbBackground, ReaderCard, StarRating, getArcanoFor } from '@/components/design'
+import type { ReaderCardData } from '@/components/design'
 import type { MarketplaceReaderData } from '@/lib/readers'
 import type { PaginationMeta } from '@/types'
+
+const AVATAR_GRADIENTS = [
+    '#8b5cf6,#f472b6', '#f5c451,#d4a017', '#14b8a6,#0f766e',
+    '#f472b6,#831843', '#fb7185,#dc2626', '#5eead4,#0891b2',
+] as const
+
+function marketplaceToCard(reader: MarketplaceReaderData, index: number, isOnline: boolean): ReaderCardData {
+    const arcanoData = getArcanoFor(reader.tags[0] || reader.title)
+    return {
+        id: reader.id,
+        slug: reader.id,
+        name: reader.name,
+        specialty: reader.title || reader.tags[0] || 'Tarot & Vidência',
+        rating: reader.rating,
+        reviews: reader.reviews,
+        price: reader.price,
+        online: isOnline,
+        avatar: (reader.name || 'CA').slice(0, 2).toUpperCase(),
+        gradient: AVATAR_GRADIENTS[index % AVATAR_GRADIENTS.length],
+        arcano: arcanoData.arcano,
+        arcanoName: reader.title || arcanoData.arcano,
+        href: `/cartomante/${reader.id}`,
+    }
+}
 
 const categories = [
     { key: 'all', label: 'Todos', count: 0 },
@@ -60,6 +85,7 @@ export function CartomantesClient({ readers, pagination, initialFilters, userId 
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
     const currentParams = searchParams.toString()
+    const { onlineUsers } = usePresence()
 
     // State initialized from server params
     const [searchQuery, setSearchQuery] = useState(initialFilters.search || '')
@@ -137,45 +163,66 @@ export function CartomantesClient({ readers, pagination, initialFilters, userId 
     )
 
     return (
-        <div className="min-h-screen bg-[#0a0a14] text-slate-100 flex">
+        <div className="min-h-screen bg-background-deep text-slate-100 flex">
             {userId && <UserSidebar className="hidden md:flex h-[calc(100vh-4rem)] sticky top-16" />}
 
             <div className="flex-1 flex flex-col min-w-0">
                 {/* Hero editorial */}
-                <section className="px-6 md:px-10 pt-10 pb-8" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div className="flex items-center gap-2 mb-3 text-muted-foreground text-sm">
-                        <Link to="/" className="hover:text-foreground">Marketplace</Link>
-                        <span>/</span>
-                        <span style={{ color: 'var(--violet-bright)' }}>
-                            {activeCategory !== 'all' ? categories.find(c => c.key === activeCategory)?.label || 'Buscar' : 'Cartomantes'}
-                        </span>
-                    </div>
-                    <h1 className="font-display text-[44px] md:text-[56px] leading-[0.95] tracking-[-0.02em] font-light">
-                        Encontre sua <em className="italic font-normal text-gradient-aurora">Cartomante</em>
-                    </h1>
-                    <p className="mt-3 text-muted-foreground">{totalReaders} profissional{totalReaders !== 1 ? 'is' : ''} disponível{totalReaders !== 1 ? 'is' : ''} para sua jornada.</p>
-                    <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto mt-6">
-                        {/* Search Bar */}
-                        <div className="relative flex-1 md:w-80">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1) }}
-                                placeholder="Buscar por nome..."
-                                className="w-full pl-11 pr-4 py-3 rounded-xl border border-border/20 bg-card/60 text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/30 text-sm"
-                            />
+                <section className="relative px-6 md:px-10 pt-10 pb-8 overflow-hidden" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <OrbBackground orbs={[
+                        { color: '#8b5cf6', size: 240, top: -60, right: -60, opacity: 0.18 },
+                        { color: '#f5c451', size: 160, bottom: -40, left: 40, opacity: 0.1 },
+                    ]} />
+                    <div style={{ position: 'relative', zIndex: 1 }}>
+                        <div className="flex items-center gap-2 mb-3 text-sm" style={{ color: 'rgba(255,255,255,.35)' }}>
+                            <Link to="/" style={{ color: 'inherit' }}>Marketplace</Link>
+                            <span>/</span>
+                            <span style={{ color: '#a78bfa' }}>
+                                {activeCategory !== 'all' ? categories.find(c => c.key === activeCategory)?.label || 'Buscar' : 'Cartomantes'}
+                            </span>
                         </div>
+                        <h1 className="font-serif" style={{ fontSize: 'clamp(32px,6vw,52px)', fontWeight: 400, lineHeight: '0.95', letterSpacing: '-0.02em', marginBottom: 8 }}>
+                            Encontre sua <em className="text-gradient-aurora" style={{ fontStyle: 'italic' }}>guia</em>
+                        </h1>
+                        <p style={{ marginTop: 6, marginBottom: 20, fontSize: 13, color: 'rgba(255,255,255,.4)' }}>
+                            {totalReaders} profissional{totalReaders !== 1 ? 'is' : ''} disponível{totalReaders !== 1 ? 'is' : ''} para sua jornada.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                            {/* Search Bar */}
+                            <div style={{ position: 'relative', flex: 1, maxWidth: 360 }}>
+                                <Search style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: 'rgba(255,255,255,.35)' }} />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1) }}
+                                    placeholder="Buscar por nome..."
+                                    style={{
+                                        width: '100%',
+                                        paddingLeft: 40,
+                                        paddingRight: 14,
+                                        paddingTop: 11,
+                                        paddingBottom: 11,
+                                        borderRadius: 12,
+                                        border: '1px solid rgba(255,255,255,.1)',
+                                        background: 'rgba(255,255,255,.05)',
+                                        color: 'rgba(255,255,255,.8)',
+                                        fontSize: 13,
+                                        outline: 'none',
+                                        boxSizing: 'border-box',
+                                    }}
+                                />
+                            </div>
 
-                        {/* Mobile Filter Toggle */}
-                        <Button
-                            variant="outline"
-                            className="md:hidden border-border/20 text-primary hover:bg-primary/10 gap-2 h-[48px] rounded-xl"
-                            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                        >
-                            <Sparkles className="w-4 h-4" />
-                            {isSidebarOpen ? 'Fechar Filtros' : 'Filtros'}
-                        </Button>
+                            {/* Mobile Filter Toggle */}
+                            <Button
+                                variant="outline"
+                                className="md:hidden border-border/20 text-primary hover:bg-primary/10 gap-2 h-[46px] rounded-xl"
+                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                            >
+                                <Sparkles className="w-4 h-4" />
+                                {isSidebarOpen ? 'Fechar Filtros' : 'Filtros'}
+                            </Button>
+                        </div>
                     </div>
                 </section>
 
@@ -325,9 +372,17 @@ export function CartomantesClient({ readers, pagination, initialFilters, userId 
                             <>
                                 {/* Cards Grid */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                                    {paginatedReaders.map(reader => (
-                                        <ReaderCard key={reader.id} reader={reader} />
-                                    ))}
+                                    {paginatedReaders.map((reader, i) => {
+                                        const card = marketplaceToCard(reader, i, onlineUsers.has(reader.id))
+                                        return (
+                                            <div key={reader.id} className="relative">
+                                                {reader.gigId && (
+                                                    <AnalyticsTracker gigId={reader.gigId} readerId={reader.id} eventType="impression" />
+                                                )}
+                                                <ReaderCard reader={card} variant="tarot" />
+                                            </div>
+                                        )
+                                    })}
                                 </div>
 
                                 {/* Pagination */}
@@ -428,110 +483,3 @@ export function CartomantesClient({ readers, pagination, initialFilters, userId 
     )
 }
 
-/* ──── Reader Card Component ──── */
-
-function ReaderCard({ reader }: { reader: MarketplaceReaderData }) {
-    const { onlineUsers } = usePresence()
-    const isOnline = onlineUsers.has(reader.id) || reader.isOnline
-
-    return (
-        <div className="border-shine rounded-2xl bg-[#110d22] hover:-translate-y-1 transition-all duration-300 group overflow-hidden relative">
-            {reader.gigId && (
-                <AnalyticsTracker
-                    gigId={reader.gigId}
-                    readerId={reader.id}
-                    eventType="impression"
-                />
-            )}
-            {/* Image */}
-            <div className="relative h-56 overflow-hidden bg-[#0d0d1a]">
-                {reader.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                        src={reader.image}
-                        alt={reader.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-900/30 to-[#0d0d1a]">
-                        <User className="w-20 h-20 text-indigo-500/20" />
-                    </div>
-                )}
-
-                {/* Overlay gradient */}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#12122a] via-transparent to-transparent opacity-80" />
-
-                {/* Status badges */}
-                <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
-                    {isOnline && (
-                        <Badge className="bg-green-500/90 text-white border-none text-[10px] font-bold px-2 py-0.5 gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                            AO VIVO
-                        </Badge>
-                    )}
-                </div>
-
-                {/* Favorite button */}
-                <button className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-purple-400 hover:text-purple-300 hover:bg-black/60 transition-all z-10 opacity-0 group-hover:opacity-100">
-                    <Heart className="w-4 h-4" />
-                </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-5 -mt-6 relative z-10">
-                {/* Name + Rating */}
-                <div className="flex items-start justify-between mb-1">
-                    <div>
-                        <h3 className="font-bold text-white text-base group-hover:text-indigo-300 transition-colors">
-                            {reader.name}
-                        </h3>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                        <Star className="w-3.5 h-3.5 text-purple-400 fill-purple-400" />
-                        <span className="text-sm font-bold text-purple-300">{reader.rating.toFixed(1)}</span>
-                        <span className="text-[10px] text-slate-500">({reader.reviews})</span>
-                    </div>
-                </div>
-
-                {/* Bio */}
-                {reader.bio && (
-                    <p className="text-xs text-slate-400 line-clamp-2 mt-2 mb-3 leading-relaxed">
-                        {reader.bio}
-                    </p>
-                )}
-
-                {/* Tags */}
-                <div className="flex flex-wrap gap-1.5 mb-4">
-                    {reader.tags.slice(0, 3).map(tag => (
-                        <span
-                            key={tag}
-                            className="px-2.5 py-1 rounded-full text-[10px] font-medium border border-indigo-500/20 text-indigo-300"
-                        >
-                            {tag}
-                        </span>
-                    ))}
-                </div>
-
-                {/* Price + CTA */}
-                <div className="flex items-center justify-between pt-3 border-t border-indigo-500/10">
-                    <div>
-                        <span className="text-[10px] text-slate-500 uppercase tracking-wider block">A partir de</span>
-                        <span className="text-xl font-mono text-gradient-violet">
-                            R$ {reader.price}
-                        </span>
-                    </div>
-                    <Button
-                        asChild
-                        size="sm"
-                        className="aurora border-shine text-white font-semibold gap-1.5 rounded-full h-9 px-5 hover:opacity-90"
-                    >
-                        <Link to={`/cartomante/${reader.id}`}>
-                            Agendar
-                            <ArrowRight className="w-3.5 h-3.5" />
-                        </Link>
-                    </Button>
-                </div>
-            </div>
-        </div>
-    )
-}

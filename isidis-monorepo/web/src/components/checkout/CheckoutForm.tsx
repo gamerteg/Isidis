@@ -1,558 +1,839 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Clock3,
-  Copy,
-  CreditCard,
-  Info,
-  Loader2,
-  QrCode,
-  Sparkles,
-  User,
-} from 'lucide-react'
+import { ArrowLeft, CreditCard, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { checkPaymentStatus, submitCheckoutPayment } from '@/lib/actions/checkout'
+import {
+    OrbBackground,
+    StepProgressBar,
+    PixPaymentStep,
+    TarotMini,
+    getArcanoFor,
+} from '@/components/design'
 import type { GigAddOn, GigRequirement } from '@/types'
 
 type CheckoutMethod = 'PIX' | 'CARD'
 
 interface CheckoutResultState {
-  orderId: string
-  paymentId: string
-  method: CheckoutMethod
-  status?: string
-  amountCardFee?: number | null
-  pix?: {
-    qrcode: string | null
-    content: string | null
-    expiresAt?: string | null
-  }
+    orderId: string
+    paymentId: string
+    method: CheckoutMethod
+    status?: string
+    amountCardFee?: number | null
+    pix?: {
+        qrcode: string | null
+        content: string | null
+        expiresAt?: string | null
+    }
 }
 
 interface CheckoutFormProps {
-  gigId: string
-  readerId: string
-  amountTotal: number
-  selectedAddOns?: GigAddOn[]
-  requirements?: GigRequirement[]
-  existingOrderId?: string
-  availablePaymentMethods?: CheckoutMethod[]
-  // Dados para o resumo (passo 1)
-  gigTitle: string
-  gigDescription?: string
-  gigImageUrl?: string
-  readerName?: string
-  readerAvatarUrl?: string
-  deliveryHours?: number
-  basePrice: number
-  addOnsTotal?: number
+    gigId: string
+    readerId: string
+    amountTotal: number
+    selectedAddOns?: GigAddOn[]
+    requirements?: GigRequirement[]
+    existingOrderId?: string
+    availablePaymentMethods?: CheckoutMethod[]
+    gigTitle: string
+    gigDescription?: string
+    gigImageUrl?: string
+    readerName?: string
+    readerAvatarUrl?: string
+    deliveryHours?: number
+    basePrice: number
+    addOnsTotal?: number
 }
 
 function formatBRL(value?: number | null) {
-  if (!value) return 'R$ 0,00'
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    if (!value) return 'R$ 0,00'
+    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
 function formatBRLFromCents(cents?: number | null) {
-  if (!cents) return 'R$ 0,00'
-  return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    if (!cents) return 'R$ 0,00'
+    return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
 export function CheckoutForm({
-  gigId,
-  readerId: _readerId,
-  amountTotal,
-  selectedAddOns = [],
-  requirements = [],
-  existingOrderId,
-  availablePaymentMethods = ['PIX', 'CARD'],
-  gigTitle,
-  gigDescription,
-  gigImageUrl,
-  readerName,
-  readerAvatarUrl,
-  deliveryHours,
-  basePrice,
-  addOnsTotal = 0,
+    gigId,
+    readerId: _readerId,
+    amountTotal,
+    selectedAddOns = [],
+    requirements = [],
+    existingOrderId,
+    availablePaymentMethods = ['PIX', 'CARD'],
+    gigTitle,
+    gigDescription,
+    readerName,
+    deliveryHours,
+    basePrice,
+    addOnsTotal = 0,
 }: CheckoutFormProps) {
-  const navigate = useNavigate()
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+    const navigate = useNavigate()
+    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  const acceptsPix = availablePaymentMethods.includes('PIX')
-  const acceptsCard = availablePaymentMethods.includes('CARD')
+    const acceptsPix = availablePaymentMethods.includes('PIX')
+    const acceptsCard = availablePaymentMethods.includes('CARD')
 
-  const [method, setMethod] = useState<CheckoutMethod>(acceptsPix ? 'PIX' : 'CARD')
-  const [error, setError] = useState('')
-  const [copied, setCopied] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [orderId, setOrderId] = useState<string | null>(existingOrderId || null)
-  const [checkoutResult, setCheckoutResult] = useState<CheckoutResultState | null>(null)
-  const [requirementsAnswers, setRequirementsAnswers] = useState<Record<string, string>>({})
-  const [pollCount, setPollCount] = useState(0)
-  const [pollError, setPollError] = useState(false)
+    const [method, setMethod] = useState<CheckoutMethod>(acceptsPix ? 'PIX' : 'CARD')
+    const [error, setError] = useState('')
+    const [submitting, setSubmitting] = useState(false)
+    const [orderId, setOrderId] = useState<string | null>(existingOrderId || null)
+    const [checkoutResult, setCheckoutResult] = useState<CheckoutResultState | null>(null)
+    const [requirementsAnswers, setRequirementsAnswers] = useState<Record<string, string>>({})
+    const [pollCount, setPollCount] = useState(0)
+    const [pollError, setPollError] = useState(false)
 
-  // Passo: summary → (requirements) → payment
-  const steps = useMemo(
-    () => requirements.length > 0
-      ? ['summary', 'requirements', 'payment'] as const
-      : ['summary', 'payment'] as const,
-    [requirements.length],
-  )
-  const [stepIndex, setStepIndex] = useState(0)
-  const currentStep = steps[stepIndex]
+    const steps = useMemo(
+        () =>
+            requirements.length > 0
+                ? (['confirm', 'pergunta', 'pagamento'] as const)
+                : (['confirm', 'pagamento'] as const),
+        [requirements.length],
+    )
+    const [stepIndex, setStepIndex] = useState(0)
+    const currentStep = steps[stepIndex]
 
-  const goNext = () => setStepIndex(i => Math.min(i + 1, steps.length - 1))
-  const goBack = () => setStepIndex(i => Math.max(i - 1, 0))
+    const goNext = () => setStepIndex((i) => Math.min(i + 1, steps.length - 1))
+    const goBack = () => setStepIndex((i) => Math.max(i - 1, 0))
 
-  const requiredQuestions = useMemo(
-    () => requirements.filter((r) => r.required),
-    [requirements],
-  )
-  const selectedAddOnIds = useMemo(
-    () => selectedAddOns.map((a) => a.id),
-    [selectedAddOns],
-  )
+    const requiredQuestions = useMemo(() => requirements.filter((r) => r.required), [requirements])
+    const selectedAddOnIds = useMemo(() => selectedAddOns.map((a) => a.id), [selectedAddOns])
 
-  // Polling de status após PIX gerado
-  useEffect(() => {
-    if (!checkoutResult?.paymentId) return
-    setPollCount(0)
-    setPollError(false)
-    const paymentId = checkoutResult.paymentId
-    const orderId = checkoutResult.orderId
-    pollingIntervalRef.current = setInterval(async () => {
-      try {
-        const result = await checkPaymentStatus(paymentId, orderId)
+    const stepLabels = useMemo(() => {
+        if (requirements.length > 0) return ['Confirmar', 'Perguntas', 'Pagamento']
+        return ['Confirmar', 'Pagamento']
+    }, [requirements.length])
+
+    // Polling após PIX gerado
+    useEffect(() => {
+        if (!checkoutResult?.paymentId) return
+        setPollCount(0)
         setPollError(false)
-        if (result.status === 'PAID') {
-          clearInterval(pollingIntervalRef.current!)
-          toast.success('Pagamento confirmado!')
-          navigate(`/dashboard/pedido/${result.orderId}`)
-        } else {
-          setPollCount(c => c + 1)
+        const paymentId = checkoutResult.paymentId
+        const oid = checkoutResult.orderId
+        pollingIntervalRef.current = setInterval(async () => {
+            try {
+                const result = await checkPaymentStatus(paymentId, oid)
+                setPollError(false)
+                if (result.status === 'PAID') {
+                    clearInterval(pollingIntervalRef.current!)
+                    toast.success('Pagamento confirmado!')
+                    navigate(`/dashboard/pedido/${result.orderId}`)
+                } else {
+                    setPollCount((c) => c + 1)
+                }
+            } catch {
+                setPollError(true)
+                setPollCount((c) => c + 1)
+            }
+        }, 3000)
+        return () => {
+            if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current)
         }
-      } catch {
-        setPollError(true)
-        setPollCount(c => c + 1)
-      }
-    }, 3000)
-    return () => { if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current) }
-  }, [checkoutResult?.paymentId, navigate])
+    }, [checkoutResult?.paymentId, navigate])
 
-  const validateRequirements = useCallback((answers: Record<string, string>) => {
-    const missing = requiredQuestions.filter((q) => !answers[q.id]?.trim())
-    if (missing.length === 0) return null
-    return 'Preencha as informacoes obrigatorias para continuar.'
-  }, [requiredQuestions])
-
-  const handleCardProSubmit = useCallback(async () => {
-    const err = validateRequirements(requirementsAnswers)
-    if (err) { setError(err); return }
-    setSubmitting(true); setError('')
-    try {
-      const result = await submitCheckoutPayment({
-        order_id: orderId ?? existingOrderId,
-        gig_id: gigId,
-        add_on_ids: selectedAddOnIds,
-        requirements_answers: requirementsAnswers,
-        payment_method: 'CARD',
-      })
-      if (result.checkout_url) {
-        window.location.href = result.checkout_url
-      } else {
-        setError('Nao foi possivel obter o link de pagamento. Tente novamente.')
-        setSubmitting(false)
-      }
-    } catch (e: any) {
-      setError(e?.message ?? 'Nao foi possivel processar o pagamento.')
-      setSubmitting(false)
-    }
-  }, [existingOrderId, gigId, orderId, requirementsAnswers, selectedAddOnIds, validateRequirements])
-
-  const handlePixDirectSubmit = useCallback(async () => {
-    setSubmitting(true)
-    setError('')
-    try {
-      const result = await submitCheckoutPayment({
-        order_id: orderId ?? existingOrderId,
-        gig_id: gigId,
-        add_on_ids: selectedAddOnIds,
-        requirements_answers: requirementsAnswers,
-        payment_method: 'PIX',
-      })
-      const resolvedOrderId = result.order_id
-      const paymentId = result.payment_id ?? result.mercadopago_payment_id ?? result.pix_qr_code_id
-      setOrderId(resolvedOrderId)
-      if (!paymentId) throw new Error('Não foi possível identificar o pagamento.')
-      setCheckoutResult({
-        orderId: resolvedOrderId, paymentId, method: 'PIX',
-        status: result.status,
-        pix: result.pix ? {
-          qrcode: result.pix.qr_code_base64,
-          content: result.pix.copy_paste_code,
-          expiresAt: result.pix.expires_at,
-        } : undefined,
-      })
-      toast.success('PIX gerado com sucesso!')
-    } catch (e: any) {
-      setError(e?.message ?? 'Não foi possível processar o pagamento.')
-    } finally {
-      setSubmitting(false)
-    }
-  }, [existingOrderId, gigId, orderId, requirementsAnswers, selectedAddOnIds])
-
-  const copyToClipboard = async () => {
-    const content = checkoutResult?.pix?.content
-    if (!content) return
-    try {
-      await navigator.clipboard.writeText(content)
-    } catch {
-      const el = document.createElement('textarea')
-      el.value = content; el.style.position = 'fixed'; el.style.opacity = '0'
-      document.body.appendChild(el); el.select()
-      document.execCommand('copy'); document.body.removeChild(el)
-    }
-    setCopied(true)
-    toast.success('Codigo PIX copiado!')
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  const pixActive = checkoutResult?.method === 'PIX' && checkoutResult.pix
-  const totalSteps = steps.length
-
-  // ─── Progress bar ───────────────────────────────────────────────────────────
-  const progressBar = (
-    <div className="flex gap-1.5 mb-8">
-      {steps.map((_, i) => (
-        <div
-          key={i}
-          className={`h-1 flex-1 rounded-full transition-colors duration-300 ${i <= stepIndex ? 'bg-primary' : 'bg-white/10'}`}
-        />
-      ))}
-    </div>
-  )
-
-  // ─── Passo 1: Resumo ────────────────────────────────────────────────────────
-  if (currentStep === 'summary') {
-    return (
-      <div className="w-full">
-        {progressBar}
-
-        {/* Imagem do serviço */}
-        <div className="relative w-full h-52 rounded-2xl overflow-hidden mb-6 bg-white/5">
-          {gigImageUrl || readerAvatarUrl ? (
-            <img
-              src={gigImageUrl || readerAvatarUrl}
-              alt={gigTitle}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <User className="h-12 w-12 text-slate-600" />
-            </div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-          <div className="absolute bottom-0 left-0 p-5">
-            <h1 className="text-2xl font-display font-light text-white leading-tight">{gigTitle}</h1>
-            {readerName && (
-              <p className="text-sm text-slate-300 mt-1">com {readerName}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Descrição */}
-        {gigDescription && (
-          <p className="text-sm text-slate-400 leading-6 mb-6 line-clamp-3">{gigDescription}</p>
-        )}
-
-        {/* Detalhes */}
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <Clock3 className="h-4 w-4 text-sky-300 mb-2" />
-            <p className="text-[11px] uppercase tracking-widest text-slate-500">Entrega</p>
-            <p className="text-sm font-semibold text-white mt-1">{deliveryHours || 48}h</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <Sparkles className="h-4 w-4 text-violet-300 mb-2" />
-            <p className="text-[11px] uppercase tracking-widest text-slate-500">Extras</p>
-            <p className="text-sm font-semibold text-white mt-1">{selectedAddOns.length} item(ns)</p>
-          </div>
-        </div>
-
-        {/* Preço */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 mb-8 space-y-3 text-sm">
-          <div className="flex justify-between text-slate-400">
-            <span>Serviço base</span>
-            <span>{formatBRL(basePrice)}</span>
-          </div>
-          {selectedAddOns.map((a) => (
-            <div key={a.id} className="flex justify-between text-slate-400">
-              <span className="flex items-center gap-2">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                {a.title}
-              </span>
-              <span>{formatBRLFromCents(a.price)}</span>
-            </div>
-          ))}
-          <div className="flex justify-between border-t border-white/10 pt-3 text-base font-semibold text-white">
-            <span>Total</span>
-            <span className="text-gradient-violet">{formatBRL(amountTotal)}</span>
-          </div>
-        </div>
-
-        <Button
-          onClick={goNext}
-          className="w-full py-6 text-base font-bold rounded-2xl aurora border-shine text-white hover:opacity-90"
-        >
-          Continuar
-        </Button>
-      </div>
+    const validateRequirements = useCallback(
+        (answers: Record<string, string>) => {
+            const missing = requiredQuestions.filter((q) => !answers[q.id]?.trim())
+            if (missing.length === 0) return null
+            return 'Preencha as informações obrigatórias para continuar.'
+        },
+        [requiredQuestions],
     )
-  }
 
-  // ─── Passo 2: Perguntas ─────────────────────────────────────────────────────
-  if (currentStep === 'requirements') {
-    const handleRequirementsNext = () => {
-      const err = validateRequirements(requirementsAnswers)
-      if (err) { setError(err); return }
-      setError('')
-      goNext()
-    }
+    const handleCardProSubmit = useCallback(async () => {
+        const err = validateRequirements(requirementsAnswers)
+        if (err) {
+            setError(err)
+            return
+        }
+        setSubmitting(true)
+        setError('')
+        try {
+            const result = await submitCheckoutPayment({
+                order_id: orderId ?? existingOrderId,
+                gig_id: gigId,
+                add_on_ids: selectedAddOnIds,
+                requirements_answers: requirementsAnswers,
+                payment_method: 'CARD',
+            })
+            if (result.checkout_url) {
+                window.location.href = result.checkout_url
+            } else {
+                setError('Não foi possível obter o link de pagamento. Tente novamente.')
+                setSubmitting(false)
+            }
+        } catch (e: any) {
+            setError(e?.message ?? 'Não foi possível processar o pagamento.')
+            setSubmitting(false)
+        }
+    }, [existingOrderId, gigId, orderId, requirementsAnswers, selectedAddOnIds, validateRequirements])
 
-    return (
-      <div className="w-full">
-        {progressBar}
+    const handlePixDirectSubmit = useCallback(async () => {
+        setSubmitting(true)
+        setError('')
+        try {
+            const result = await submitCheckoutPayment({
+                order_id: orderId ?? existingOrderId,
+                gig_id: gigId,
+                add_on_ids: selectedAddOnIds,
+                requirements_answers: requirementsAnswers,
+                payment_method: 'PIX',
+            })
+            const resolvedOrderId = result.order_id
+            const paymentId =
+                result.payment_id ?? result.mercadopago_payment_id ?? result.pix_qr_code_id
+            setOrderId(resolvedOrderId)
+            if (!paymentId) throw new Error('Não foi possível identificar o pagamento.')
+            setCheckoutResult({
+                orderId: resolvedOrderId,
+                paymentId,
+                method: 'PIX',
+                status: result.status,
+                pix: result.pix
+                    ? {
+                          qrcode: result.pix.qr_code_base64,
+                          content: result.pix.copy_paste_code,
+                          expiresAt: result.pix.expires_at,
+                      }
+                    : undefined,
+            })
+            toast.success('PIX gerado com sucesso!')
+        } catch (e: any) {
+            setError(e?.message ?? 'Não foi possível processar o pagamento.')
+        } finally {
+            setSubmitting(false)
+        }
+    }, [existingOrderId, gigId, orderId, requirementsAnswers, selectedAddOnIds])
 
-        <button
-          onClick={goBack}
-          className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors mb-6"
-        >
-          <ArrowLeft className="h-4 w-4" /> Voltar
-        </button>
+    const pixActive = checkoutResult?.method === 'PIX' && checkoutResult.pix
+    const arcanoData = getArcanoFor(gigTitle)
 
-        <h2 className="text-xl font-display font-light text-white mb-1">Informações para a leitura</h2>
-        <p className="text-sm text-slate-400 mb-6">Sua cartomante receberá essas respostas junto com o pedido.</p>
+    // ─── Passo 1: Confirmar serviço ─────────────────────────────────────────────
+    if (currentStep === 'confirm') {
+        return (
+            <div style={{ position: 'relative' }}>
+                <OrbBackground
+                    orbs={[{ color: '#8b5cf6', size: 200, top: -60, right: -40, opacity: 0.18 }]}
+                />
 
-        <div className="space-y-5 mb-8">
-          {requirements.map((req) => (
-            <div key={req.id} className="space-y-2">
-              <Label className="text-sm text-slate-200">
-                {req.question}
-                {req.required && <span className="ml-1 text-rose-400">*</span>}
-              </Label>
-              {req.type === 'choice' && req.options?.length ? (
-                <select
-                  value={requirementsAnswers[req.id] || ''}
-                  onChange={(e) => setRequirementsAnswers(cur => ({ ...cur, [req.id]: e.target.value }))}
-                  className="flex h-11 w-full rounded-xl border border-white/10 bg-[#0c0b17] px-3 text-sm text-slate-100 outline-none transition focus:border-primary"
+                <StepProgressBar steps={stepLabels} current={0} />
+
+                <div style={{ marginBottom: 20, position: 'relative', zIndex: 1 }}>
+                    <div
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(91,33,182,.3) 0%, rgba(30,20,60,.7) 100%)',
+                            border: '1px solid rgba(167,139,250,.2)',
+                            borderRadius: 20,
+                            padding: '20px 18px',
+                            display: 'flex',
+                            gap: 14,
+                            alignItems: 'flex-start',
+                        }}
+                    >
+                        <TarotMini
+                            arcano={arcanoData.arcano}
+                            arcanoName={gigTitle}
+                            gradient={arcanoData.gradient}
+                            width={52}
+                            height={66}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div
+                                style={{
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                    letterSpacing: '.15em',
+                                    textTransform: 'uppercase',
+                                    color: 'rgba(167,139,250,.7)',
+                                    marginBottom: 4,
+                                }}
+                            >
+                                Serviço selecionado
+                            </div>
+                            <div
+                                className="font-serif"
+                                style={{
+                                    fontSize: 16,
+                                    fontWeight: 600,
+                                    marginBottom: 4,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                }}
+                            >
+                                {gigTitle}
+                            </div>
+                            {readerName && (
+                                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)' }}>
+                                    com {readerName}
+                                </div>
+                            )}
+                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', marginTop: 4 }}>
+                                Entrega em até {deliveryHours ?? 48}h
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {gigDescription && (
+                    <div
+                        style={{
+                            fontSize: 13,
+                            color: 'rgba(255,255,255,.5)',
+                            lineHeight: 1.6,
+                            marginBottom: 16,
+                            position: 'relative',
+                            zIndex: 1,
+                        }}
+                    >
+                        {gigDescription}
+                    </div>
+                )}
+
+                {/* Garantias */}
+                <div
+                    style={{
+                        background: 'rgba(255,255,255,.03)',
+                        border: '1px solid rgba(255,255,255,.07)',
+                        borderRadius: 16,
+                        padding: '14px 16px',
+                        marginBottom: 16,
+                        position: 'relative',
+                        zIndex: 1,
+                    }}
                 >
-                  <option value="">Selecione uma opcao</option>
-                  {req.options.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              ) : (
-                <Textarea
-                  value={requirementsAnswers[req.id] || ''}
-                  onChange={(e) => setRequirementsAnswers(cur => ({ ...cur, [req.id]: e.target.value }))}
-                  placeholder="Escreva aqui..."
-                  className="min-h-[110px] rounded-2xl border-white/10 bg-[#0c0b17] text-slate-100 placeholder:text-slate-500"
-                />
-              )}
+                    {[
+                        { icon: '✦', text: 'Leitora verificada pelo Isidis' },
+                        { icon: '✦', text: 'Entrega garantida no prazo' },
+                        { icon: '✦', text: 'Pagamento seguro via Mercado Pago' },
+                    ].map((item) => (
+                        <div
+                            key={item.text}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                marginBottom: 8,
+                                fontSize: 12,
+                                color: 'rgba(255,255,255,.6)',
+                            }}
+                        >
+                            <span style={{ color: '#a78bfa', fontSize: 10 }}>{item.icon}</span>
+                            {item.text}
+                        </div>
+                    ))}
+                </div>
+
+                {/* Resumo de preço */}
+                <div
+                    style={{
+                        background: 'rgba(255,255,255,.04)',
+                        border: '1px solid rgba(255,255,255,.08)',
+                        borderRadius: 16,
+                        padding: '14px 16px',
+                        marginBottom: 20,
+                        position: 'relative',
+                        zIndex: 1,
+                    }}
+                >
+                    <div
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: 12,
+                            color: 'rgba(255,255,255,.5)',
+                            marginBottom: 6,
+                        }}
+                    >
+                        <span>Serviço base</span>
+                        <span>{formatBRL(basePrice)}</span>
+                    </div>
+                    {selectedAddOns.map((a) => (
+                        <div
+                            key={a.id}
+                            style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                fontSize: 12,
+                                color: 'rgba(255,255,255,.5)',
+                                marginBottom: 6,
+                            }}
+                        >
+                            <span>+ {a.title}</span>
+                            <span>{formatBRLFromCents(a.price)}</span>
+                        </div>
+                    ))}
+                    <div
+                        style={{
+                            borderTop: '1px solid rgba(255,255,255,.08)',
+                            paddingTop: 10,
+                            marginTop: 4,
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: 15,
+                            fontWeight: 800,
+                        }}
+                    >
+                        <span>Total</span>
+                        <span style={{ color: '#f5c451' }}>{formatBRL(amountTotal)}</span>
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    className="btn-primary-design"
+                    style={{ width: '100%', padding: '14px', fontSize: 14, position: 'relative', zIndex: 1 }}
+                    onClick={goNext}
+                >
+                    Continuar
+                </button>
             </div>
-          ))}
+        )
+    }
+
+    // ─── Passo 2: Perguntas ─────────────────────────────────────────────────────
+    if (currentStep === 'pergunta') {
+        const handleRequirementsNext = () => {
+            const err = validateRequirements(requirementsAnswers)
+            if (err) {
+                setError(err)
+                return
+            }
+            setError('')
+            goNext()
+        }
+
+        return (
+            <div style={{ position: 'relative' }}>
+                <OrbBackground
+                    orbs={[{ color: '#f472b6', size: 160, top: -40, right: -40, opacity: 0.14 }]}
+                />
+
+                <StepProgressBar steps={stepLabels} current={1} />
+
+                <button
+                    type="button"
+                    onClick={goBack}
+                    style={{
+                        background: 'rgba(255,255,255,.06)',
+                        border: '1px solid rgba(255,255,255,.1)',
+                        borderRadius: 10,
+                        width: 34,
+                        height: 34,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        marginBottom: 16,
+                        position: 'relative',
+                        zIndex: 1,
+                    }}
+                >
+                    <ArrowLeft size={14} />
+                </button>
+
+                <div
+                    className="font-serif"
+                    style={{ fontSize: 20, fontWeight: 400, marginBottom: 4, position: 'relative', zIndex: 1 }}
+                >
+                    Informações para a leitura
+                </div>
+                <div
+                    style={{
+                        fontSize: 12,
+                        color: 'rgba(255,255,255,.4)',
+                        marginBottom: 20,
+                        position: 'relative',
+                        zIndex: 1,
+                    }}
+                >
+                    Sua cartomante receberá essas respostas com o pedido.
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20, position: 'relative', zIndex: 1 }}>
+                    {requirements.map((req) => (
+                        <div key={req.id}>
+                            <Label
+                                style={{
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    color: 'rgba(255,255,255,.7)',
+                                    display: 'block',
+                                    marginBottom: 6,
+                                }}
+                            >
+                                {req.question}
+                                {req.required && (
+                                    <span style={{ color: '#f87171', marginLeft: 3 }}>*</span>
+                                )}
+                            </Label>
+                            {req.type === 'choice' && req.options?.length ? (
+                                <select
+                                    value={requirementsAnswers[req.id] || ''}
+                                    onChange={(e) =>
+                                        setRequirementsAnswers((cur) => ({
+                                            ...cur,
+                                            [req.id]: e.target.value,
+                                        }))
+                                    }
+                                    style={{
+                                        width: '100%',
+                                        background: 'rgba(255,255,255,.05)',
+                                        border: '1px solid rgba(255,255,255,.1)',
+                                        borderRadius: 12,
+                                        padding: '10px 12px',
+                                        fontSize: 13,
+                                        color: 'rgba(255,255,255,.8)',
+                                        outline: 'none',
+                                    }}
+                                >
+                                    <option value="">Selecione uma opção</option>
+                                    {req.options.map((opt) => (
+                                        <option key={opt} value={opt}>
+                                            {opt}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <Textarea
+                                    value={requirementsAnswers[req.id] || ''}
+                                    onChange={(e) =>
+                                        setRequirementsAnswers((cur) => ({
+                                            ...cur,
+                                            [req.id]: e.target.value,
+                                        }))
+                                    }
+                                    placeholder="Escreva aqui..."
+                                    className="min-h-[100px] rounded-2xl border-white/10 bg-[#0c0b17] text-slate-100 placeholder:text-slate-500"
+                                />
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                {error && (
+                    <div
+                        style={{
+                            fontSize: 12,
+                            color: '#f87171',
+                            background: 'rgba(248,113,113,.1)',
+                            border: '1px solid rgba(248,113,113,.2)',
+                            borderRadius: 10,
+                            padding: '10px 12px',
+                            marginBottom: 14,
+                            position: 'relative',
+                            zIndex: 1,
+                        }}
+                    >
+                        {error}
+                    </div>
+                )}
+
+                <button
+                    type="button"
+                    className="btn-primary-design"
+                    style={{ width: '100%', padding: '14px', fontSize: 14, position: 'relative', zIndex: 1 }}
+                    onClick={handleRequirementsNext}
+                >
+                    Continuar para o pagamento
+                </button>
+            </div>
+        )
+    }
+
+    // ─── Passo 3: Pagamento ─────────────────────────────────────────────────────
+    const paymentStepIndex = steps.length - 1
+
+    // PIX ativo — mostrar PixPaymentStep
+    if (pixActive) {
+        const pixCode = checkoutResult?.pix?.content ?? ''
+        const qrBase64 = checkoutResult?.pix?.qrcode
+        const qrSrc = qrBase64
+            ? qrBase64.startsWith('data:')
+                ? qrBase64
+                : `data:image/png;base64,${qrBase64}`
+            : undefined
+
+        const expiresInSec = checkoutResult?.pix?.expiresAt
+            ? Math.max(0, Math.round((new Date(checkoutResult.pix.expiresAt).getTime() - Date.now()) / 1000))
+            : 872
+
+        const pixSummary = [
+            { label: gigTitle, value: formatBRL(basePrice) },
+            ...selectedAddOns.map((a) => ({ label: a.title, value: formatBRLFromCents(a.price) })),
+        ]
+
+        return (
+            <div style={{ position: 'relative' }}>
+                <PixPaymentStep
+                    pixCode={pixCode}
+                    amount={formatBRL(amountTotal)}
+                    summary={pixSummary}
+                    qrImageSrc={qrSrc}
+                    expiresInSec={expiresInSec}
+                    onBack={goBack}
+                    onConfirm={() => navigate(`/dashboard/pedido/${checkoutResult.orderId}`)}
+                />
+
+                {/* Polling status */}
+                <div style={{ padding: '0 18px 20px', position: 'relative', zIndex: 1 }}>
+                    {pollError ? (
+                        <div
+                            style={{
+                                background: 'rgba(245,196,81,.08)',
+                                border: '1px solid rgba(245,196,81,.2)',
+                                borderRadius: 12,
+                                padding: '12px 14px',
+                                fontSize: 12,
+                                color: 'rgba(245,196,81,.8)',
+                                textAlign: 'center',
+                            }}
+                        >
+                            Verifique o status do pagamento no painel.
+                            <button
+                                type="button"
+                                className="btn-ghost-design"
+                                style={{ marginTop: 8, width: '100%', padding: '9px', fontSize: 12 }}
+                                onClick={() => navigate('/dashboard')}
+                            >
+                                Ver meus pedidos
+                            </button>
+                        </div>
+                    ) : pollCount >= 40 ? (
+                        <div
+                            style={{
+                                fontSize: 11,
+                                color: 'rgba(255,255,255,.35)',
+                                textAlign: 'center',
+                            }}
+                        >
+                            O pagamento pode levar alguns minutos para ser confirmado.
+                        </div>
+                    ) : (
+                        <div
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                                fontSize: 11,
+                                color: 'rgba(255,255,255,.3)',
+                            }}
+                        >
+                            <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                            Aguardando confirmação...{' '}
+                            {pollCount > 0 ? `(${pollCount})` : ''}
+                        </div>
+                    )}
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div style={{ position: 'relative' }}>
+            <OrbBackground
+                orbs={[{ color: '#8b5cf6', size: 180, top: -40, left: -40, opacity: 0.16 }]}
+            />
+
+            <StepProgressBar steps={stepLabels} current={paymentStepIndex} />
+
+            {!checkoutResult && (
+                <button
+                    type="button"
+                    onClick={goBack}
+                    style={{
+                        background: 'rgba(255,255,255,.06)',
+                        border: '1px solid rgba(255,255,255,.1)',
+                        borderRadius: 10,
+                        width: 34,
+                        height: 34,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        marginBottom: 16,
+                        position: 'relative',
+                        zIndex: 1,
+                    }}
+                >
+                    <ArrowLeft size={14} />
+                </button>
+            )}
+
+            {/* Resumo compacto */}
+            <div
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 16,
+                    position: 'relative',
+                    zIndex: 1,
+                }}
+            >
+                <span
+                    style={{
+                        fontSize: 13,
+                        color: 'rgba(255,255,255,.7)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '60%',
+                    }}
+                >
+                    {gigTitle}
+                </span>
+                <span
+                    className="font-serif"
+                    style={{ fontSize: 16, fontWeight: 700, color: '#f5c451' }}
+                >
+                    {formatBRL(amountTotal)}
+                </span>
+            </div>
+
+            {/* Method selector */}
+            {acceptsPix && acceptsCard && (
+                <div
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: 8,
+                        marginBottom: 16,
+                        position: 'relative',
+                        zIndex: 1,
+                    }}
+                >
+                    {(['PIX', 'CARD'] as CheckoutMethod[]).map((m) => (
+                        <button
+                            key={m}
+                            type="button"
+                            onClick={() => setMethod(m)}
+                            style={{
+                                padding: '12px',
+                                borderRadius: 12,
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                border: method === m
+                                    ? '1px solid rgba(167,139,250,.4)'
+                                    : '1px solid rgba(255,255,255,.08)',
+                                background: method === m
+                                    ? 'rgba(167,139,250,.15)'
+                                    : 'rgba(255,255,255,.04)',
+                                color: method === m ? '#a78bfa' : 'rgba(255,255,255,.5)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                            }}
+                        >
+                            {m === 'PIX' ? '⚡ PIX' : '💳 Cartão'}
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {error && (
+                <div
+                    style={{
+                        fontSize: 12,
+                        color: '#f87171',
+                        background: 'rgba(248,113,113,.1)',
+                        border: '1px solid rgba(248,113,113,.2)',
+                        borderRadius: 10,
+                        padding: '10px 12px',
+                        marginBottom: 14,
+                        position: 'relative',
+                        zIndex: 1,
+                    }}
+                >
+                    {error}
+                </div>
+            )}
+
+            {method === 'CARD' ? (
+                <div style={{ position: 'relative', zIndex: 1 }}>
+                    <div
+                        style={{
+                            background: 'rgba(14,165,233,.08)',
+                            border: '1px solid rgba(14,165,233,.2)',
+                            borderRadius: 14,
+                            padding: '14px 16px',
+                            fontSize: 12,
+                            color: 'rgba(186,230,253,.8)',
+                            textAlign: 'center',
+                            lineHeight: 1.6,
+                            marginBottom: 14,
+                        }}
+                    >
+                        Você será redirecionado para o{' '}
+                        <strong>Mercado Pago</strong> para finalizar com segurança.
+                    </div>
+                    <button
+                        type="button"
+                        className="btn-primary-design"
+                        style={{
+                            width: '100%',
+                            padding: '14px',
+                            fontSize: 14,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            opacity: submitting ? 0.6 : 1,
+                        }}
+                        onClick={() => void handleCardProSubmit()}
+                        disabled={submitting}
+                    >
+                        {submitting ? (
+                            <>
+                                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                                Preparando...
+                            </>
+                        ) : (
+                            <>
+                                <CreditCard size={14} />
+                                Pagar {formatBRL(amountTotal)}
+                            </>
+                        )}
+                    </button>
+                </div>
+            ) : (
+                <div style={{ position: 'relative', zIndex: 1 }}>
+                    <button
+                        type="button"
+                        className="btn-primary-design"
+                        style={{
+                            width: '100%',
+                            padding: '14px',
+                            fontSize: 14,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            opacity: submitting ? 0.6 : 1,
+                        }}
+                        onClick={() => void handlePixDirectSubmit()}
+                        disabled={submitting}
+                    >
+                        {submitting ? (
+                            <>
+                                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                                Gerando PIX...
+                            </>
+                        ) : (
+                            <>⚡ Gerar QR Code PIX — {formatBRL(amountTotal)}</>
+                        )}
+                    </button>
+                </div>
+            )}
         </div>
-
-        {error && (
-          <div className="mb-5 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-            {error}
-          </div>
-        )}
-
-        <Button
-          onClick={handleRequirementsNext}
-          className="w-full py-6 text-base font-bold rounded-2xl aurora border-shine text-white hover:opacity-90"
-        >
-          Continuar para o pagamento
-        </Button>
-      </div>
     )
-  }
-
-  // ─── Passo 3: Pagamento ─────────────────────────────────────────────────────
-  const paymentStep = (
-    <div className="w-full">
-      {progressBar}
-
-      {!checkoutResult && (
-        <button
-          onClick={goBack}
-          className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors mb-6"
-        >
-          <ArrowLeft className="h-4 w-4" /> Voltar
-        </button>
-      )}
-
-      {/* Resumo compacto */}
-      {!checkoutResult && (
-        <div className="flex items-center justify-between mb-6 px-1">
-          <span className="text-sm text-slate-300 truncate max-w-[60%]">{gigTitle}</span>
-          <span className="text-base font-semibold text-white">{formatBRL(amountTotal)}</span>
-        </div>
-      )}
-
-      {/* Tabs PIX / Cartão */}
-      {!checkoutResult && acceptsPix && acceptsCard && (
-        <Tabs value={method} onValueChange={(v) => setMethod(v as CheckoutMethod)} className="mb-5">
-          <TabsList className="grid h-auto grid-cols-2 rounded-2xl bg-white/5 p-1">
-            <TabsTrigger value="PIX" className="rounded-xl py-3 data-[state=active]:bg-emerald-500/15 data-[state=active]:text-emerald-300">
-              <QrCode className="h-4 w-4 mr-2" /> PIX
-            </TabsTrigger>
-            <TabsTrigger value="CARD" className="rounded-xl py-3 data-[state=active]:bg-sky-500/15 data-[state=active]:text-sky-300">
-              <CreditCard className="h-4 w-4 mr-2" /> Cartão
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      )}
-
-      {error && (
-        <div className="mb-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-          {error}
-        </div>
-      )}
-
-      {/* Resultado PIX */}
-      {pixActive ? (
-        <div className="space-y-5">
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5 text-center">
-            <div className="mx-auto flex w-fit items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-emerald-200">
-              <CheckCircle2 className="h-3.5 w-3.5" /> PIX pronto para pagamento
-            </div>
-            {checkoutResult?.pix?.qrcode && (
-              <div className="mx-auto mt-5 w-fit rounded-2xl bg-white p-4 shadow-xl">
-                <img
-                  src={checkoutResult.pix.qrcode.startsWith('data:') ? checkoutResult.pix.qrcode : `data:image/png;base64,${checkoutResult.pix.qrcode}`}
-                  alt="QR Code PIX"
-                  className="h-52 w-52 rounded-lg"
-                />
-              </div>
-            )}
-            <p className="mt-4 text-sm text-slate-300">Escaneie no seu banco ou copie o código abaixo.</p>
-            {checkoutResult?.pix?.expiresAt && (
-              <p className="mt-1 text-xs text-slate-500">
-                Expira em {new Date(checkoutResult.pix.expiresAt).toLocaleString('pt-BR')}
-              </p>
-            )}
-          </div>
-
-          {checkoutResult?.pix?.content && (
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <Label className="mb-2 block text-xs uppercase tracking-widest text-slate-500">Código copia e cola</Label>
-              <Textarea
-                readOnly
-                value={checkoutResult.pix.content}
-                className="min-h-[120px] rounded-2xl border-white/10 bg-[#090812] font-mono text-xs text-slate-200"
-              />
-              <Button
-                type="button"
-                onClick={() => void copyToClipboard()}
-                variant="secondary"
-                className="mt-3 w-full rounded-xl bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20"
-              >
-                {copied ? <CheckCircle2 className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-                {copied ? 'Código copiado' : 'Copiar código PIX'}
-              </Button>
-            </div>
-          )}
-
-          {/* Aviso sobre o recebedor */}
-          <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-400">
-            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-slate-500" />
-            <span>
-              O pagamento será recebido pela conta{' '}
-              <span className="font-semibold text-slate-200">Cristian Paxur de Araujo Alexandre</span>{' '}
-              (CNPJ 58.054.513) via Mercado Pago.
-            </span>
-          </div>
-
-          {/* Status do polling */}
-          {pollError ? (
-            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-4 text-sm text-amber-200 text-center space-y-3">
-              <p>Não conseguimos verificar o status automaticamente.</p>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => navigate('/dashboard')}
-                className="w-full rounded-xl text-amber-200 hover:text-white border border-amber-500/30"
-              >
-                Ver meus pedidos
-              </Button>
-            </div>
-          ) : pollCount >= 40 ? (
-            <div className="rounded-2xl border border-slate-500/30 bg-slate-500/10 px-4 py-4 text-sm text-slate-300 text-center space-y-3">
-              <p>O pagamento pode levar alguns minutos para ser confirmado pelo banco.</p>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => navigate('/dashboard')}
-                className="w-full rounded-xl text-slate-300 hover:text-white border border-slate-500/30"
-              >
-                Já paguei — Ver meus pedidos
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center gap-2 rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3 text-sm text-sky-200">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Aguardando confirmação do banco...
-            </div>
-          )}
-        </div>
-
-      ) : method === 'CARD' ? (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-4 text-sm text-sky-200 text-center leading-6">
-            Você será redirecionado para o <span className="font-semibold">Mercado Pago</span> para finalizar o pagamento com segurança.
-          </div>
-          <Button
-            type="button"
-            onClick={() => void handleCardProSubmit()}
-            disabled={submitting}
-            className="w-full py-6 text-base font-bold rounded-2xl bg-sky-600 text-white hover:bg-sky-500 disabled:opacity-60"
-          >
-            {submitting ? (
-              <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Preparando pagamento...</>
-            ) : (
-              <><CreditCard className="h-5 w-5 mr-2" /> Pagar {formatBRL(amountTotal)}</>
-            )}
-          </Button>
-        </div>
-
-      ) : (
-        /* PIX — chamada direta, sem Brick */
-        <div className="space-y-4">
-          <Button
-            type="button"
-            onClick={() => void handlePixDirectSubmit()}
-            disabled={submitting}
-            className="w-full py-6 text-base font-bold rounded-2xl aurora border-shine text-white hover:opacity-90 disabled:opacity-60"
-          >
-            {submitting ? (
-              <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Gerando PIX...</>
-            ) : (
-              <><QrCode className="h-5 w-5 mr-2" /> Gerar QR Code PIX — {formatBRL(amountTotal)}</>
-            )}
-          </Button>
-        </div>
-      )}
-    </div>
-  )
-
-  return paymentStep
 }

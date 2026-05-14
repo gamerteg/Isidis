@@ -1,9 +1,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import useSWR from 'swr'
+import { ArrowLeft } from 'lucide-react'
 import { ChatWindow } from '@/components/chat/chat-window'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
 import { getConversations } from '@/lib/actions/chat'
 
@@ -108,56 +107,128 @@ export function MessagesClient({ initialConversations, currentUserId, initialOrd
     const displayConversations = conversations || initialConversations
 
     return (
-        <div className="flex h-full gap-6">
+        <div style={{ display: 'flex', height: '100%', gap: 0 }}>
             {/* Conversation List */}
-            <div className={`w-full md:w-1/3 lg:w-1/4 space-y-4 overflow-y-auto pr-2 ${activeConv ? 'hidden md:block' : 'block'}`}>
-                <h2 className="text-xl font-bold text-foreground">Mensagens</h2>
+            <div style={{
+                width: activeConv ? '0' : '100%',
+                maxWidth: 340,
+                flexShrink: 0,
+                overflowY: 'auto',
+                display: activeConv ? 'none' : 'flex',
+                flexDirection: 'column',
+                gap: 0,
+                borderRight: '1px solid rgba(255,255,255,.06)',
+            }}
+                className="md:!flex md:!w-80"
+            >
+                {/* Header */}
+                <div style={{ padding: '16px 18px 12px', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,.3)', marginBottom: 2 }}>
+                        Inbox
+                    </div>
+                    <div className="font-serif" style={{ fontSize: 20, fontWeight: 400 }}>
+                        Mensagens
+                    </div>
+                </div>
+
                 {displayConversations.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">Nenhuma conversa ainda.</p>
+                    <div style={{ padding: 24, textAlign: 'center', color: 'rgba(255,255,255,.3)', fontSize: 13 }}>
+                        Nenhuma conversa ainda.
+                    </div>
                 ) : (
-                    <div className="space-y-2">
-                        {displayConversations.map((conv, idx) => (
-                            <Card
-                                key={idx}
-                                onClick={() => setActiveConv(conv)}
-                                className={`p-4 cursor-pointer hover:bg-accent/50 transition-colors border-border/40 ${activeConv?.otherUser.id === conv.otherUser.id && activeConv?.orderId === conv.orderId ? 'bg-accent border-primary/50' : 'bg-card/50'}`}
-                            >
-                                <div className="flex justify-between items-start mb-1">
-                                    <h3 className="font-bold text-sm text-foreground">{conv.otherUser.name}</h3>
-                                    {conv.unreadCount > 0 && (
-                                        <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">{conv.unreadCount}</Badge>
-                                    )}
-                                </div>
-                                <p className="text-xs text-muted-foreground line-clamp-1 mb-2">
-                                    {conv.lastMessage.sender_id === currentUserId && 'Você: '}
-                                    {conv.lastMessage.content}
-                                </p>
-                                <div className="flex justify-between items-center text-[10px] text-muted-foreground">
-                                    <span>{conv.orderId ? `Pedido #${conv.orderId.substring(0, 8)}` : 'Pré-venda'}</span>
-                                    <span>{timeAgo(conv.lastMessage.created_at)}</span>
-                                </div>
-                            </Card>
-                        ))}
+                    <div>
+                        {displayConversations.map((conv, idx) => {
+                            const isActive = activeConv?.otherUser.id === conv.otherUser.id && activeConv?.orderId === conv.orderId
+                            const initials = (conv.otherUser.name || 'CA').slice(0, 2).toUpperCase()
+                            return (
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => setActiveConv(conv)}
+                                    style={{
+                                        width: '100%', textAlign: 'left', background: isActive ? 'rgba(167,139,250,.12)' : 'transparent',
+                                        borderLeft: isActive ? '2px solid #a78bfa' : '2px solid transparent',
+                                        padding: '12px 18px', cursor: 'pointer', borderTop: 'none', borderRight: 'none', borderBottom: '1px solid rgba(255,255,255,.04)',
+                                        display: 'flex', gap: 10, alignItems: 'center',
+                                        transition: 'background .15s',
+                                    }}
+                                >
+                                    {/* Avatar */}
+                                    <div style={{
+                                        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                                        background: 'linear-gradient(160deg,#2a1b5e,#1a0e3d)',
+                                        border: '1px solid rgba(167,139,250,.3)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: 12, fontWeight: 700, color: '#a78bfa',
+                                        overflow: 'hidden',
+                                    }}>
+                                        {conv.otherUser.avatar
+                                            ? <img src={conv.otherUser.avatar} alt={conv.otherUser.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            : initials}
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                                            <span style={{ fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {conv.otherUser.name}
+                                            </span>
+                                            <span style={{ fontSize: 9, color: 'rgba(255,255,255,.3)', flexShrink: 0, marginLeft: 4 }}>
+                                                {timeAgo(conv.lastMessage.created_at)}
+                                            </span>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            <span style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                                {conv.lastMessage.sender_id === currentUserId && 'Você: '}
+                                                {conv.lastMessage.content || '—'}
+                                            </span>
+                                            {conv.unreadCount > 0 && (
+                                                <span style={{
+                                                    background: '#f87171', color: 'white', borderRadius: '50%',
+                                                    minWidth: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    fontSize: 9, fontWeight: 700, flexShrink: 0,
+                                                }}>
+                                                    {conv.unreadCount}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </button>
+                            )
+                        })}
                     </div>
                 )}
             </div>
 
             {/* Chat Area */}
-            <div className={`flex-1 bg-card/30 rounded-2xl border border-border/40 overflow-hidden relative ${activeConv ? 'block' : 'hidden md:block'}`}>
+            <div style={{
+                flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+                background: 'rgba(17,13,34,.5)',
+            }}
+                className={activeConv ? '!flex' : 'hidden md:!flex'}
+            >
                 {activeConv ? (
-                    <div className="w-full h-full flex flex-col">
-                        {/* Mobile Header */}
-                        <div className="md:hidden p-4 border-b border-white/10 flex items-center gap-3 bg-card/50">
+                    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                        {/* Mobile header */}
+                        <div style={{
+                            padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,.06)',
+                            display: 'flex', alignItems: 'center', gap: 10,
+                        }} className="md:hidden">
                             <button
+                                type="button"
                                 onClick={() => setActiveConv(null)}
-                                className="text-sm font-bold text-primary hover:text-primary/80"
+                                style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                             >
-                                ← Voltar
+                                <ArrowLeft size={13} />
                             </button>
-                            <span className="font-bold truncate">{activeConv.otherUser.name}</span>
+                            <div>
+                                <div style={{ fontSize: 13, fontWeight: 700 }}>{activeConv.otherUser.name}</div>
+                                <div style={{ fontSize: 9, color: 'rgba(74,222,128,.8)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
+                                    Online
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="flex-1 overflow-hidden">
+                        <div style={{ flex: 1, overflow: 'hidden' }}>
                             <ChatWindow
                                 currentUser={{ id: currentUserId }}
                                 otherUser={activeConv.otherUser}
@@ -168,8 +239,9 @@ export function MessagesClient({ initialConversations, currentUserId, initialOrd
                         </div>
                     </div>
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                        Selecione uma conversa para ver as mensagens.
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ fontSize: 28, opacity: 0.2 }}>✦</div>
+                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,.25)' }}>Selecione uma conversa</div>
                     </div>
                 )}
             </div>
